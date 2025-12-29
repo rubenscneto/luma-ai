@@ -23,12 +23,21 @@ export async function generateMotivation(): Promise<{ text: string, author: stri
         const result = await model.generateContent(prompt);
         const text = result.response.text();
 
-        // Clean JSON formatting
         const jsonStr = text.replace(/```json|```/g, "").trim();
         return JSON.parse(jsonStr);
     } catch (error) {
         console.error("Gemini Error:", error);
-        return { text: "Mantenha o foco, você está construindo seu futuro.", author: "Luma AI" };
+
+        const FALLBACK_QUOTES = [
+            { text: "A única maneira de fazer um excelente trabalho é amar o que você faz.", author: "Steve Jobs" },
+            { text: "O sucesso não é final, o fracasso não é fatal: é a coragem de continuar que conta.", author: "Winston Churchill" },
+            { text: "A lógica pode levar de A a B. A imaginação leva a qualquer lugar.", author: "Albert Einstein" },
+            { text: "Se você pode sonhar, você pode fazer.", author: "Walt Disney" },
+            { text: "Não espere. O tempo nunca será o ideal.", author: "Napoleon Hill" },
+            { text: "A persistência é o caminho do êxito.", author: "Charles Chaplin" }
+        ];
+
+        return FALLBACK_QUOTES[Math.floor(Math.random() * FALLBACK_QUOTES.length)];
     }
 }
 

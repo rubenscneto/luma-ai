@@ -36,14 +36,14 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
             if (savedMotivation) {
                 try {
                     const parsed = JSON.parse(savedMotivation);
-                    if (typeof parsed === 'object' && parsed.text) {
+                    if (parsed && parsed.author && parsed.author !== "Luma AI") {
                         setMotivationState(parsed);
                     } else {
-                        // Migration: Old string format
-                        setMotivationState({ text: savedMotivation, author: "Luma AI" });
+                        // Force refresh if generic or old format
+                        setMotivationState(null);
                     }
                 } catch (e) {
-                    setMotivationState({ text: savedMotivation, author: "Luma AI" });
+                    setMotivationState(null);
                 }
             }
 
