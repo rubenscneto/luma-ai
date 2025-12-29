@@ -51,12 +51,17 @@ export default function DashboardPage() {
                 <div className="absolute top-0 right-0 p-4 opacity-10">
                     <Sparkles size={100} />
                 </div>
-                <div className="relative z-10">
-                    <div className="flex items-center gap-2 text-violet-200 mb-2">
-                        <Sparkles size={16} />
-                        <span className="text-sm font-medium uppercase tracking-wider">Daily Motivation</span>
+                <div className="relative z-10 flex flex-col h-full justify-between">
+                    <div>
+                        <div className="flex items-center gap-2 text-violet-200 mb-2">
+                            <Sparkles size={16} />
+                            <span className="text-sm font-medium uppercase tracking-wider">Daily Motivation</span>
+                        </div>
+                        <p className="text-xl md:text-2xl font-serif italic text-pretty max-w-2xl leading-relaxed">"{motivation?.text || 'Carregando...'}"</p>
                     </div>
-                    <p className="text-2xl font-serif italic text-pretty max-w-2xl">"{motivation || 'Carregando...'}"</p>
+                    {motivation?.author && (
+                        <p className="text-right text-violet-200 font-medium text-sm mt-4">— {motivation.author}</p>
+                    )}
                 </div>
             </motion.div>
 
@@ -100,16 +105,14 @@ export default function DashboardPage() {
                             <Target className="text-red-500" size={20} />
                             <h2 className="font-semibold text-lg">Prioridades</h2>
                         </div>
-                        <ul className="space-y-3">
-                            <li className="flex items-center gap-3">
-                                <div className="w-2 h-2 rounded-full bg-red-500" />
-                                <span className="text-sm">Revisar Capítulo 3</span>
-                            </li>
-                            <li className="flex items-center gap-3">
-                                <div className="w-2 h-2 rounded-full bg-orange-500" />
-                                <span className="text-sm">Finalizar Mockups</span>
-                            </li>
-                        </ul>
+                        {/* Priorities Logic: Currently Empty as requested */}
+                        <div className="flex flex-col items-center justify-center py-6 text-center space-y-2">
+                            <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400">
+                                <Target size={20} />
+                            </div>
+                            <p className="text-sm text-zinc-500">Nenhuma prioridade definida ainda.</p>
+                            <button className="text-xs text-blue-600 font-medium hover:underline">Adicionar Prioridade</button>
+                        </div>
                     </Card>
 
                     <Card className="p-6 bg-violet-50 dark:bg-zinc-900 border-violet-100 dark:border-violet-900/20">

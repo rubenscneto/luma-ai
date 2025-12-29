@@ -47,10 +47,7 @@ export default function LandingPage() {
           </div>
 
           {/* Issue Tag Simulation */}
-          <div className="inline-flex items-center gap-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 px-3 py-1 rounded-full text-xs font-bold mt-8">
-            <div className="w-4 h-4 bg-red-500 rounded-full text-white flex items-center justify-center text-[10px]">N</div>
-            1 Issue x
-          </div>
+
         </div>
 
         {/* Right Content / Visual */}

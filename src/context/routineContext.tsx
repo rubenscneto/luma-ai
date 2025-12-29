@@ -13,8 +13,8 @@ interface RoutineContextType {
     setRoutine: (routine: RoutineBlock[]) => void;
     profile: RoutineProfile | null;
     setProfile: (profile: RoutineProfile) => void;
-    motivation: string;
-    setMotivation: (text: string) => void;
+    motivation: { text: string; author: string } | null;
+    setMotivation: (data: { text: string; author: string }) => void;
 }
 
 const RoutineContext = createContext<RoutineContextType | undefined>(undefined);
@@ -23,7 +23,7 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
     const { user } = useAuth();
     const [routine, setRoutineState] = useState<RoutineBlock[]>([]);
     const [profile, setProfileState] = useState<RoutineProfile | null>(null);
-    const [motivation, setMotivationState] = useState("");
+    const [motivation, setMotivationState] = useState<{ text: string; author: string } | null>(null);
 
     // Load Data (Local or Supabase)
     useEffect(() => {
@@ -33,7 +33,19 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
             const savedProfile = localStorage.getItem('luma_profile');
             const savedMotivation = localStorage.getItem('luma_motivation');
             if (savedProfile) setProfileState(JSON.parse(savedProfile));
-            if (savedMotivation) setMotivationState(savedMotivation);
+            if (savedMotivation) {
+                try {
+                    const parsed = JSON.parse(savedMotivation);
+                    if (typeof parsed === 'object' && parsed.text) {
+                        setMotivationState(parsed);
+                    } else {
+                        // Migration: Old string format
+                        setMotivationState({ text: savedMotivation, author: "Luma AI" });
+                    }
+                } catch (e) {
+                    setMotivationState({ text: savedMotivation, author: "Luma AI" });
+                }
+            }
 
             if (user) {
                 const { data, error } = await supabase
@@ -95,9 +107,9 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
         // TODO: Sync profile to DB too if needed
     };
 
-    const setMotivation = (text: string) => {
-        setMotivationState(text);
-        localStorage.setItem('luma_motivation', text);
+    const setMotivation = (data: { text: string; author: string }) => {
+        setMotivationState(data);
+        localStorage.setItem('luma_motivation', JSON.stringify(data));
     };
 
     const addBlock = (block: RoutineBlock) => {

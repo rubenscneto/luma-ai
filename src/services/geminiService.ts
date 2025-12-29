@@ -12,16 +12,23 @@ const getModel = () => {
     return genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 };
 
-export async function generateMotivation(): Promise<string> {
+export async function generateMotivation(): Promise<{ text: string, author: string }> {
     const model = getModel();
-    if (!model) return "O sucesso é a soma de pequenos esforços repetidos dia após dia.";
+    if (!model) return { text: "O sucesso é a soma de pequenos esforços repetidos dia após dia.", author: "Robert Collier" };
 
     try {
-        const result = await model.generateContent("Gere uma frase de motivação curta, inspiradora e direta para alguém focado em produtividade e estudos. Responda apenas com a frase.");
-        return result.response.text();
+        const prompt = `Gere uma frase de motivação curta e inspiradora dita por uma pessoa famosa (empresário, visionário, figura histórica).
+        Retorne APENAS um JSON no formato: { "text": "A frase em português", "author": "Nome do Autor" }`;
+
+        const result = await model.generateContent(prompt);
+        const text = result.response.text();
+
+        // Clean JSON formatting
+        const jsonStr = text.replace(/```json|```/g, "").trim();
+        return JSON.parse(jsonStr);
     } catch (error) {
         console.error("Gemini Error:", error);
-        return "Mantenha o foco, você está construindo seu futuro.";
+        return { text: "Mantenha o foco, você está construindo seu futuro.", author: "Luma AI" };
     }
 }
 
