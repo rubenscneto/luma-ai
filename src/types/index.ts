@@ -60,3 +60,43 @@ export interface Insight {
     date: string;
     type: 'motivation' | 'tip' | 'warning';
 }
+
+// Education Modules
+
+export interface Subject {
+    id: string;
+    user_id: string;
+    name: string;
+    color: string;
+    goal?: string;
+    difficulty: number; // 1-5
+    created_at?: string;
+}
+
+export interface StudyMaterial {
+    id: string;
+    subject_id: string;
+    title: string;
+    type: 'pdf' | 'text' | 'link' | 'video';
+    content: string;
+    summary?: string;
+    created_at?: string;
+}
+
+export interface Flashcard {
+    id: string;
+    subject_id: string;
+    front: string;
+    back: string;
+    next_review: string; // ISO Date
+    interval: number;
+    ease_factor: number;
+}
+
+export interface MindMap {
+    id: string;
+    subject_id: string;
+    title: string;
+    nodes: any[]; // React Flow Nodes
+    edges: any[]; // React Flow Edges
+}

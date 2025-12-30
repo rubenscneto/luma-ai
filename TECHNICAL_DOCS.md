@@ -71,6 +71,11 @@ Não usamos Redux. O estado é gerenciado via **React Context API**, dividindo r
 
 ## 📅 Diário de Bordo (Changelog)
 
+### [30/12/2025] - Fase 4: Infraestrutura Educacional & Matérias
+*   **Database**: Criação de tabelas `subjects`, `study_materials`, `flashcards`, `mindmaps` com RLS.
+*   **Feature (Subject Manager)**: Implementação do CRUD de matérias no `StudyContext`.
+*   **Frontend**: Página `/estudos` agora conecta com o Supabase para adicionar/remover matérias.
+
 ### [29/12/2025] - Fase 3: Produção & Polimento (Final)
 *   **Feature**: Implementado Fallback Robusto para Motivação. Agora exibe frases de autores reais (Jobs, Churchill) se a IA falhar.
 *   **Fix**: Correção crítica no Login com Google. O app redirecionava para Home por não ler o Cookie de sessão. Migrado para `createBrowserClient` (+ `@supabase/ssr`).
