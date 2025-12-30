@@ -83,9 +83,12 @@ Não usamos Redux. O estado é gerenciado via **React Context API**, dividindo r
 *   **Database**: Utilizada tabela `study_materials` para persistência.
 *   **UI Update**: Aba "Materiais" agora lista itens com opção de abrir link e deletar.
 
+*   **Feature (Flashcards)**: Implementado sistema de SRS (Spaced Repetition System).
+    *   Algoritmo: Calculadora de intervalos baseada em avaliação (Again/Hard/Good/Easy).
+    *   UI: `FlashcardReview` (Flippable Cards) e `AddFlashcardModal`.
 *   **UI/UX**: Refinamento visual com `framer-motion`. Adicionado efeito "Sliding Tabs" na página de detalhes.
-*   **Accessibility**: Melhorado contraste do badge de Nível e Headers das abas (Fixed active text visibility).
-*   **Feature (Materials)**: Implementado `AddMaterialModal` com suporte a Links e Texto.
+
+### [29/12/2025] - Fase 3: Produção & Polimento (Final)
 
 ### [29/12/2025] - Fase 3: Produção & Polimento (Final)
 *   **Feature**: Implementado Fallback Robusto para Motivação. Agora exibe frases de autores reais (Jobs, Churchill) se a IA falhar.

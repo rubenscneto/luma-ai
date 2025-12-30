@@ -11,6 +11,9 @@ import { ArrowLeft, BookOpen, Layers, Target, Clock, FileText, BrainCircuit } fr
 import { motion } from "framer-motion";
 
 
+import { AddFlashcardModal } from '@/components/education/AddFlashcardModal';
+import { FlashcardReview } from '@/components/education/FlashcardReview';
+
 import { AddMaterialModal } from '@/components/education/AddMaterialModal';
 import { ExternalLink, FileText as FileIcon, Trash2 } from 'lucide-react';
 
@@ -19,13 +22,16 @@ export default function SubjectDetailsPage() {
     const router = useRouter();
     const [subject, setSubject] = useState<Subject | null>(null);
     const [materials, setMaterials] = useState<StudyMaterial[]>([]);
+    const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isReviewing, setIsReviewing] = useState(false);
+    const [activeTab, setActiveTab] = useState("overview");
 
     const fetchData = async () => {
         if (!params.subjectId) return;
 
         // Fetch Subject
-        const { data: subData, error: subError } = await supabase
+        const { data: subData } = await supabase
             .from('subjects')
             .select('*')
             .eq('id', params.subjectId)
@@ -34,7 +40,7 @@ export default function SubjectDetailsPage() {
         if (subData) setSubject(subData as Subject);
 
         // Fetch Materials
-        const { data: matData, error: matError } = await supabase
+        const { data: matData } = await supabase
             .from('study_materials')
             .select('*')
             .eq('subject_id', params.subjectId)
@@ -42,10 +48,17 @@ export default function SubjectDetailsPage() {
 
         if (matData) setMaterials(matData as StudyMaterial[]);
 
+        // Fetch Flashcards (All, but we will filter for review)
+        const { data: fcData } = await supabase
+            .from('flashcards')
+            .select('*')
+            .eq('subject_id', params.subjectId)
+            .order('next_review', { ascending: true });
+
+        if (fcData) setFlashcards(fcData as Flashcard[]);
+
         setLoading(false);
     };
-
-    const [activeTab, setActiveTab] = useState("overview");
 
     useEffect(() => {
         fetchData();
@@ -57,6 +70,15 @@ export default function SubjectDetailsPage() {
         await supabase.from('study_materials').delete().eq('id', id);
         setMaterials(prev => prev.filter(m => m.id !== id));
     };
+
+    const handleDeleteCard = async (id: string) => {
+        if (!confirm("Deletar este card?")) return;
+        await supabase.from('flashcards').delete().eq('id', id);
+        setFlashcards(prev => prev.filter(c => c.id !== id));
+    }
+
+    // Filter cards due for review (next_review <= now) or new cards
+    const cardsDue = flashcards.filter(c => new Date(c.next_review || '') <= new Date());
 
     if (loading) {
         return <div className="p-8 flex justify-center"><div className="animate-spin w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full" /></div>;
@@ -72,6 +94,17 @@ export default function SubjectDetailsPage() {
         { id: "flashcards", label: "Flashcards" },
         { id: "mindmap", label: "Mapa Mental" },
     ];
+
+    if (isReviewing) {
+        return (
+            <div className="space-y-6">
+                <Button variant="ghost" onClick={() => { setIsReviewing(false); fetchData(); }} className="gap-2">
+                    <ArrowLeft className="h-4 w-4" /> Sair da Revisão
+                </Button>
+                <FlashcardReview cards={cardsDue} onSessionComplete={() => { setIsReviewing(false); fetchData(); }} />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -128,8 +161,8 @@ export default function SubjectDetailsPage() {
                         <StatCard
                             icon={<Layers className="h-4 w-4" />}
                             label="Flashcards"
-                            value="0"
-                            isActive={false}
+                            value={flashcards.length.toString()}
+                            isActive={flashcards.length > 0}
                         />
                         <StatCard
                             icon={<FileText className="h-4 w-4" />}
@@ -198,18 +231,62 @@ export default function SubjectDetailsPage() {
 
                 {/* FLASHCARDS TAB */}
                 <TabsContent value="flashcards" className="mt-6">
-                    <Card className="p-12 text-center border-dashed border-zinc-800 bg-zinc-900/30">
-                        <div className="mx-auto w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mb-4">
-                            <Layers className="h-6 w-6 text-zinc-500" />
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-lg font-semibold">Deck de Revisão</h3>
+                        <AddFlashcardModal subjectId={subject.id} onCardAdded={fetchData} />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Status Card */}
+                        <Card className="p-6 bg-gradient-to-br from-violet-900/50 to-zinc-900 border-violet-500/30">
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="w-12 h-12 rounded-full bg-violet-600 flex items-center justify-center shadow-lg shadow-violet-600/20">
+                                    <BrainCircuit className="text-white" />
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-lg">Revisão Espaçada</h4>
+                                    <p className="text-zinc-400 text-sm">Algoritmo inteligente ativo</p>
+                                </div>
+                            </div>
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center bg-black/20 p-3 rounded-lg">
+                                    <span className="text-zinc-300">Total de Cartas</span>
+                                    <span className="font-mono font-bold text-xl">{flashcards.length}</span>
+                                </div>
+                                <div className="flex justify-between items-center bg-black/20 p-3 rounded-lg border border-violet-500/30">
+                                    <span className="text-violet-200">Para Revisar Hoje</span>
+                                    <span className="font-mono font-bold text-xl text-violet-400">{cardsDue.length}</span>
+                                </div>
+                                <Button
+                                    className="w-full bg-violet-600 hover:bg-violet-700 font-bold"
+                                    disabled={cardsDue.length === 0}
+                                    onClick={() => setIsReviewing(true)}
+                                >
+                                    {cardsDue.length > 0 ? `Iniciar Revisão (${cardsDue.length})` : "Tudo em dia! 🎉"}
+                                </Button>
+                            </div>
+                        </Card>
+
+                        {/* Recent Cards List */}
+                        <div className="space-y-3">
+                            <h4 className="text-sm text-zinc-500 font-medium">Últimas Cartas Adicionadas</h4>
+                            {flashcards.slice(0, 5).map(card => (
+                                <div key={card.id} className="p-3 bg-zinc-900 border border-zinc-800 rounded-lg flex justify-between items-center group">
+                                    <span className="text-sm truncate max-w-[80%]">{card.front}</span>
+                                    <button onClick={() => handleDeleteCard(card.id)} className="text-zinc-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                            {flashcards.length === 0 && (
+                                <div className="text-center py-10 text-zinc-500 border border-dashed border-zinc-800 rounded-lg">
+                                    Nenhuma carta criada.
+                                </div>
+                            )}
                         </div>
-                        <h3 className="text-lg font-semibold">Deck Vazio</h3>
-                        <p className="text-zinc-500 mb-6">Crie flashcards manualmente ou peça para a IA gerar.</p>
-                        <div className="flex justify-center gap-4">
-                            <Button variant="outline">Criar Manualmente</Button>
-                            <Button className="bg-violet-600 hover:bg-violet-700">Gerar com IA ✨</Button>
-                        </div>
-                    </Card>
+                    </div>
                 </TabsContent>
+
 
                 {/* MINDMAP TAB */}
                 <TabsContent value="mindmap" className="mt-6">
