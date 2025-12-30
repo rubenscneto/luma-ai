@@ -54,7 +54,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('luma_study_sessions', JSON.stringify(updated));
     };
 
-    const addSubject = async (name: string, goal: string = "") => {
+    const addSubject = async (name: string, goal: string = "", difficulty: number = 3) => {
         if (!user) return;
 
         // Optimistic UI
@@ -65,7 +65,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
             name,
             goal,
             color: '#6366f1',
-            difficulty: 3,
+            difficulty,
             created_at: new Date().toISOString()
         };
 
@@ -73,7 +73,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
 
         const { data, error } = await supabase
             .from('subjects')
-            .insert([{ user_id: user.id, name, goal }])
+            .insert([{ user_id: user.id, name, goal, difficulty }])
             .select()
             .single();
 

@@ -75,6 +75,9 @@ Não usamos Redux. O estado é gerenciado via **React Context API**, dividindo r
 *   **Database**: Criação de tabelas `subjects`, `study_materials`, `flashcards`, `mindmaps` com RLS.
 *   **Feature (Subject Manager)**: Implementação do CRUD de matérias no `StudyContext`.
 *   **Frontend**: Página `/estudos` agora conecta com o Supabase para adicionar/remover matérias.
+*   **UI Update**: Substituído input simples por `SubjectModal` (Wizard) com Meta e Dificuldade.
+*   **Routing**: Criada página dinâmica `/estudos/[subjectId]` com abas (Visão Geral, Materiais, Flashcards).
+*   **Components**: Novos componentes `Tabs`, `Dialog`, `Label` adicionados à biblioteca UI.
 
 ### [29/12/2025] - Fase 3: Produção & Polimento (Final)
 *   **Feature**: Implementado Fallback Robusto para Motivação. Agora exibe frases de autores reais (Jobs, Churchill) se a IA falhar.

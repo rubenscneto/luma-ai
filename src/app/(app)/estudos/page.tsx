@@ -1,26 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { useStudy } from "@/context/studyContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Plus, BookOpen, Clock, BrainCircuit } from "lucide-react";
+import { SubjectModal } from "@/components/education/SubjectModal";
+import { BookOpen, Clock, BrainCircuit } from "lucide-react";
+import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
 
 export default function EstudosPage() {
-    const { subjects, addSubject, removeSubject, sessions, addSession, loading } = useStudy();
-    const [newSubject, setNewSubject] = useState("");
-    const [isAdding, setIsAdding] = useState(false);
-
-    const handleAddSubject = async () => {
-        if (newSubject.trim()) {
-            setIsAdding(true);
-            await addSubject(newSubject.trim());
-            setNewSubject("");
-            setIsAdding(false);
-        }
-    };
+    const { subjects, removeSubject, sessions, addSession, loading } = useStudy();
 
     const startSession = (subjectName: string) => {
         // Simplified session log for now (Simulation)
@@ -43,16 +33,7 @@ export default function EstudosPage() {
                     <p className="text-zinc-500">Gerencie suas matérias e acompanhe seu progresso.</p>
                 </div>
                 <div className="flex gap-2 w-full md:w-auto">
-                    <Input
-                        placeholder="Nova Matéria (Ex: Matemática)"
-                        value={newSubject}
-                        onChange={(e) => setNewSubject(e.target.value)}
-                        className="w-full md:w-64"
-                        onKeyDown={(e) => e.key === 'Enter' && handleAddSubject()}
-                    />
-                    <Button onClick={handleAddSubject} disabled={isAdding}>
-                        {isAdding ? <div className="animate-spin w-4 h-4 border-2 border-white/50 border-t-white rounded-full" /> : <Plus size={20} />}
-                    </Button>
+                    <SubjectModal />
                 </div>
             </header>
 
@@ -79,7 +60,9 @@ export default function EstudosPage() {
                                 <div className="w-10 h-10 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-600 flex items-center justify-center font-bold">
                                     {subject.name.substring(0, 2).toUpperCase()}
                                 </div>
-                                <h3 className="text-xl font-bold z-10 relative truncate">{subject.name}</h3>
+                                <Link href={`/estudos/${subject.id}`} className="hover:text-violet-500 transition-colors">
+                                    <h3 className="text-xl font-bold z-10 relative truncate">{subject.name}</h3>
+                                </Link>
                             </div>
 
                             <p className="text-sm text-zinc-400 mb-6 h-5 truncate">{subject.goal || "Sem meta definida"}</p>
