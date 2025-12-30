@@ -49,9 +49,24 @@ export async function generateRoutine(profile: any): Promise<any> {
         throw new Error("API Key missing");
     }
 
-    const prompt = `Crie uma rotina diária detalhada em formato JSON baseado no seguinte perfil:
-  ${JSON.stringify(profile)}
-  
+    const prompt = `Crie uma rotina diária detalhada em formato JSON baseado no seguinte perfil e restrições:
+    PERFIL DO USUÁRIO:
+    - Ocupação: ${profile.occupation}
+    - Pico de Produtividade: ${profile.peakProductivity}
+    - Energia: ${profile.energyLevel}
+    - Estilo: ${profile.style}
+    
+    RESTRIÇÕES DE HORÁRIO (RIGOROSO):
+    - Acorda: ${profile.userSettings?.wake_up_time || "07:00"}
+    - Dorme: ${profile.userSettings?.bed_time || "23:00"}
+    - TAREFAS FIXAS (Não sobrepor): ${JSON.stringify(profile.fixedTasks)}
+    
+    INSTRUÇÕES:
+    1. A rotina DEVE começar no horário de acordar e terminar no horário de dormir.
+    2. Respeite OBRIGATORIAMENTE os horários das Tarefas Fixas (Ex: se tem Trabalho das 09h às 18h, não agende estudos nesse período).
+    3. Almeje alocar blocos de foco nos horários de pico de produtividade.
+    4. Inclua pausas e refeições.
+
   Retorne APENAS um array JSON válido de objetos com este formato:
   { "id": "string", "title": "string", "startTime": "HH:mm", "duration": number, "type": "work"|"study"|"leisure"|"health"|"fixed" }
   Certifique-se que o JSON é válido e não contem markdown (backticks).`;

@@ -88,6 +88,11 @@ Não usamos Redux. O estado é gerenciado via **React Context API**, dividindo r
     *   UI: `FlashcardReview` (Flippable Cards) e `AddFlashcardModal`.
 *   **UI/UX**: Refinamento visual com `framer-motion`. Adicionado efeito "Sliding Tabs" na página de detalhes.
 
+*   **Feature (Perdidão V2)**:
+    *   **Data**: Novas tabelas `fixed_tasks` e `user_settings`.
+    *   **UI**: Wizard atualizado com configuração de Ciclo de Sono e Compromissos Fixos.
+    *   **AI**: Prompt aprimorado para "subtrair" horários ocupados e respeitar sono.
+
 ### [29/12/2025] - Fase 3: Produção & Polimento (Final)
 
 ### [29/12/2025] - Fase 3: Produção & Polimento (Final)

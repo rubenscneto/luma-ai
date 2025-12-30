@@ -149,3 +149,37 @@ $$ language plpgsql security definer;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- Table: User Settings (Perdidão Config)
+create table if not exists user_settings (
+  user_id uuid references profiles(id) on delete cascade not null primary key,
+  wake_up_time time not null default '07:00:00',
+  bed_time time not null default '23:00:00',
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Table: Fixed Tasks (Compromissos Fixos)
+create table if not exists fixed_tasks (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references profiles(id) on delete cascade not null,
+  title text not null,
+  start_time time not null,
+  end_time time not null,
+  days_of_week integer[] not null, -- Array of integers (1=Mon, 7=Sun)
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Enable RLS
+alter table user_settings enable row level security;
+alter table fixed_tasks enable row level security;
+
+-- Policies for User Settings
+create policy "Users can view own settings" on user_settings for select using (auth.uid() = user_id);
+create policy "Users can upsert own settings" on user_settings for insert with check (auth.uid() = user_id) on conflict (user_id) do update set wake_up_time = excluded.wake_up_time, bed_time = excluded.bed_time;
+create policy "Users can update own settings" on user_settings for update using (auth.uid() = user_id);
+
+-- Policies for Fixed Tasks
+create policy "Users can view own fixed tasks" on fixed_tasks for select using (auth.uid() = user_id);
+create policy "Users can create own fixed tasks" on fixed_tasks for insert with check (auth.uid() = user_id);
+create policy "Users can update own fixed tasks" on fixed_tasks for update using (auth.uid() = user_id);
+create policy "Users can delete own fixed tasks" on fixed_tasks for delete using (auth.uid() = user_id);

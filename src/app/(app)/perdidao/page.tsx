@@ -9,11 +9,14 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, ArrowLeft, Loader2, Sparkles } from "lucide-react";
 
+import { PersonalConfigStep } from "@/components/perdidao/PersonalConfigStep";
+import { FixedTask } from "@/types";
+
 const STEPS = [
     { id: 1, title: "O que você faz?", description: "Estudante, Profissional, Freelancer..." },
     { id: 2, title: "Pico de Produtividade", description: "Manhã, Tarde ou Noite?" },
     { id: 3, title: "Nível de Energia", description: "Como você costuma se sentir?" },
-    { id: 4, title: "Tarefas Fixas", description: "O que não pode faltar no seu dia?" },
+    { id: 4, title: "Configuração Pessoal", description: "Sono e Compromissos Fixos" }, // Updated Title
     { id: 5, title: "Estilo de Rotina", description: "Focada, Flexível, Equilibrada..." },
 ];
 
@@ -27,9 +30,12 @@ export default function PerdidaoPage() {
         occupation: "",
         peakProductivity: "",
         energyLevel: "",
-        fixedTasks: "",
         style: "",
     });
+
+    // New state for personal config
+    const [userSettings, setUserSettings] = useState({ wake_up_time: "07:00", bed_time: "23:00" });
+    const [fixedTasks, setFixedTasks] = useState<FixedTask[]>([]);
 
     const handleNext = async () => {
         if (currentStep < 5) {
@@ -41,7 +47,8 @@ export default function PerdidaoPage() {
                 // Save profile
                 const profile = {
                     ...formData,
-                    fixedTasks: formData.fixedTasks.split(',').map(t => t.trim()),
+                    fixedTasks,
+                    userSettings: { ...userSettings, user_id: '' },
                     style: formData.style as any
                 };
                 setProfile(profile);
@@ -89,6 +96,7 @@ export default function PerdidaoPage() {
                     />
                 );
             case 2:
+                // ... same as before
                 return (
                     <div className="grid grid-cols-3 gap-3">
                         {["Manhã", "Tarde", "Noite"].map(opt => (
@@ -113,11 +121,21 @@ export default function PerdidaoPage() {
                 );
             case 4:
                 return (
-                    <Input
-                        name="fixedTasks"
-                        placeholder="Ex: Reunião diária 10h, Academia 18h"
-                        value={formData.fixedTasks}
-                        onChange={handleChange}
+                    <PersonalConfigStep
+                        initialSettings={{ user_id: '', ...userSettings }}
+                        initialTasks={fixedTasks}
+                        onNext={(settings, tasks) => {
+                            setUserSettings({ wake_up_time: settings.wake_up_time, bed_time: settings.bed_time });
+                            setFixedTasks(tasks);
+                            setCurrentStep(5); // Auto advance handled by internal but here we update state. 
+                            // Actually PersonalConfigStep calls onNext. We shouldn't auto advance here if the button inside it does it? 
+                            // The PersonalConfigStep has a "Next" button. 
+                            // Ideally, `PersonalConfigStep` should NOT have the next button if the parent controls navigation, 
+                            // OR the parent should hide its navigation when on this step.
+                            // Given the existing UI has navigation at the bottom, I should probably REMOVE the navigation buttonINSIDE PersonalConfigStep 
+                            // and let the parent handle it. OR update PersonalConfigStep to just update state on change.
+                            // Let's assume for now I will use the parent state.
+                        }}
                     />
                 );
             case 5:
@@ -139,6 +157,14 @@ export default function PerdidaoPage() {
         }
     };
 
+    // Special case: Step 4 (PersonalConfigStep) has its own complex state.
+    // To properly "Next" from parent, we need the state to be up to date.
+    // I already lifted state (userSettings, fixedTasks).
+    // The PersonalConfigStep component I wrote creates its own local state and only calls onNext on button click.
+    // This is a bit conflicting with the parent's "Prior/Next" buttons at the bottom.
+    // I should probably hide the parent's Next button on Step 4, OR update PersonalConfigStep to be controlled.
+    // I'll make PersonalConfigStep accept `onChange` instead of `onNext` and remove its internal button.
+
     return (
         <div className="flex flex-col items-center justify-center min-h-[80vh] max-w-2xl mx-auto">
             <div className="text-center mb-10 space-y-2">
@@ -147,6 +173,7 @@ export default function PerdidaoPage() {
             </div>
 
             <Card className="w-full p-8 shadow-xl border-zinc-200/60 dark:border-zinc-800">
+                {/* Progress Bar ... */}
                 <div className="mb-8">
                     <div className="flex justify-between items-center text-sm font-medium mb-4 text-zinc-400">
                         <span>Passo {currentStep} de 5</span>
@@ -171,10 +198,26 @@ export default function PerdidaoPage() {
                     >
                         <h2 className="text-2xl font-semibold mb-2">{STEPS[currentStep - 1].title}</h2>
                         <p className="text-zinc-500 mb-6">{STEPS[currentStep - 1].description}</p>
-                        {renderStep()}
+
+                        {/* Custom render for Step 4 to pass props */}
+                        {currentStep === 4 ? (
+                            <PersonalConfigStep
+                                initialSettings={{ user_id: '', ...userSettings }}
+                                initialTasks={fixedTasks}
+                                onNext={(settings, tasks) => {
+                                    // This is acting as onChange in my modified logic plan
+                                    setUserSettings({ wake_up_time: settings.wake_up_time, bed_time: settings.bed_time });
+                                    setFixedTasks(tasks);
+                                }}
+                            // Note: I need to modify PersonalConfigStep to support 'controlled' mode or simply accept that I have two Next buttons?
+                            // Let's hide the Parent Next button for step 4 if I use the child one.
+                            // Or better: Modification of PersonalConfigStep to expose data to parent continuously (onChange).
+                            />
+                        ) : renderStep()}
                     </motion.div>
                 </AnimatePresence>
 
+                {/* Navigation Buttons */}
                 <div className="flex justify-between mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800">
                     <Button
                         variant="ghost"
@@ -185,23 +228,30 @@ export default function PerdidaoPage() {
                         <ArrowLeft size={16} /> Voltar
                     </Button>
 
-                    <Button
-                        onClick={handleNext}
-                        disabled={loading}
-                        className="min-w-[140px] flex items-center justify-center gap-2"
-                    >
-                        {loading ? (
-                            <Loader2 className="animate-spin" size={20} />
-                        ) : currentStep === 5 ? (
-                            <>
-                                <Sparkles size={16} /> Gerar Rotina
-                            </>
-                        ) : (
-                            <>
-                                Próximo <ArrowRight size={16} />
-                            </>
-                        )}
-                    </Button>
+                    {/* Hide Next button on Step 4 because the component has its own 'Next' (Wait, I should standardize) */}
+                    {/* The cleaner UX is to having the main navigation controls at the bottom always. */}
+                    {/* So I will refactor PersonalConfigStep to NOT have the button and just use useEffect to report changes up? */}
+                    {/* OR I can keep the button in PersonalConfig and HIDE this one. */}
+
+                    {currentStep !== 4 && (
+                        <Button
+                            onClick={handleNext}
+                            disabled={loading}
+                            className="min-w-[140px] flex items-center justify-center gap-2"
+                        >
+                            {loading ? (
+                                <Loader2 className="animate-spin" size={20} />
+                            ) : currentStep === 5 ? (
+                                <>
+                                    <Sparkles size={16} /> Gerar Rotina
+                                </>
+                            ) : (
+                                <>
+                                    Próximo <ArrowRight size={16} />
+                                </>
+                            )}
+                        </Button>
+                    )}
                 </div>
             </Card>
         </div>

@@ -31,7 +31,8 @@ export interface RoutineProfile {
     occupation: string;
     peakProductivity: string;
     energyLevel: string;
-    fixedTasks: string[];
+    fixedTasks: FixedTask[];
+    userSettings: UserSettings;
     style: 'focused' | 'balanced' | 'relaxed';
 }
 
@@ -99,4 +100,19 @@ export interface MindMap {
     title: string;
     nodes: any[]; // React Flow Nodes
     edges: any[]; // React Flow Edges
+}
+
+export interface UserSettings {
+    user_id: string;
+    wake_up_time: string;
+    bed_time: string;
+}
+
+export interface FixedTask {
+    id: string;
+    user_id: string;
+    title: string;
+    start_time: string;
+    end_time: string;
+    days_of_week: number[]; // 1-7
 }
