@@ -9,33 +9,51 @@ import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, BookOpen, Layers, Target, Clock, FileText, BrainCircuit } from 'lucide-react';
 
+
+import { AddMaterialModal } from '@/components/education/AddMaterialModal';
+import { ExternalLink, FileText as FileIcon, Trash2 } from 'lucide-react';
+
 export default function SubjectDetailsPage() {
     const params = useParams();
     const router = useRouter();
     const [subject, setSubject] = useState<Subject | null>(null);
+    const [materials, setMaterials] = useState<StudyMaterial[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const fetchData = async () => {
+        if (!params.subjectId) return;
+
+        // Fetch Subject
+        const { data: subData, error: subError } = await supabase
+            .from('subjects')
+            .select('*')
+            .eq('id', params.subjectId)
+            .single();
+
+        if (subData) setSubject(subData as Subject);
+
+        // Fetch Materials
+        const { data: matData, error: matError } = await supabase
+            .from('study_materials')
+            .select('*')
+            .eq('subject_id', params.subjectId)
+            .order('created_at', { ascending: false });
+
+        if (matData) setMaterials(matData as StudyMaterial[]);
+
+        setLoading(false);
+    };
+
     useEffect(() => {
-        const fetchSubject = async () => {
-            if (!params.subjectId) return;
+        fetchData();
+    }, [params.subjectId]);
 
-            const { data, error } = await supabase
-                .from('subjects')
-                .select('*')
-                .eq('id', params.subjectId)
-                .single();
+    const handleDeleteMaterial = async (id: string) => {
+        if (!confirm("Remover este material?")) return;
 
-            if (data && !error) {
-                setSubject(data as Subject);
-            } else {
-                console.error("Subject not found", error);
-                // router.push('/estudos');
-            }
-            setLoading(false);
-        };
-
-        fetchSubject();
-    }, [params.subjectId, router]);
+        await supabase.from('study_materials').delete().eq('id', id);
+        setMaterials(prev => prev.filter(m => m.id !== id));
+    };
 
     if (loading) {
         return <div className="p-8 flex justify-center"><div className="animate-spin w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full" /></div>;
@@ -77,18 +95,24 @@ export default function SubjectDetailsPage() {
                 {/* OVERVIEW TAB */}
                 <TabsContent value="overview" className="mt-6 space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <Card className="p-6 bg-zinc-900/50 border-zinc-800">
-                            <h3 className="text-zinc-400 mb-2 flex items-center gap-2"><Clock className="h-4 w-4" /> Tempo Estudado</h3>
-                            <p className="text-2xl font-bold">0h</p>
-                        </Card>
-                        <Card className="p-6 bg-zinc-900/50 border-zinc-800">
-                            <h3 className="text-zinc-400 mb-2 flex items-center gap-2"><Layers className="h-4 w-4" /> Flashcards</h3>
-                            <p className="text-2xl font-bold">0</p>
-                        </Card>
-                        <Card className="p-6 bg-zinc-900/50 border-zinc-800">
-                            <h3 className="text-zinc-400 mb-2 flex items-center gap-2"><FileText className="h-4 w-4" /> Materiais</h3>
-                            <p className="text-2xl font-bold">0</p>
-                        </Card>
+                        <StatCard
+                            icon={<Clock className="h-4 w-4" />}
+                            label="Tempo Estudado"
+                            value="0h"
+                            isActive={false}
+                        />
+                        <StatCard
+                            icon={<Layers className="h-4 w-4" />}
+                            label="Flashcards"
+                            value="0"
+                            isActive={false}
+                        />
+                        <StatCard
+                            icon={<FileText className="h-4 w-4" />}
+                            label="Materiais"
+                            value={materials.length.toString()}
+                            isActive={materials.length > 0}
+                        />
                     </div>
 
                     <Card className="p-8 text-center border-dashed border-zinc-800 bg-transparent">
@@ -102,14 +126,50 @@ export default function SubjectDetailsPage() {
 
                 {/* MATERIALS TAB */}
                 <TabsContent value="materials" className="mt-6">
-                    <Card className="p-12 text-center border-dashed border-zinc-800 bg-zinc-900/30">
-                        <div className="mx-auto w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mb-4">
-                            <FileText className="h-6 w-6 text-zinc-500" />
+                    {materials.length === 0 ? (
+                        <Card className="p-12 text-center border-dashed border-zinc-800 bg-zinc-900/30">
+                            <div className="mx-auto w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mb-4">
+                                <FileText className="h-6 w-6 text-zinc-500" />
+                            </div>
+                            <h3 className="text-lg font-semibold">Nenhum material ainda</h3>
+                            <p className="text-zinc-500 mb-6">Faça upload de links ou cole textos para estudar.</p>
+                            <AddMaterialModal subjectId={subject.id} onMaterialAdded={fetchData} />
+                        </Card>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-semibold text-lg">Seus Materiais ({materials.length})</h3>
+                                <AddMaterialModal subjectId={subject.id} onMaterialAdded={fetchData} />
+                            </div>
+                            <div className="grid gap-4">
+                                {materials.map(material => (
+                                    <div key={material.id} className="flex items-center justify-between p-4 rounded-lg border border-zinc-800 bg-zinc-900 hover:border-violet-500/50 transition-colors group">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded bg-zinc-800 flex items-center justify-center text-violet-400">
+                                                {material.type === 'link' ? <ExternalLink size={20} /> : <FileIcon size={20} />}
+                                            </div>
+                                            <div>
+                                                <h4 className="font-medium text-white">{material.title}</h4>
+                                                <p className="text-xs text-zinc-500 truncate max-w-[300px]">
+                                                    {material.content || 'Conteúdo de texto'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            {material.type === 'link' && (
+                                                <a href={material.content} target='_blank' rel='noreferrer'>
+                                                    <Button size="sm" variant="ghost">Abrir</Button>
+                                                </a>
+                                            )}
+                                            <Button size="sm" variant="ghost" onClick={() => handleDeleteMaterial(material.id)}>
+                                                <Trash2 size={16} className="text-red-500" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                        <h3 className="text-lg font-semibold">Nenhum material ainda</h3>
-                        <p className="text-zinc-500 mb-6">Faça upload de PDFs ou cole textos para estudar.</p>
-                        <Button>Adicionar Material</Button>
-                    </Card>
+                    )}
                 </TabsContent>
 
                 {/* FLASHCARDS TAB */}
@@ -135,5 +195,19 @@ export default function SubjectDetailsPage() {
                 </TabsContent>
             </Tabs>
         </div>
+    );
+}
+
+function StatCard({ icon, label, value, isActive }: { icon: React.ReactNode, label: string, value: string, isActive: boolean }) {
+    return (
+        <Card className={`p-6 border transition-all ${isActive
+            ? "bg-violet-600 border-violet-500 text-white"
+            : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100"
+            }`}>
+            <h3 className={`text-sm mb-2 flex items-center gap-2 ${isActive ? "text-violet-100" : "text-zinc-500 dark:text-zinc-400"}`}>
+                {icon} {label}
+            </h3>
+            <p className="text-2xl font-bold">{value}</p>
+        </Card>
     );
 }
