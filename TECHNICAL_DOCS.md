@@ -83,6 +83,10 @@ Não usamos Redux. O estado é gerenciado via **React Context API**, dividindo r
 *   **Database**: Utilizada tabela `study_materials` para persistência.
 *   **UI Update**: Aba "Materiais" agora lista itens com opção de abrir link e deletar.
 
+*   **UI/UX**: Refinamento visual com `framer-motion`. Adicionado efeito "Sliding Tabs" na página de detalhes.
+*   **Accessibility**: Melhorado contraste do badge de Nível e Headers das abas para legibilidade.
+*   **Feature (Materials)**: Implementado `AddMaterialModal` com suporte a Links e Texto.
+
 ### [29/12/2025] - Fase 3: Produção & Polimento (Final)
 *   **Feature**: Implementado Fallback Robusto para Motivação. Agora exibe frases de autores reais (Jobs, Churchill) se a IA falhar.
 *   **Fix**: Correção crítica no Login com Google. O app redirecionava para Home por não ler o Cookie de sessão. Migrado para `createBrowserClient` (+ `@supabase/ssr`).

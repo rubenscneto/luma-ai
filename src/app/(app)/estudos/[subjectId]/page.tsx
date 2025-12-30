@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, BookOpen, Layers, Target, Clock, FileText, BrainCircuit } from 'lucide-react';
+import { motion } from "framer-motion";
 
 
 import { AddMaterialModal } from '@/components/education/AddMaterialModal';
@@ -44,6 +45,8 @@ export default function SubjectDetailsPage() {
         setLoading(false);
     };
 
+    const [activeTab, setActiveTab] = useState("overview");
+
     useEffect(() => {
         fetchData();
     }, [params.subjectId]);
@@ -63,6 +66,13 @@ export default function SubjectDetailsPage() {
         return <div className="p-8 text-center">Matéria não encontrada.</div>;
     }
 
+    const tabs = [
+        { id: "overview", label: "Visão Geral" },
+        { id: "materials", label: "Materiais" },
+        { id: "flashcards", label: "Flashcards" },
+        { id: "mindmap", label: "Mapa Mental" },
+    ];
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -73,7 +83,7 @@ export default function SubjectDetailsPage() {
                 <div>
                     <h1 className="text-3xl font-bold flex items-center gap-3">
                         {subject.name}
-                        <span className="text-sm font-normal px-2 py-1 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
+                        <span className="text-sm font-bold px-3 py-1 rounded-full bg-zinc-100 text-zinc-900 border border-zinc-200 shadow-sm">
                             Nível {subject.difficulty}/5
                         </span>
                     </h1>
@@ -84,12 +94,26 @@ export default function SubjectDetailsPage() {
             </header>
 
             {/* Main Content Tabs */}
-            <Tabs defaultValue="overview" className="w-full">
-                <TabsList className="bg-zinc-900 border border-zinc-800">
-                    <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-                    <TabsTrigger value="materials">Materiais</TabsTrigger>
-                    <TabsTrigger value="flashcards">Flashcards</TabsTrigger>
-                    <TabsTrigger value="mindmap">Mapa Mental</TabsTrigger>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="bg-transparent border-b border-zinc-200 dark:border-zinc-800 w-full justify-start h-auto p-0 rounded-none space-x-6">
+                    {tabs.map((tab) => (
+                        <TabsTrigger
+                            key={tab.id}
+                            value={tab.id}
+                            className={`relative px-4 py-3 rounded-none bg-transparent border-b-2 border-transparent data-[state=active]:shadow-none data-[state=active]:bg-transparent transition-colors ${activeTab === tab.id ? "text-violet-600 dark:text-violet-400 font-semibold" : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                                }`}
+                        >
+                            <span className="relative z-10">{tab.label}</span>
+                            {activeTab === tab.id && (
+                                <motion.div
+                                    layoutId="activeTab"
+                                    className="absolute bottom-0 left-0 right-0 h-[2px] bg-violet-600 shadow-[0_0_10px_rgba(124,58,237,0.5)]"
+                                    initial={false}
+                                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                />
+                            )}
+                        </TabsTrigger>
+                    ))}
                 </TabsList>
 
                 {/* OVERVIEW TAB */}
