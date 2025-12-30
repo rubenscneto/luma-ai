@@ -100,7 +100,7 @@ export default function SubjectDetailsPage() {
                         <TabsTrigger
                             key={tab.id}
                             value={tab.id}
-                            className={`relative px-4 py-3 rounded-none bg-transparent border-b-2 border-transparent data-[state=active]:shadow-none data-[state=active]:bg-transparent transition-colors ${activeTab === tab.id ? "text-violet-600 dark:text-violet-400 font-semibold" : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                            className={`relative px-4 py-3 rounded-none bg-transparent border-b-2 border-transparent data-[state=active]:shadow-none data-[state=active]:bg-transparent data-[state=active]:text-violet-600 dark:data-[state=active]:text-violet-400 transition-colors ${activeTab === tab.id ? "font-semibold" : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
                                 }`}
                         >
                             <span className="relative z-10">{tab.label}</span>

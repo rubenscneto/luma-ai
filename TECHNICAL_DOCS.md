@@ -84,7 +84,7 @@ Não usamos Redux. O estado é gerenciado via **React Context API**, dividindo r
 *   **UI Update**: Aba "Materiais" agora lista itens com opção de abrir link e deletar.
 
 *   **UI/UX**: Refinamento visual com `framer-motion`. Adicionado efeito "Sliding Tabs" na página de detalhes.
-*   **Accessibility**: Melhorado contraste do badge de Nível e Headers das abas para legibilidade.
+*   **Accessibility**: Melhorado contraste do badge de Nível e Headers das abas (Fixed active text visibility).
 *   **Feature (Materials)**: Implementado `AddMaterialModal` com suporte a Links e Texto.
 
 ### [29/12/2025] - Fase 3: Produção & Polimento (Final)
