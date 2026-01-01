@@ -9,7 +9,10 @@ const getModel = () => {
         console.warn("GEMINI_API_KEY is not set. Returning mock data.");
         return null;
     }
-    return genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+    return genAI.getGenerativeModel({
+        model: "gemini-1.5-flash",
+        generationConfig: { responseMimeType: "application/json" }
+    });
 };
 
 export async function generateMotivation(): Promise<{ text: string, author: string }> {
@@ -57,9 +60,10 @@ export async function generateRoutine(profile: any): Promise<any> {
     - Estilo: ${profile.style}
     
     RESTRIÇÕES DE HORÁRIO (RIGOROSO):
+    RESTRIÇÕES DE HORÁRIO (RIGOROSO):
     - Acorda: ${profile.userSettings?.wake_up_time || "07:00"}
-    - Dorme: ${profile.userSettings?.bed_time || "23:00"}
-    - TAREFAS FIXAS (Não sobrepor): ${JSON.stringify(profile.fixedTasks)}
+    - Dorme: ${profile.userSettings?.bed_time || "22:00"}
+    - TAREFAS FIXAS: ${JSON.stringify(profile.fixedTasks)}
     
     INSTRUÇÕES:
     1. A rotina DEVE começar no horário de acordar e terminar no horário de dormir.
@@ -82,20 +86,26 @@ export async function generateRoutine(profile: any): Promise<any> {
     } catch (error) {
         console.warn("Gemini API Error (Falling back to Mock):", error);
         // Robust Mock Generation based on profile
-        const isNight = profile.peak === "Noite";
-        const baseHour = isNight ? 10 : 7;
+        const wakeTime = profile.userSettings?.wake_up_time || "07:00";
+        const [wakeHour, wakeMin] = wakeTime.split(':').map(Number);
+        const baseHour = wakeHour;
 
-        return [
-            { id: "1", title: "Acordar e Hidratação", startTime: `${baseHour.toString().padStart(2, '0')}:00`, duration: 30, type: "health" },
-            { id: "2", title: "Planejamento do Dia", startTime: `${baseHour}:30`, duration: 15, type: "fixed" },
+        // Simple mock generator avoiding overlap would be complex, just returning a cleaner list without [object Object]
+        // and respecting start time.
+
+        const mockRoutine = [
+            { id: "1", title: "Acordar e Hidratação", startTime: `${baseHour.toString().padStart(2, '0')}:${wakeMin.toString().padStart(2, '0')}`, duration: 30, type: "health" },
+            { id: "2", title: "Planejamento do Dia", startTime: `${(baseHour).toString().padStart(2, '0')}:${(wakeMin + 30).toString().padStart(2, '0')}`, duration: 15, type: "fixed" },
             { id: "3", title: `Foco: ${profile.occupation} (Sessão 1)`, startTime: `${(baseHour + 1).toString().padStart(2, '0')}:00`, duration: 90, type: "work" },
-            { id: "4", title: "Intervalo Revigorante", startTime: `${(baseHour + 2).toString().padStart(2, '0')}:30`, duration: 15, type: "leisure" },
-            { id: "5", title: `Foco: ${profile.occupation} (Sessão 2)`, startTime: `${(baseHour + 2).toString().padStart(2, '0')}:45`, duration: 90, type: "work" },
-            { id: "6", title: "Almoço Nutritivo", startTime: `${(baseHour + 4).toString().padStart(2, '0')}:30`, duration: 60, type: "health" },
-            { id: "7", title: `Estudo: ${profile.fixedTasks}`, startTime: `${(baseHour + 6).toString().padStart(2, '0')}:00`, duration: 60, type: "study" },
-            { id: "8", title: "Exercício Físico / Caminhada", startTime: `${(baseHour + 7).toString().padStart(2, '0')}:30`, duration: 45, type: "health" },
-            { id: "9", title: "Descompressão e Lazer", startTime: `${(baseHour + 9).toString().padStart(2, '0')}:00`, duration: 60, type: "leisure" }
+            { id: "4", title: "Almoço", startTime: "12:00", duration: 60, type: "health" },
+            { id: "5", title: `Foco: ${profile.occupation} (Sessão 2)`, startTime: "14:00", duration: 90, type: "work" },
         ];
+
+        // If user has fixed tasks, we should try to append them or at least mention them? 
+        // For a mock, let's keep it simple but VALID.
+        // The previous error was injecting the object directly.
+
+        return mockRoutine;
     }
 }
 
