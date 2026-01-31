@@ -14,8 +14,11 @@ const menuItems = [
     { href: "/analytics", label: "Analytics", icon: BarChart3 },
     { href: "/estudos", label: "Estudos", icon: GraduationCap },
     { href: "/projetos", label: "Projetos", icon: FolderKanban },
+    { href: "/dashboard/assistant", label: "Assistente", icon: Bot }, // Added assistant
     { href: "/biblioteca", label: "Biblioteca", icon: Library },
 ];
+
+import { Bot } from "lucide-react"; // Make sure Bot is imported from lucide-react if not already
 
 export function Sidebar() {
     const pathname = usePathname();
