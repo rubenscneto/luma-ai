@@ -7,9 +7,14 @@ import { Sparkles, Clock, Target, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
+import { useAuth } from "@/context/authContext";
+
 export default function DashboardPage() {
+    const { user } = useAuth();
     const { motivation, setMotivation, routine } = useRoutine();
     const [insight, setInsight] = React.useState("Carregando insight do dia...");
+
+    const userName = user?.user_metadata?.full_name?.split(' ')[0] || "Visionário";
 
     useEffect(() => {
         if (!motivation) {
@@ -38,7 +43,7 @@ export default function DashboardPage() {
     return (
         <div className="space-y-8">
             <header>
-                <h1 className="text-3xl font-bold mb-2">Bom dia, Visionário.</h1>
+                <h1 className="text-3xl font-bold mb-2">Bom dia, {userName}.</h1>
                 <p className="text-zinc-500 dark:text-zinc-400">Aqui está o seu panorama diário.</p>
             </header>
 

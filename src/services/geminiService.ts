@@ -114,8 +114,14 @@ export async function generateInsight(contextData: string): Promise<string> {
     if (!model) return "Analise seus padrões de energia para otimizar tarefas exigentes.";
 
     try {
-        const result = await model.generateContent(`Com base nestes dados: ${contextData}. Gere um insight curto e acionável em uma frase.`);
-        return result.response.text();
+        const result = await model.generateContent(`Com base nestes dados: ${contextData}. Gere um insight curto e acionável em uma frase. NÃO use aspas, NEM colchetes, NEM markdown. Apenas o texto puro.`);
+        let text = result.response.text();
+
+        // Clean up common AI artifacts just in case
+        text = text.replace(/^["'\[]+|["'\]]+$/g, '').trim();
+        text = text.replace(/\\"/g, '"');
+
+        return text;
     } catch (error) {
         console.error("Gemini Error:", error);
         return "Revise suas prioridades para amanhã.";
