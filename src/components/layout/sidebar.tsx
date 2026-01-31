@@ -10,7 +10,7 @@ import { useAuth } from "@/context/authContext";
 const menuItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/agenda", label: "Agenda", icon: Calendar },
-    { href: "/perdidao", label: "Perdidão", icon: Compass },
+    { href: "/dashboard/routine", label: "Rotina", icon: Compass }, // Changed from /perdidao to /dashboard/routine
     { href: "/analytics", label: "Analytics", icon: BarChart3 },
     { href: "/estudos", label: "Estudos", icon: GraduationCap },
     { href: "/projetos", label: "Projetos", icon: FolderKanban },

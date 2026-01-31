@@ -13,7 +13,7 @@ export default function DashboardPage() {
 
     useEffect(() => {
         if (!motivation) {
-            fetch("/api/motivacao")
+            fetch("/api/ai/daily-motivation")
                 .then((res) => res.json())
                 .then((data) => setMotivation(data.motivation));
         }

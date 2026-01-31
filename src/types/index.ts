@@ -116,3 +116,37 @@ export interface FixedTask {
     end_time: string;
     days_of_week: number[]; // 1-7
 }
+
+export interface RoutineProfileDB {
+    user_id: string;
+    occupation: string;
+    peak_productivity: string;
+    energy_level: string;
+    goal: string;
+    summary?: string;
+    wake_up_time: string;
+    bed_time: string;
+}
+
+export interface FixedCommitment {
+    id: string;
+    user_id: string;
+    title: string;
+    category: string;
+    start_time: string;
+    end_time: string;
+    days_of_week: number[];
+}
+
+export interface AgendaItem {
+    id: string;
+    user_id: string;
+    title: string;
+    notes?: string;
+    date: string; // ISO Date YYYY-MM-DD
+    start_time: string; // HH:mm
+    duration: number; // minutes
+    category: 'work' | 'study' | 'health' | 'leisure' | 'fixed' | 'project';
+    status: 'todo' | 'in-progress' | 'done';
+    generated: boolean;
+}

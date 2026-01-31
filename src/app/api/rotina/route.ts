@@ -33,19 +33,44 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Generate Routine
+    // 1. Save Profile (Upsert)
+    const profileData = {
+        user_id: user.id,
+        occupation: body.occupation,
+        peak_productivity: body.peakProductivity, // Mapping camelCase to snake_case
+        energy_level: body.energyLevel,
+        style: body.style,
+        wake_up_time: body.userSettings?.wake_up_time,
+        bed_time: body.userSettings?.bed_time,
+        goal: body.goal || "Maximizar produtividade"
+    };
+
+    const { error: profileError } = await supabase.from('routine_profiles').upsert(profileData);
+    if (profileError) console.error("Error saving profile:", profileError);
+
+    // 2. Save Fixed Commitments (Delete old & Insert new)
+    if (body.fixedTasks && body.fixedTasks.length > 0) {
+        await supabase.from('fixed_commitments').delete().eq('user_id', user.id);
+
+        const fixedToInsert = body.fixedTasks.map((t: any) => ({
+            user_id: user.id,
+            title: t.title,
+            start_time: t.start_time,
+            end_time: t.end_time,
+            days_of_week: t.days_of_week,
+            category: "fixed"
+        }));
+
+        const { error: fixedError } = await supabase.from('fixed_commitments').insert(fixedToInsert);
+        if (fixedError) console.error("Error saving fixed:", fixedError);
+    }
+
+    // 3. Generate Routine (AI)
     const routineBlocks = await generateRoutine(body);
 
-    // Save Fixed Tasks & User Settings (if not already saved by frontend? Frontend does it? No, Frontend calls setsProfile in context but context might not save to DB immediately for these specific tables)
-    // Actually, let's persist everything here to be safe or assume frontend handles profile updates.
-    // The request body contains the profile.
-
-    // Persist Routine Blocks
-    // We need to delete old routine for this user first? Or just add?
-    // Let's clear old routine blocks to avoid duplicate accumulation for now.
+    // 4. Persist Routine Blocks (Legacy/Display support)
     await supabase.from('routines').delete().eq('user_id', user.id);
 
-    // Insert new blocks
     const routinesToInsert = routineBlocks.map((block: any) => ({
         user_id: user.id,
         title: block.title,
@@ -58,7 +83,6 @@ export async function POST(request: Request) {
 
     if (error) {
         console.error('Error saving routine:', error);
-        // Continue anyway to return the routine to UI
     }
 
     return NextResponse.json({ routine: routineBlocks });

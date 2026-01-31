@@ -77,6 +77,32 @@ export async function POST(req: Request) {
             }
         }
 
+        // 6. Handle Actions (Server-Side Execution)
+        if (parsedResponse.actions && parsedResponse.actions.length > 0) {
+            const tasksToInsert: any[] = [];
+
+            parsedResponse.actions.forEach((action: any) => {
+                if (action.type === 'create_task' || action.type === 'create_project_task') {
+                    // Determine table based on action or simplified to 'agenda_items' vs 'tasks' 
+                    // For now, let's put everything in 'agenda_items' for the calendar
+                    tasksToInsert.push({
+                        user_id: user.id,
+                        title: action.title,
+                        date: action.date || new Date().toISOString().split("T")[0],
+                        start_time: action.start || "09:00",
+                        duration: action.durationMin || 30,
+                        category: action.category || "work",
+                        status: "todo",
+                        generated: true
+                    });
+                }
+            });
+
+            if (tasksToInsert.length > 0) {
+                await supabase.from('agenda_items').insert(tasksToInsert);
+            }
+        }
+
         return NextResponse.json({
             userName,
             reply: parsedResponse.reply || "Desculpe, não entendi.",
