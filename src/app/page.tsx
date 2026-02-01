@@ -2,15 +2,44 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Sparkles } from "lucide-react";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-transparent text-[var(--luma-black)] dark:text-[var(--luma-mint)] flex flex-col overflow-hidden font-sans">
+    <div className="min-h-screen bg-[#EEF4ED] dark:bg-[#090C08] text-[var(--luma-black)] dark:text-[var(--luma-mint)] flex flex-col overflow-hidden font-sans relative">
+
+      {/* Landing Page Glow Background with Center Spotlight */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden" aria-hidden="true">
+        {/* Top Right Sky Glow */}
+        <div
+          className="absolute top-[-10%] right-[-10%] w-[60vw] h-[60vw] rounded-full"
+          style={{
+            background: "radial-gradient(circle, rgba(134, 187, 216, 0.45) 0%, rgba(134, 187, 216, 0.2) 35%, transparent 65%)",
+            filter: "blur(70px)",
+          }}
+        />
+
+        {/* Bottom Left Rose Glow */}
+        <div
+          className="absolute bottom-[-10%] left-[-10%] w-[55vw] h-[55vw] rounded-full"
+          style={{
+            background: "radial-gradient(circle, rgba(172, 136, 135, 0.40) 0%, rgba(172, 136, 135, 0.15) 35%, transparent 65%)",
+            filter: "blur(80px)",
+          }}
+        />
+
+        {/* Center Spotlight "Hole" - Clear area for logo */}
+        <div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] md:w-[500px] md:h-[500px] rounded-full"
+          style={{
+            background: "radial-gradient(circle, rgba(238, 244, 237, 0.95) 0%, rgba(238, 244, 237, 0.7) 40%, transparent 70%)",
+            filter: "blur(40px)",
+          }}
+        />
+      </div>
+
       {/* Navbar */}
-      <nav className="flex items-center justify-between px-8 py-6 max-w-7xl mx-auto w-full z-50">
+      <nav className="flex items-center justify-between px-8 py-6 max-w-7xl mx-auto w-full z-50 relative">
         <div className="flex items-center gap-3">
-          {/* Logo - using the image as requested */}
           <div className="relative w-8 h-8 md:w-10 md:h-10">
             <img src="/brand/logo.png" alt="LumaAI Logo" className="object-contain w-full h-full drop-shadow-sm" />
           </div>
@@ -27,7 +56,7 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <main className="flex-1 flex flex-col md:flex-row items-center justify-center px-8 relative max-w-7xl mx-auto w-full gap-12">
+      <main className="flex-1 flex flex-col md:flex-row items-center justify-center px-8 relative max-w-7xl mx-auto w-full gap-12 z-10">
 
         {/* Left Content */}
         <div className="flex-1 space-y-8 z-10 md:-mt-20">
@@ -50,23 +79,19 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Right Content / Visual */}
+        {/* Right Content / Visual - Logo in the "Spotlight Hole" */}
         <div className="flex-1 relative w-full h-[500px] md:h-[600px] flex items-center justify-center">
-          {/* Hero Image / Brand Element */}
-          <div className="relative w-full h-full flex items-center justify-center p-8">
-            <div className="relative w-64 h-64 md:w-96 md:h-96 rounded-3xl bg-[var(--luma-mint)]/50 backdrop-blur-xl border border-[var(--luma-sky)]/30 shadow-2xl flex items-center justify-center overflow-hidden">
-              <div className="absolute inset-0 bg-white/20"></div>
-              {/* Large Logo in Hero */}
-              <img src="/brand/logo.png" alt="LumaAI Hero" className="w-2/3 h-2/3 object-contain z-10 drop-shadow-2xl" />
-            </div>
-
-            {/* Decorative Elements */}
-            <div className="absolute top-1/4 right-10 p-4 bg-white/80 dark:bg-black/80 backdrop-blur-md rounded-2xl shadow-xl animate-bounce-slow">
-              <Sparkles className="text-[var(--luma-sky)] w-6 h-6" />
-            </div>
+          <div className="relative flex items-center justify-center">
+            {/* Logo floating in the clear center */}
+            <img
+              src="/brand/logo.png"
+              alt="LumaAI Hero"
+              className="w-48 h-48 md:w-72 md:h-72 object-contain drop-shadow-2xl z-20"
+            />
           </div>
         </div>
       </main>
     </div>
   );
 }
+
