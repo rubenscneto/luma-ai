@@ -16,6 +16,14 @@ export default function DashboardPage() {
 
     const userName = user?.user_metadata?.full_name?.split(' ')[0] || "Visionário";
 
+    // Dynamic greeting based on time of day
+    const getGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour >= 5 && hour < 12) return "Bom dia";
+        if (hour >= 12 && hour < 18) return "Boa tarde";
+        return "Boa noite";
+    };
+
     useEffect(() => {
         if (!motivation) {
             fetch("/api/ai/daily-motivation")
@@ -43,7 +51,7 @@ export default function DashboardPage() {
     return (
         <div className="space-y-8">
             <header>
-                <h1 className="text-3xl font-bold mb-2">Bom dia, {userName}.</h1>
+                <h1 className="text-3xl font-bold mb-2">{getGreeting()}, {userName}.</h1>
                 <p className="text-zinc-500 dark:text-zinc-400">Aqui está o seu panorama diário.</p>
             </header>
 
