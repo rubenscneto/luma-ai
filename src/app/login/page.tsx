@@ -47,17 +47,38 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-black p-4">
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-8 rounded-2xl shadow-xl w-full max-w-md space-y-6">
+        <div className="min-h-screen flex items-center justify-center bg-[#EEF4ED] dark:bg-[#090C08] p-4 relative overflow-hidden">
+            {/* Glow Background */}
+            <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden" aria-hidden="true">
+                {/* Top Right Sky Glow */}
+                <div
+                    className="absolute top-[-15%] right-[-15%] w-[60vw] h-[60vw] rounded-full"
+                    style={{
+                        background: "radial-gradient(circle, rgba(134, 187, 216, 0.35) 0%, rgba(134, 187, 216, 0.15) 40%, transparent 70%)",
+                        filter: "blur(80px)",
+                    }}
+                />
+
+                {/* Bottom Left Rose Glow */}
+                <div
+                    className="absolute bottom-[-15%] left-[-15%] w-[55vw] h-[55vw] rounded-full"
+                    style={{
+                        background: "radial-gradient(circle, rgba(172, 136, 135, 0.30) 0%, rgba(172, 136, 135, 0.12) 40%, transparent 70%)",
+                        filter: "blur(90px)",
+                    }}
+                />
+            </div>
+
+            <div className="bg-white dark:bg-zinc-900 border border-[#4D626A]/20 dark:border-zinc-800 p-8 rounded-2xl shadow-xl w-full max-w-md space-y-6 z-10 relative">
                 <div className="text-center space-y-2">
-                    <h1 className="text-2xl font-bold">Bem-vindo de volta</h1>
-                    <p className="text-zinc-500">Entre para continuar sua jornada.</p>
+                    <h1 className="text-2xl font-bold text-[#090C08] dark:text-[#EEF4ED]">Bem-vindo de volta</h1>
+                    <p className="text-[#4D626A]">Entre para continuar sua jornada.</p>
                 </div>
 
                 <div className="space-y-4">
                     <Button
                         variant="secondary"
-                        className="w-full flex items-center justify-center gap-2 h-12 border border-zinc-200 dark:border-zinc-700 font-medium"
+                        className="w-full flex items-center justify-center gap-2 h-12 border border-[#4D626A]/30 dark:border-zinc-700 font-medium bg-white dark:bg-zinc-800 hover:bg-[#EEF4ED] dark:hover:bg-zinc-700"
                         onClick={handleGoogleLogin}
                         disabled={loading}
                     >
@@ -72,50 +93,55 @@ export default function LoginPage() {
 
                     <div className="relative">
                         <div className="absolute inset-0 flex items-center">
-                            <span className="w-full border-t border-zinc-200 dark:border-zinc-800" />
+                            <span className="w-full border-t border-[#4D626A]/20 dark:border-zinc-800" />
                         </div>
                         <div className="relative flex justify-center text-xs uppercase">
-                            <span className="bg-white dark:bg-zinc-900 px-2 text-zinc-500">Ou continuar com email</span>
+                            <span className="bg-white dark:bg-zinc-900 px-2 text-[#4D626A]">Ou continuar com email</span>
                         </div>
                     </div>
 
                     <form onSubmit={handleLogin} className="space-y-4">
                         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Email</label>
+                            <label className="text-sm font-medium text-[#090C08] dark:text-[#EEF4ED]">Email</label>
                             <Input
                                 type="email"
                                 placeholder="seu@email.com"
                                 required
-                                className="h-11"
+                                className="h-11 border-[#4D626A]/30 focus:border-[#86BBD8] focus:ring-[#86BBD8]"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                             />
                         </div>
                         <div className="space-y-2">
                             <div className="flex justify-between">
-                                <label className="text-sm font-medium">Senha</label>
-                                <Link href="#" className="text-xs text-blue-500 hover:underline">Esqueceu?</Link>
+                                <label className="text-sm font-medium text-[#090C08] dark:text-[#EEF4ED]">Senha</label>
+                                <Link href="#" className="text-xs text-[#86BBD8] hover:underline">Esqueceu?</Link>
                             </div>
                             <Input
                                 type="password"
                                 placeholder="••••••••"
                                 required
-                                className="h-11"
+                                className="h-11 border-[#4D626A]/30 focus:border-[#86BBD8] focus:ring-[#86BBD8]"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                             />
                         </div>
-                        <Button type="submit" className="w-full h-11 bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black" disabled={loading}>
+                        <Button
+                            type="submit"
+                            className="w-full h-11 bg-[#090C08] text-[#EEF4ED] hover:bg-[#4D626A] dark:bg-[#EEF4ED] dark:text-[#090C08] dark:hover:bg-[#86BBD8]"
+                            disabled={loading}
+                        >
                             {loading ? <Loader2 className="animate-spin" /> : "Entrar"}
                         </Button>
                     </form>
                 </div>
 
-                <p className="text-center text-sm text-zinc-500">
-                    Não tem uma conta? <Link href="/register" className="text-blue-600 font-medium hover:underline">Cadastre-se</Link>
+                <p className="text-center text-sm text-[#4D626A]">
+                    Não tem uma conta? <Link href="/register" className="text-[#86BBD8] font-medium hover:underline">Cadastre-se</Link>
                 </p>
             </div>
         </div>
     );
 }
+

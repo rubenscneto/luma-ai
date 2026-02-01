@@ -39,12 +39,6 @@ export default function RegisterPage() {
             if (error) {
                 setError(error.message);
             } else {
-                // If email confirmation is off, redirect. Usually configured to verify email.
-                // For this demo, let's assume it might require verification or login.
-                // But often local dev or new Supabase projects require verification by default.
-                // I will show a message or redirect if session is instant.
-
-                // Check if session established (depends on Supabase settings)
                 const { data } = await supabase.auth.getSession();
                 if (data.session) {
                     router.push("/dashboard");
@@ -66,11 +60,32 @@ export default function RegisterPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-black p-4">
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-8 rounded-2xl shadow-xl w-full max-w-md space-y-6">
+        <div className="min-h-screen flex items-center justify-center bg-[#EEF4ED] dark:bg-[#090C08] p-4 relative overflow-hidden">
+            {/* Glow Background */}
+            <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden" aria-hidden="true">
+                {/* Top Right Sky Glow */}
+                <div
+                    className="absolute top-[-15%] right-[-15%] w-[60vw] h-[60vw] rounded-full"
+                    style={{
+                        background: "radial-gradient(circle, rgba(134, 187, 216, 0.35) 0%, rgba(134, 187, 216, 0.15) 40%, transparent 70%)",
+                        filter: "blur(80px)",
+                    }}
+                />
+
+                {/* Bottom Left Rose Glow */}
+                <div
+                    className="absolute bottom-[-15%] left-[-15%] w-[55vw] h-[55vw] rounded-full"
+                    style={{
+                        background: "radial-gradient(circle, rgba(172, 136, 135, 0.30) 0%, rgba(172, 136, 135, 0.12) 40%, transparent 70%)",
+                        filter: "blur(90px)",
+                    }}
+                />
+            </div>
+
+            <div className="bg-white dark:bg-zinc-900 border border-[#4D626A]/20 dark:border-zinc-800 p-8 rounded-2xl shadow-xl w-full max-w-md space-y-6 z-10 relative">
                 <div className="text-center space-y-2">
-                    <h1 className="text-2xl font-bold">Crie sua conta</h1>
-                    <p className="text-zinc-500">Comece a transformar sua rotina hoje.</p>
+                    <h1 className="text-2xl font-bold text-[#090C08] dark:text-[#EEF4ED]">Crie sua conta</h1>
+                    <p className="text-[#4D626A]">Comece a transformar sua rotina hoje.</p>
                 </div>
 
                 <div className="space-y-4">
@@ -78,21 +93,21 @@ export default function RegisterPage() {
                         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Nome</label>
+                                <label className="text-sm font-medium text-[#090C08] dark:text-[#EEF4ED]">Nome</label>
                                 <Input
                                     placeholder="João"
                                     required
-                                    className="h-11"
+                                    className="h-11 border-[#4D626A]/30 focus:border-[#86BBD8] focus:ring-[#86BBD8]"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Sobrenome</label>
+                                <label className="text-sm font-medium text-[#090C08] dark:text-[#EEF4ED]">Sobrenome</label>
                                 <Input
                                     placeholder="Silva"
                                     required
-                                    className="h-11"
+                                    className="h-11 border-[#4D626A]/30 focus:border-[#86BBD8] focus:ring-[#86BBD8]"
                                     value={lastName}
                                     onChange={(e) => setLastName(e.target.value)}
                                 />
@@ -100,35 +115,39 @@ export default function RegisterPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Email</label>
+                            <label className="text-sm font-medium text-[#090C08] dark:text-[#EEF4ED]">Email</label>
                             <Input
                                 type="email"
                                 placeholder="seu@email.com"
                                 required
-                                className="h-11"
+                                className="h-11 border-[#4D626A]/30 focus:border-[#86BBD8] focus:ring-[#86BBD8]"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Senha</label>
+                            <label className="text-sm font-medium text-[#090C08] dark:text-[#EEF4ED]">Senha</label>
                             <Input
                                 type="password"
                                 placeholder="••••••••"
                                 required
-                                className="h-11"
+                                className="h-11 border-[#4D626A]/30 focus:border-[#86BBD8] focus:ring-[#86BBD8]"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                             />
                         </div>
-                        <Button type="submit" className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20" disabled={loading}>
+                        <Button
+                            type="submit"
+                            className="w-full h-11 bg-[#090C08] text-[#EEF4ED] hover:bg-[#4D626A] dark:bg-[#EEF4ED] dark:text-[#090C08] dark:hover:bg-[#86BBD8] shadow-md"
+                            disabled={loading}
+                        >
                             {loading ? <Loader2 className="animate-spin" /> : "Criar conta grátis"}
                         </Button>
                     </form>
 
                     <Button
                         variant="secondary"
-                        className="w-full flex items-center justify-center gap-2 h-11 border border-zinc-200 dark:border-zinc-700 font-medium bg-transparent hover:bg-zinc-50"
+                        className="w-full flex items-center justify-center gap-2 h-11 border border-[#4D626A]/30 dark:border-zinc-700 font-medium bg-white dark:bg-zinc-800 hover:bg-[#EEF4ED] dark:hover:bg-zinc-700"
                         onClick={handleGoogleRegister}
                         disabled={loading}
                     >
@@ -142,10 +161,11 @@ export default function RegisterPage() {
                     </Button>
                 </div>
 
-                <p className="text-center text-sm text-zinc-500">
-                    Já tem uma conta? <Link href="/login" className="text-blue-600 font-medium hover:underline">Faça Login</Link>
+                <p className="text-center text-sm text-[#4D626A]">
+                    Já tem uma conta? <Link href="/login" className="text-[#86BBD8] font-medium hover:underline">Faça Login</Link>
                 </p>
             </div>
         </div>
     );
 }
+
