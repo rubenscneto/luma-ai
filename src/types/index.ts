@@ -150,3 +150,98 @@ export interface AgendaItem {
     status: 'todo' | 'in-progress' | 'done';
     generated: boolean;
 }
+
+// ========== New Agenda System Types ==========
+
+export type BlockCategory = 'work' | 'study' | 'health' | 'leisure' | 'admin' | 'sleep' | 'meal' | 'commute' | 'fixed';
+export type BlockSource = 'fixed' | 'ai' | 'manual';
+export type PlanStatus = 'draft' | 'active' | 'archived';
+export type HealthGoal = 'energy' | 'fitness' | 'healthy_habits' | 'sleep' | 'stress' | 'general';
+export type TrainingLevel = 'beginner' | 'intermediate' | 'advanced';
+
+export interface FixedBlock {
+    id: string;
+    user_id: string;
+    title: string;
+    category: BlockCategory;
+    day_of_week: number; // 0-6 (0 = Sunday)
+    start_time: string; // HH:mm
+    end_time: string; // HH:mm
+    location?: string;
+    notes?: string;
+    is_active: boolean;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface DailyPlan {
+    id: string;
+    user_id: string;
+    plan_date: string; // YYYY-MM-DD
+    timezone: string;
+    status: PlanStatus;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface DailyBlock {
+    id: string;
+    plan_id: string;
+    user_id: string;
+    title: string;
+    category: BlockCategory;
+    start_datetime: string; // ISO datetime
+    end_datetime: string; // ISO datetime
+    source: BlockSource;
+    is_done: boolean;
+    done_at?: string;
+    is_skipped: boolean;
+    skip_reason?: string;
+    order_index: number;
+    meta?: Record<string, any>;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface HealthProfile {
+    user_id: string;
+    height_cm?: number;
+    weight_kg?: number;
+    goal: HealthGoal;
+    dietary_preferences: string[];
+    allergies_restrictions: string[];
+    training_level: TrainingLevel;
+    equipment: string[];
+    wake_time?: string; // HH:mm
+    sleep_time?: string; // HH:mm
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface ShoppingItem {
+    name: string;
+    qty?: number;
+    unit?: string;
+    category?: string;
+    checked: boolean;
+}
+
+export interface ShoppingList {
+    id: string;
+    user_id: string;
+    title: string;
+    items: ShoppingItem[];
+    source: BlockSource;
+    created_at?: string;
+    updated_at?: string;
+}
+
+// Helper type for current block status
+export type BlockStatus = 'upcoming' | 'current' | 'done' | 'skipped' | 'delayed';
+
+export interface DailyBlockWithStatus extends DailyBlock {
+    status: BlockStatus;
+    timeUntilStart?: number; // minutes
+    timeUntilEnd?: number; // minutes
+}
+

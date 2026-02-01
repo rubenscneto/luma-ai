@@ -3,6 +3,10 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { FloatingAssistantOrb } from "@/components/FloatingAssistantOrb";
 import { AssistantDrawer } from "@/components/AssistantDrawer";
+import { DailyPlanProvider } from "@/context/dailyPlanContext";
+import { HealthProvider } from "@/context/healthContext";
+import { ToastProvider } from "@/context/toastContext";
+import NotificationManager from "@/components/notifications/NotificationManager";
 import { useState } from "react";
 
 export default function AppLayout({
@@ -68,11 +72,20 @@ export default function AppLayout({
                 </div>
             )}
 
-            <main className="flex-1 md:ml-64 p-4 md:p-8 pt-20 md:pt-8 overflow-y-auto max-h-screen relative z-10">
-                <div className="max-w-7xl mx-auto">
-                    {children}
-                </div>
-            </main>
+            <ToastProvider>
+                <DailyPlanProvider>
+                    <HealthProvider>
+                        <main className="flex-1 md:ml-64 p-4 md:p-8 pt-20 md:pt-8 overflow-y-auto max-h-screen relative z-10">
+                            <div className="max-w-7xl mx-auto">
+                                {children}
+                            </div>
+                        </main>
+
+                        {/* Notification Manager */}
+                        <NotificationManager />
+                    </HealthProvider>
+                </DailyPlanProvider>
+            </ToastProvider>
 
             {/* Assistant Layer */}
             <FloatingAssistantOrb onClick={() => setIsAssistantOpen(true)} />
@@ -80,4 +93,3 @@ export default function AppLayout({
         </div>
     );
 }
-

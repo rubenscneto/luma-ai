@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Sparkles, Clock, Target, ArrowRight, Plus, X, Check, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-
+import { LiveTimeline } from "@/components/dashboard/LiveTimeline";
 import { useAuth } from "@/context/authContext";
 
 interface Priority {
@@ -131,37 +131,8 @@ export default function DashboardPage() {
             </motion.div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Timeline Widget */}
-                <Card className="p-6">
-                    <div className="flex items-center justify-between mb-6">
-                        <div className="flex items-center gap-2">
-                            <Clock className="text-violet-500" size={20} />
-                            <h2 className="font-semibold text-lg">Timeline</h2>
-                        </div>
-                        <Link href="/agenda" className="text-sm text-zinc-500 hover:text-violet-500 flex items-center gap-1 transition-colors">
-                            Ver tudo <ArrowRight size={14} />
-                        </Link>
-                    </div>
-
-                    <div className="space-y-4">
-                        {upcomingBlocks.length === 0 ? (
-                            <p className="text-zinc-500 text-sm">Nenhuma tarefa pendente ou rotina não configurada.</p>
-                        ) : (
-                            upcomingBlocks.map((block) => (
-                                <div key={block.id} className="flex items-center gap-4 p-3 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors border border-transparent hover:border-zinc-100 dark:hover:border-zinc-800">
-                                    <div className="w-12 text-center">
-                                        <span className="text-sm font-bold block">{block.startTime}</span>
-                                    </div>
-                                    <div className="h-full w-1 rounded-full bg-zinc-200 dark:bg-zinc-700 mx-2" />
-                                    <div className="flex-1">
-                                        <h3 className="font-medium text-sm">{block.title}</h3>
-                                        <p className="text-xs text-zinc-500 capitalize">{block.type}</p>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </Card>
+                {/* Timeline Widget - New AI-powered */}
+                <LiveTimeline />
 
                 {/* Priorities */}
                 <div className="space-y-6">

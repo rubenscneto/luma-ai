@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Calendar, Compass, GraduationCap, FolderKanban, Library, LogOut, BarChart3, Bot } from "lucide-react";
+import { LayoutDashboard, Calendar, Compass, GraduationCap, FolderKanban, Library, LogOut, BarChart3, Bot, Heart, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/authContext";
 import { motion } from "framer-motion";
@@ -11,12 +11,14 @@ import { motion } from "framer-motion";
 const menuItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/agenda", label: "Agenda", icon: Calendar },
+    { href: "/saude", label: "Saúde", icon: Heart },
     { href: "/dashboard/routine", label: "Rotina", icon: Compass },
     { href: "/analytics", label: "Analytics", icon: BarChart3 },
     { href: "/estudos", label: "Estudos", icon: GraduationCap },
     { href: "/projetos", label: "Projetos", icon: FolderKanban },
     { href: "/dashboard/assistant", label: "Assistente", icon: Bot },
     { href: "/biblioteca", label: "Biblioteca", icon: Library },
+    { href: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
 export function Sidebar() {
