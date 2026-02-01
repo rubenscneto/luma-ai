@@ -40,8 +40,8 @@ export default function LandingPage() {
       {/* Navbar */}
       <nav className="flex items-center justify-between px-8 py-6 max-w-7xl mx-auto w-full z-50 relative">
         <div className="flex items-center gap-3">
-          <div className="relative w-8 h-8 md:w-10 md:h-10">
-            <img src="/brand/logo.png" alt="LumaAI Logo" className="object-contain w-full h-full drop-shadow-sm" />
+          <div className="relative w-10 h-10 md:w-14 md:h-14">
+            <img src="/brand/logo.png" alt="LumaAI Logo" className="object-contain w-full h-full drop-shadow-md" />
           </div>
           <span className="font-bold text-xl tracking-tight text-[var(--luma-black)] dark:text-[var(--luma-mint)]">LumaAI</span>
         </div>
@@ -79,16 +79,9 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Right Content / Visual - Logo in the "Spotlight Hole" */}
-        <div className="flex-1 relative w-full h-[500px] md:h-[600px] flex items-center justify-center">
-          <div className="relative flex items-center justify-center">
-            {/* Logo floating in the clear center */}
-            <img
-              src="/brand/logo.png"
-              alt="LumaAI Hero"
-              className="w-48 h-48 md:w-72 md:h-72 object-contain drop-shadow-2xl z-20"
-            />
-          </div>
+        {/* Right Content - Empty space with glow effect */}
+        <div className="flex-1 relative w-full h-[400px] md:h-[500px] hidden md:flex items-center justify-center">
+          {/* Glow effect only, no logo */}
         </div>
       </main>
     </div>
