@@ -1,26 +1,67 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #EEF4ED; /* luma-mint */
+  --foreground: #090C08; /* luma-black */
+  
+  /* LumaAI Palace */
+  --luma-rose: #AC8887;
+  --luma-sky: #86BBD8;
+  --luma-slate: #4D626A;
+  --luma-black: #090C08;
+  --luma-mint: #EEF4ED;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  
+  --color-luma-rose: var(--luma-rose);
+  --color-luma-sky: var(--luma-sky);
+  --color-luma-slate: var(--luma-slate);
+  --color-luma-black: var(--luma-black);
+  --color-luma-mint: var(--luma-mint);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #090C08; /* Dark mode fallback to black */
+    --foreground: #EEF4ED;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Global Utility for Soft Glow Background */
+.glow-bg::before {
+  content: '';
+  position: fixed;
+  top: -20%;
+  right: -10%;
+  width: 60vw;
+  height: 60vw;
+  background: radial-gradient(circle, rgba(134, 187, 216, 0.15) 0%, rgba(238, 244, 237, 0) 70%);
+  filter: blur(80px);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.glow-bg::after {
+  content: '';
+  position: fixed;
+  bottom: -20%;
+  left: -10%;
+  width: 70vw;
+  height: 70vw;
+  background: radial-gradient(circle, rgba(172, 136, 135, 0.12) 0%, rgba(238, 244, 237, 0) 70%);
+  filter: blur(100px);
+  z-index: -1;
+  pointer-events: none;
 }

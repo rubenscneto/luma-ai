@@ -48,24 +48,26 @@ export default function DashboardPage() {
             </header>
 
             {/* Motivation Banner */}
+            {/* Motivation Banner (Minimalist Redesign) */}
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-gradient-to-r from-violet-600 to-indigo-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden"
+                className="bg-white dark:bg-zinc-900 rounded-xl p-6 border border-zinc-100 dark:border-zinc-800 shadow-sm relative overflow-hidden group"
             >
-                <div className="absolute top-0 right-0 p-4 opacity-10">
-                    <Sparkles size={100} />
-                </div>
+                {/* Thin top accent */}
+                <div className="absolute top-0 left-0 right-0 h-[2px] bg-[var(--luma-sky)] opacity-50" />
+
                 <div className="relative z-10 flex flex-col h-full justify-between">
                     <div>
-                        <div className="flex items-center gap-2 text-violet-200 mb-2">
-                            <Sparkles size={16} />
-                            <span className="text-sm font-medium uppercase tracking-wider">Daily Motivation</span>
+                        <div className="flex items-center gap-2 text-[var(--luma-slate)] mb-3">
+                            <span className="text-xs font-semibold uppercase tracking-wider opacity-70">Daily Motivation</span>
                         </div>
-                        <p className="text-xl md:text-2xl font-serif italic text-pretty max-w-2xl leading-relaxed">"{motivation?.text || 'Carregando...'}"</p>
+                        <p className="text-lg md:text-xl font-medium text-[var(--luma-black)] dark:text-white leading-relaxed font-sans">
+                            "{motivation?.text || 'Carregando...'}"
+                        </p>
                     </div>
                     {motivation?.author && (
-                        <p className="text-right text-violet-200 font-medium text-sm mt-4">— {motivation.author}</p>
+                        <p className="text-right text-[var(--luma-slate)] text-sm mt-3 font-medium">— {motivation.author}</p>
                     )}
                 </div>
             </motion.div>

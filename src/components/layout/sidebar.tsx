@@ -30,9 +30,12 @@ export function Sidebar() {
     };
 
     return (
-        <aside className="fixed left-0 top-0 h-screen w-64 bg-zinc-50 dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 p-6 flex flex-col">
-            <div className="mb-10">
-                <h1 className="text-2xl font-bold tracking-tight">LumaAI</h1>
+        <aside className="h-full w-full md:w-64 bg-zinc-50 dark:bg-black border-r border-zinc-200 dark:border-zinc-800 p-6 flex flex-col md:fixed md:left-0 md:top-0 z-40">
+            <div className="mb-10 flex items-center gap-3">
+                <div className="w-8 h-8 relative">
+                    <img src="/brand/Logo.png" alt="LumaAI" className="object-contain w-full h-full" />
+                </div>
+                <h1 className="text-xl font-bold tracking-tight text-[var(--luma-black)] dark:text-[var(--luma-mint)]">LumaAI</h1>
             </div>
 
             <nav className="space-y-2 flex-1">
@@ -47,8 +50,8 @@ export function Sidebar() {
                             className={cn(
                                 "flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm",
                                 isActive
-                                    ? "bg-black text-white dark:bg-white dark:text-black shadow-md"
-                                    : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-black dark:hover:text-white"
+                                    ? "bg-[var(--luma-black)] text-[var(--luma-mint)] dark:bg-[var(--luma-mint)] dark:text-[var(--luma-black)] shadow-sm"
+                                    : "text-[var(--luma-slate)] hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-[var(--luma-black)] dark:hover:text-white"
                             )}
                         >
                             <Icon size={20} />
@@ -59,17 +62,17 @@ export function Sidebar() {
             </nav>
 
             <div className="mt-auto space-y-4">
-                <div className="bg-gradient-to-br from-violet-500/10 to-transparent p-4 rounded-xl border border-violet-500/20">
-                    <p className="text-xs text-violet-600 dark:text-violet-400 font-semibold mb-1">Status da IA</p>
+                <div className="bg-gradient-to-br from-[var(--luma-sky)]/10 to-transparent p-4 rounded-xl border border-[var(--luma-sky)]/20">
+                    <p className="text-xs text-[var(--luma-slate)] font-semibold mb-1">Status da IA</p>
                     <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                        <span className="text-xs text-zinc-500">Online & Ready</span>
+                        <span className="text-xs text-[var(--luma-slate)]">Online & Ready</span>
                     </div>
                 </div>
 
                 <button
                     onClick={handleSignOut}
-                    className="flex items-center gap-3 px-4 py-3 rounded-xl w-full text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-red-500 transition-colors text-sm font-medium"
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl w-full text-[var(--luma-slate)] hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-red-500 transition-colors text-sm font-medium"
                 >
                     <LogOut size={20} />
                     Sair
