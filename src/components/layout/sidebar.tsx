@@ -33,7 +33,7 @@ export function Sidebar() {
         <aside className="h-full w-full md:w-64 bg-zinc-50 dark:bg-black border-r border-zinc-200 dark:border-zinc-800 p-6 flex flex-col md:fixed md:left-0 md:top-0 z-40">
             <div className="mb-10 flex items-center gap-3">
                 <div className="w-8 h-8 relative">
-                    <img src="/brand/Logo.png" alt="LumaAI" className="object-contain w-full h-full" />
+                    <img src="/brand/logo.png" alt="LumaAI" className="object-contain w-full h-full" />
                 </div>
                 <h1 className="text-xl font-bold tracking-tight text-[var(--luma-black)] dark:text-[var(--luma-mint)]">LumaAI</h1>
             </div>

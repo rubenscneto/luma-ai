@@ -12,7 +12,7 @@ export default function LandingPage() {
         <div className="flex items-center gap-3">
           {/* Logo - using the image as requested */}
           <div className="relative w-8 h-8 md:w-10 md:h-10">
-            <img src="/brand/Logo.png" alt="LumaAI Logo" className="object-contain w-full h-full drop-shadow-sm" />
+            <img src="/brand/logo.png" alt="LumaAI Logo" className="object-contain w-full h-full drop-shadow-sm" />
           </div>
           <span className="font-bold text-xl tracking-tight text-[var(--luma-black)] dark:text-[var(--luma-mint)]">LumaAI</span>
         </div>
@@ -57,7 +57,7 @@ export default function LandingPage() {
             <div className="relative w-64 h-64 md:w-96 md:h-96 rounded-3xl bg-[var(--luma-mint)]/50 backdrop-blur-xl border border-[var(--luma-sky)]/30 shadow-2xl flex items-center justify-center overflow-hidden">
               <div className="absolute inset-0 bg-white/20"></div>
               {/* Large Logo in Hero */}
-              <img src="/brand/Logo.png" alt="LumaAI Hero" className="w-2/3 h-2/3 object-contain z-10 drop-shadow-2xl" />
+              <img src="/brand/logo.png" alt="LumaAI Hero" className="w-2/3 h-2/3 object-contain z-10 drop-shadow-2xl" />
             </div>
 
             {/* Decorative Elements */}

@@ -65,7 +65,7 @@ export function AssistantDrawer({ isOpen, onClose }: AssistantDrawerProps) {
                         <div className="flex items-center justify-between p-6 border-b border-zinc-100 dark:border-zinc-800">
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-lg bg-[var(--luma-sky)]/20 flex items-center justify-center p-1.5">
-                                    <img src="/brand/Logo.png" className="w-full h-full object-contain" alt="Logo" />
+                                    <img src="/brand/logo.png" className="w-full h-full object-contain" alt="Logo" />
                                 </div>
                                 <h2 className="font-semibold text-lg text-[var(--luma-black)] dark:text-white">Assistant</h2>
                             </div>

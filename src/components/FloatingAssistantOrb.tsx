@@ -24,7 +24,7 @@ export function FloatingAssistantOrb({ onClick }: FloatingAssistantOrbProps) {
             {/* Orb Container */}
             <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-full bg-white dark:bg-black border border-[var(--luma-sky)]/30 shadow-xl flex items-center justify-center overflow-hidden backdrop-blur-sm">
                 <img
-                    src="/brand/Logo.png"
+                    src="/brand/logo.png"
                     alt="Assistant"
                     className="w-8 h-8 md:w-10 md:h-10 object-contain drop-shadow-sm"
                 />
