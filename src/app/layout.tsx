@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
@@ -9,10 +9,13 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "LumaAI",
   description: "Seu assistente de produtividade e estudos",
-  manifest: "/manifest.json",
+  icons: {
+    icon: "/brand/logo.png",
+    apple: "/brand/logo.png",
+  },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "LumaAI",
   },
   formatDetection: {
@@ -20,11 +23,16 @@ export const metadata: Metadata = {
   },
   other: {
     "mobile-web-app-capable": "yes",
-  }
+  },
 };
 
-export const viewport = {
-  themeColor: "#EEF4ED",
+export const viewport: Viewport = {
+  themeColor: "#090C08",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -35,8 +43,8 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className={inter.className}>
-        <AppBackgroundGlow />
         <Providers>
+          <AppBackgroundGlow />
           {children}
         </Providers>
       </body>

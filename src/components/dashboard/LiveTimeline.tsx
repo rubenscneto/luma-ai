@@ -9,8 +9,9 @@ import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
 export function LiveTimeline() {
-    const { currentBlock, nextBlock, todayBlocks, isLoading, generatePlan, todayPlan } = useDailyPlan();
+    const { currentBlock, nextBlock, todayBlocks, isLoading, generatePlan, todayPlan, replanDay } = useDailyPlan();
     const [now, setNow] = useState(new Date());
+    const [isReplanning, setIsReplanning] = useState(false);
 
     // Update time every minute
     useEffect(() => {
@@ -31,9 +32,28 @@ export function LiveTimeline() {
         return Math.min(Math.max(((current - start) / (end - start)) * 100, 0), 100);
     })() : 0;
 
+    // Time remaining in current block
+    const timeRemaining = currentBlock ? (() => {
+        const end = new Date(currentBlock.end_datetime).getTime();
+        const mins = Math.round((end - now.getTime()) / 60000);
+        return mins > 0 ? mins : 0;
+    })() : 0;
+
+    // Check if user is late (has overdue blocks)
+    const isLate = todayBlocks.some(b => b.status === 'delayed');
+
     // Stats
     const completedCount = todayBlocks.filter(b => b.is_done).length;
     const totalCount = todayBlocks.length;
+
+    const handleReplan = async () => {
+        setIsReplanning(true);
+        try {
+            await replanDay('Usuário solicitou replanejamento');
+        } finally {
+            setIsReplanning(false);
+        }
+    };
 
     if (isLoading) {
         return (
@@ -76,8 +96,22 @@ export function LiveTimeline() {
                 <div className="flex items-center gap-2">
                     <Clock className="w-5 h-5 text-brand-primary" />
                     <h3 className="font-semibold text-white">Timeline</h3>
+                    {isLate && (
+                        <span className="px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 text-xs font-medium">
+                            Atrasado
+                        </span>
+                    )}
                 </div>
                 <div className="flex items-center gap-3">
+                    {isLate && (
+                        <button
+                            onClick={handleReplan}
+                            disabled={isReplanning}
+                            className="px-3 py-1 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 text-xs font-medium transition-colors disabled:opacity-50"
+                        >
+                            {isReplanning ? 'Replanejando...' : 'Replanejar'}
+                        </button>
+                    )}
                     <span className="text-sm text-white/60">
                         {completedCount}/{totalCount}
                     </span>

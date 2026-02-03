@@ -244,15 +244,78 @@ ${message}
                         break;
                     }
 
+                    case 'mark_done': {
+                        const { error } = await supabase
+                            .from('daily_blocks')
+                            .update({ is_done: true, done_at: nowISO, updated_at: nowISO })
+                            .eq('id', action.block_id)
+                            .eq('user_id', user_id);
+
+                        executedActions.push({ type: action.type, success: !error, block_id: action.block_id });
+                        break;
+                    }
+
+                    case 'mark_skip': {
+                        const { error } = await supabase
+                            .from('daily_blocks')
+                            .update({
+                                is_skipped: true,
+                                skip_reason: action.skip_reason || 'Pulado pelo usuário',
+                                updated_at: nowISO
+                            })
+                            .eq('id', action.block_id)
+                            .eq('user_id', user_id);
+
+                        executedActions.push({ type: action.type, success: !error, block_id: action.block_id });
+                        break;
+                    }
+
+                    case 'trigger_replan': {
+                        // Call the replan API
+                        try {
+                            await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/ai/agenda/replan-day`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    user_id,
+                                    signal: 'manual_request',
+                                    user_note: action.reason,
+                                }),
+                            });
+                            executedActions.push({ type: action.type, success: true, reason: action.reason });
+                        } catch {
+                            executedActions.push({ type: action.type, success: false, error: 'Failed to trigger replan' });
+                        }
+                        break;
+                    }
+
+                    case 'plan_day': {
+                        // Call the plan-day API
+                        try {
+                            await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/ai/agenda/plan-day`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    user_id,
+                                    date: action.date || today,
+                                    mode: action.mode || 'first_time',
+                                }),
+                            });
+                            executedActions.push({ type: action.type, success: true });
+                        } catch {
+                            executedActions.push({ type: action.type, success: false, error: 'Failed to generate plan' });
+                        }
+                        break;
+                    }
+
                     case 'ask_user':
-                    case 'trigger_replan':
                     case 'generate_daily_plan':
                         // These are signals for the frontend to handle
                         executedActions.push({ ...action });
                         break;
 
                     default:
-                        executedActions.push({ type: action.type, success: false, error: 'Unknown action type' });
+                        executedActions.push({ type: (action as any).type, success: false, error: 'Unknown action type' });
                 }
             } catch (actionError: any) {
                 executedActions.push({ type: action.type, success: false, error: actionError.message });

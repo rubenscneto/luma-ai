@@ -2,10 +2,9 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Sparkles, Loader2, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Sparkles, Loader2, Calendar, RefreshCw, Heart } from 'lucide-react';
 import { useDailyPlan } from '@/context/dailyPlanContext';
 import { BlockCard } from './BlockCard';
-import { cn } from '@/lib/utils';
 
 interface AddBlockModalProps {
     isOpen: boolean;
@@ -129,8 +128,10 @@ function AddBlockModal({ isOpen, onClose, onAdd }: AddBlockModalProps) {
 }
 
 export function DayView() {
-    const { todayBlocks, todayPlan, isLoading, generatePlan, addBlock } = useDailyPlan();
+    const { todayBlocks, todayPlan, isLoading, generatePlan, generateHealthBlocks, addBlock, replanDay } = useDailyPlan();
     const [showAddModal, setShowAddModal] = useState(false);
+    const [isReplanning, setIsReplanning] = useState(false);
+    const [isGeneratingHealth, setIsGeneratingHealth] = useState(false);
 
     const now = new Date();
     const formattedDate = now.toLocaleDateString('pt-BR', {
@@ -139,13 +140,29 @@ export function DayView() {
         month: 'long',
     });
 
-    // Group blocks by time
-    const currentTime = now.getHours() * 60 + now.getMinutes();
-
+    // Group blocks by status
     const pastBlocks = todayBlocks.filter(b => b.status === 'done' || b.status === 'skipped');
     const currentBlock = todayBlocks.find(b => b.status === 'current');
     const upcomingBlocks = todayBlocks.filter(b => b.status === 'upcoming');
     const delayedBlocks = todayBlocks.filter(b => b.status === 'delayed');
+
+    const handleReplan = async () => {
+        setIsReplanning(true);
+        try {
+            await replanDay('Usuário solicitou replanejamento');
+        } finally {
+            setIsReplanning(false);
+        }
+    };
+
+    const handleGenerateHealth = async () => {
+        setIsGeneratingHealth(true);
+        try {
+            await generateHealthBlocks();
+        } finally {
+            setIsGeneratingHealth(false);
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -155,10 +172,39 @@ export function DayView() {
                     <h2 className="text-2xl font-bold text-white capitalize">{formattedDate}</h2>
                     <p className="text-white/60 text-sm mt-1">
                         {todayBlocks.length} blocos • {pastBlocks.length} concluídos
+                        {delayedBlocks.length > 0 && (
+                            <span className="text-amber-400"> • {delayedBlocks.length} atrasado(s)</span>
+                        )}
                     </p>
                 </div>
 
                 <div className="flex gap-2">
+                    {delayedBlocks.length > 0 && (
+                        <button
+                            onClick={handleReplan}
+                            disabled={isReplanning}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 transition-colors disabled:opacity-50"
+                        >
+                            <RefreshCw className={`w-4 h-4 ${isReplanning ? 'animate-spin' : ''}`} />
+                            <span className="hidden sm:inline">{isReplanning ? 'Replanejando...' : 'Replanejar'}</span>
+                        </button>
+                    )}
+
+                    {todayPlan && (
+                        <button
+                            onClick={handleGenerateHealth}
+                            disabled={isGeneratingHealth || isLoading}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500/20 hover:bg-green-500/30 text-green-400 transition-colors disabled:opacity-50"
+                        >
+                            {isGeneratingHealth ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Heart className="w-4 h-4" />
+                            )}
+                            <span className="hidden sm:inline">Saúde</span>
+                        </button>
+                    )}
+
                     <button
                         onClick={() => setShowAddModal(true)}
                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"

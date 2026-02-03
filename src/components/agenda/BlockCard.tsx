@@ -120,7 +120,7 @@ export function BlockCard({ block, compact = false }: BlockCardProps) {
                     <div className="flex items-center gap-2 mt-1">
                         <Clock className="w-3 h-3 text-white/40" />
                         <span className="text-sm text-white/60">{startTime} - {endTime}</span>
-                        {block.source === 'fixed' && (
+                        {(block.source === 'fixed' || (block as any).is_fixed) && (
                             <span className="text-xs px-1.5 py-0.5 rounded bg-white/10 text-white/50">
                                 Fixo
                             </span>

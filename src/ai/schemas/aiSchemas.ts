@@ -36,6 +36,15 @@ export const AssistantActionSchema = z.discriminatedUnion('type', [
         block_id: z.string(),
     }),
     z.object({
+        type: z.literal('mark_done'),
+        block_id: z.string(),
+    }),
+    z.object({
+        type: z.literal('mark_skip'),
+        block_id: z.string(),
+        skip_reason: z.string().optional(),
+    }),
+    z.object({
         type: z.literal('create_fixed_block'),
         title: z.string(),
         category: BlockCategorySchema,
@@ -55,6 +64,11 @@ export const AssistantActionSchema = z.discriminatedUnion('type', [
     z.object({
         type: z.literal('trigger_replan'),
         reason: z.string(),
+    }),
+    z.object({
+        type: z.literal('plan_day'),
+        date: z.string().optional(),
+        mode: z.enum(['first_time', 'regenerate', 'fill_gaps']).optional(),
     }),
     z.object({
         type: z.literal('create_shopping_list'),

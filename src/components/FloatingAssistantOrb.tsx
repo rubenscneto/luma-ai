@@ -11,22 +11,38 @@ export function FloatingAssistantOrb({ onClick }: FloatingAssistantOrbProps) {
     return (
         <motion.button
             onClick={onClick}
-            className="fixed bottom-6 right-6 z-50 group"
+            className="fixed z-50 group"
+            style={{
+                // Position above tab bar on mobile, normal on desktop
+                bottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)",
+                right: "16px",
+            }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
         >
-            {/* Pulse Effect */}
-            <div className="absolute inset-0 rounded-full bg-[var(--luma-sky)] opacity-20 animate-ping" />
+            {/* Subtle Pulse Effect */}
+            <motion.div
+                className="absolute inset-0 rounded-full bg-[#86BBD8]"
+                animate={{
+                    scale: [1, 1.15, 1],
+                    opacity: [0.2, 0.1, 0.2],
+                }}
+                transition={{
+                    duration: 3,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                }}
+            />
 
             {/* Glow Layer */}
-            <div className="absolute inset-0 rounded-full bg-[var(--luma-sky)] blur-md opacity-40 group-hover:opacity-60 transition-opacity" />
+            <div className="absolute inset-0 rounded-full bg-[#86BBD8] blur-md opacity-30 group-hover:opacity-50 transition-opacity" />
 
             {/* Orb Container */}
-            <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-full bg-white dark:bg-black border border-[var(--luma-sky)]/30 shadow-xl flex items-center justify-center overflow-hidden backdrop-blur-sm">
+            <div className="relative w-14 h-14 rounded-full bg-white dark:bg-[#090C08] border border-[#86BBD8]/30 shadow-xl flex items-center justify-center overflow-hidden backdrop-blur-sm">
                 <img
                     src="/brand/logo.png"
-                    alt="Assistant"
-                    className="w-8 h-8 md:w-10 md:h-10 object-contain drop-shadow-sm"
+                    alt="Assistente"
+                    className="w-8 h-8 object-contain drop-shadow-sm"
                 />
             </div>
         </motion.button>

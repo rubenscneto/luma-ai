@@ -16,12 +16,13 @@ interface DailyPlanContextType {
 
     // Actions
     loadTodayPlan: () => Promise<void>;
-    generatePlan: (date?: string) => Promise<void>;
+    generatePlan: (date?: string, mode?: 'first_time' | 'regenerate' | 'fill_gaps') => Promise<void>;
+    generateHealthBlocks: (options?: { includeMeals?: boolean; includeWorkouts?: boolean }) => Promise<void>;
     markBlockDone: (blockId: string) => Promise<void>;
     skipBlock: (blockId: string, reason?: string) => Promise<void>;
     delayBlock: (blockId: string, minutes: number) => Promise<void>;
     addBlock: (block: Partial<DailyBlock>) => Promise<void>;
-    triggerReplan: (event: string, details: string) => Promise<void>;
+    replanDay: (userNote?: string) => Promise<void>;
     refreshBlocks: () => void;
 }
 
@@ -67,13 +68,16 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(true);
         try {
             const now = new Date();
+            const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+            const todayDate = today;
 
-            // Load fixed blocks
+            // Load fixed blocks for today
             const { data: fixed } = await supabase
                 .from('fixed_blocks')
                 .select('*')
                 .eq('user_id', user.id)
-                .eq('is_active', true);
+                .eq('is_active', true)
+                .contains('days_of_week', [dayOfWeek]);
 
             setFixedBlocks(fixed || []);
 
@@ -82,24 +86,76 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
                 .from('daily_plan')
                 .select('*')
                 .eq('user_id', user.id)
-                .eq('plan_date', today)
+                .eq('plan_date', todayDate)
                 .single();
 
             if (plan) {
                 setTodayPlan(plan);
 
-                // Load blocks
+                // Load daily blocks
                 const { data: blocks } = await supabase
                     .from('daily_blocks')
                     .select('*')
                     .eq('plan_id', plan.id)
                     .order('start_datetime', { ascending: true });
 
-                const enriched = (blocks || []).map(b => enrichBlockWithStatus(b, now));
-                setTodayBlocks(enriched);
+                // Convert fixed blocks to daily block format for display
+                const fixedAsDailyBlocks: DailyBlockWithStatus[] = (fixed || []).map(fb => {
+                    const startDatetime = `${todayDate}T${fb.start_time}`;
+                    const endDatetime = `${todayDate}T${fb.end_time}`;
+
+                    return enrichBlockWithStatus({
+                        id: `fixed-${fb.id}`,
+                        plan_id: plan.id,
+                        user_id: user.id,
+                        title: fb.title,
+                        description: fb.description,
+                        category: fb.category,
+                        start_datetime: startDatetime,
+                        end_datetime: endDatetime,
+                        is_done: false,
+                        is_skipped: false,
+                        ai_suggested: false,
+                        created_at: fb.created_at,
+                        is_fixed: true, // Mark as fixed block
+                    } as any, now);
+                });
+
+                // Merge and sort all blocks by start time
+                const dailyEnriched = (blocks || []).map(b => enrichBlockWithStatus(b, now));
+                const allBlocks = [...dailyEnriched, ...fixedAsDailyBlocks].sort((a, b) =>
+                    new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime()
+                );
+
+                setTodayBlocks(allBlocks);
             } else {
                 setTodayPlan(null);
-                setTodayBlocks([]);
+
+                // Even without a plan, show fixed blocks
+                const fixedAsDailyBlocks: DailyBlockWithStatus[] = (fixed || []).map(fb => {
+                    const startDatetime = `${todayDate}T${fb.start_time}`;
+                    const endDatetime = `${todayDate}T${fb.end_time}`;
+
+                    return enrichBlockWithStatus({
+                        id: `fixed-${fb.id}`,
+                        plan_id: '',
+                        user_id: user.id,
+                        title: fb.title,
+                        description: fb.description,
+                        category: fb.category,
+                        start_datetime: startDatetime,
+                        end_datetime: endDatetime,
+                        is_done: false,
+                        is_skipped: false,
+                        ai_suggested: false,
+                        created_at: fb.created_at,
+                        is_fixed: true,
+                    } as any, now);
+                });
+
+                setTodayBlocks(fixedAsDailyBlocks.sort((a, b) =>
+                    new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime()
+                ));
             }
         } catch (error) {
             console.error('Load today plan error:', error);
@@ -124,17 +180,18 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
         loadTodayPlan();
     }, [loadTodayPlan]);
 
-    const generatePlan = async (date?: string) => {
+    const generatePlan = async (date?: string, mode: 'first_time' | 'regenerate' | 'fill_gaps' = 'first_time') => {
         if (!user) return;
 
         setIsLoading(true);
         try {
-            const response = await fetch('/api/ai/generate-daily-plan', {
+            const response = await fetch('/api/ai/agenda/plan-day', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     user_id: user.id,
                     date: date || today,
+                    mode,
                     timezone: 'America/Sao_Paulo',
                 }),
             });
@@ -179,8 +236,8 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
                 b.id === blockId ? { ...b, is_skipped: true, status: 'skipped' } : b
             ));
 
-            // Trigger replan
-            await triggerReplan('skip', `Pulou: ${reason || 'sem motivo'}`);
+            // Trigger replan with skip signal
+            await triggerReplan('skip', blockId, reason);
         }
     };
 
@@ -203,7 +260,8 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
             .eq('user_id', user.id);
 
         if (!error) {
-            await triggerReplan('delay', `Atrasou ${minutes} minutos`);
+            // Use 'late' signal since delay means user is running late
+            await triggerReplan('late', blockId, `Atrasou ${minutes} minutos`);
             await loadTodayPlan();
         }
     };
@@ -247,24 +305,61 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    const triggerReplan = async (event: string, details: string) => {
-        if (!user || !todayPlan) return;
+    const triggerReplan = async (signal: 'late' | 'done' | 'skip' | 'manual_request', blockId?: string, note?: string) => {
+        if (!user) return;
 
+        setIsLoading(true);
         try {
-            await fetch('/api/ai/replan-day', {
+            const response = await fetch('/api/ai/agenda/replan-day', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     user_id: user.id,
-                    plan_id: todayPlan.id,
-                    event,
-                    event_details: details,
+                    date: today,
+                    signal,
+                    block_id: blockId,
+                    user_note: note,
                 }),
             });
 
-            await loadTodayPlan();
+            if (response.ok) {
+                await loadTodayPlan();
+            }
         } catch (error) {
             console.error('Replan error:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const replanDay = async (userNote?: string) => {
+        await triggerReplan('manual_request', undefined, userNote);
+    };
+
+    const generateHealthBlocks = async (options?: { includeMeals?: boolean; includeWorkouts?: boolean }) => {
+        if (!user || !todayPlan) return;
+
+        setIsLoading(true);
+        try {
+            const response = await fetch('/api/ai/health/generate-blocks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: user.id,
+                    date: today,
+                    plan_id: todayPlan.id,
+                    include_meals: options?.includeMeals ?? true,
+                    include_workouts: options?.includeWorkouts ?? true,
+                }),
+            });
+
+            if (response.ok) {
+                await loadTodayPlan();
+            }
+        } catch (error) {
+            console.error('Generate health blocks error:', error);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -282,11 +377,12 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
             isLoading,
             loadTodayPlan,
             generatePlan,
+            generateHealthBlocks,
             markBlockDone,
             skipBlock,
             delayBlock,
             addBlock,
-            triggerReplan,
+            replanDay,
             refreshBlocks,
         }}>
             {children}

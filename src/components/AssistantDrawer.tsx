@@ -91,7 +91,12 @@ export function AssistantDrawer({ isOpen, onClose }: AssistantDrawerProps) {
                         </div>
 
                         {/* Input Area */}
-                        <div className="p-4 bg-white dark:bg-black border-t border-zinc-100 dark:border-zinc-800">
+                        <div
+                            className="p-4 bg-white dark:bg-black border-t border-zinc-100 dark:border-zinc-800"
+                            style={{
+                                paddingBottom: isMobile ? "calc(env(safe-area-inset-bottom, 0px) + 16px)" : "16px",
+                            }}
+                        >
                             <form
                                 onSubmit={(e) => { e.preventDefault(); handleSend(); }}
                                 className="relative flex items-center"
@@ -101,9 +106,9 @@ export function AssistantDrawer({ isOpen, onClose }: AssistantDrawerProps) {
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     placeholder="Digite sua mensagem..."
-                                    className="w-full bg-zinc-50 dark:bg-zinc-900 border-none rounded-full px-5 py-3 pr-12 text-sm focus:ring-2 focus:ring-[var(--luma-sky)] outline-none"
+                                    className="w-full bg-zinc-50 dark:bg-zinc-900 border-none rounded-full px-5 py-3 pr-12 text-sm focus:ring-2 focus:ring-[var(--luma-sky)] outline-none min-h-[44px]"
                                 />
-                                <button type="submit" className="absolute right-2 p-2 bg-[var(--luma-black)] text-white rounded-full hover:opacity-90 transition-opacity">
+                                <button type="submit" className="absolute right-2 p-2.5 bg-[var(--luma-black)] text-white rounded-full hover:opacity-90 transition-opacity min-w-[44px] min-h-[44px] flex items-center justify-center">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
                                 </button>
                             </form>

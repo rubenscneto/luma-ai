@@ -4,12 +4,22 @@
   --background: #EEF4ED; /* luma-mint */
   --foreground: #090C08; /* luma-black */
   
-  /* LumaAI Palace */
+  /* LumaAI Palette */
   --luma-rose: #AC8887;
   --luma-sky: #86BBD8;
   --luma-slate: #4D626A;
   --luma-black: #090C08;
   --luma-mint: #EEF4ED;
+
+  /* Safe Area Insets */
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+
+  /* Mobile Tab Bar Height */
+  --tab-bar-height: 64px;
+  --mobile-header-height: 56px;
 }
 
 @theme inline {
@@ -33,10 +43,49 @@
   }
 }
 
+/* Use dvh for proper mobile viewport handling */
+html,
+body {
+  height: 100%;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Prevent pull-to-refresh on iOS */
+  overscroll-behavior-y: none;
+}
+
+/* Touch target minimum size for accessibility */
+button,
+a,
+[role="button"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Smaller buttons in specific contexts */
+.btn-sm {
+  min-height: 36px;
+  min-width: auto;
+}
+
+/* Fix for iOS keyboard pushing content */
+@supports (-webkit-touch-callout: none) {
+  .keyboard-aware {
+    padding-bottom: env(keyboard-inset-height, 0px);
+  }
+}
+
+/* Smooth scrolling with momentum on iOS */
+.scroll-smooth {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
 }
 
 /* Global Utility for Soft Glow Background */
@@ -64,4 +113,30 @@ body {
   filter: blur(100px);
   z-index: -1;
   pointer-events: none;
+}
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Animation for page transitions */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
 }
