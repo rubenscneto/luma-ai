@@ -92,7 +92,7 @@ export function LiveTimeline() {
     return (
         <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm">
             {/* Header */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
                 <div className="flex items-center gap-2">
                     <Clock className="w-5 h-5 text-brand-primary" />
                     <h3 className="font-semibold text-white">Timeline</h3>
@@ -102,20 +102,23 @@ export function LiveTimeline() {
                         </span>
                     )}
                 </div>
-                <div className="flex items-center gap-3">
+
+                <div className="flex items-center justify-between w-full sm:w-auto gap-3">
                     {isLate && (
                         <button
                             onClick={handleReplan}
                             disabled={isReplanning}
-                            className="px-3 py-1 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 text-xs font-medium transition-colors disabled:opacity-50"
+                            className="px-3 py-1.5 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 text-xs font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
                         >
-                            {isReplanning ? 'Replanejando...' : 'Replanejar'}
+                            {isReplanning ? '...' : 'Replanejar'}
                         </button>
                     )}
-                    <span className="text-sm text-white/60">
-                        {completedCount}/{totalCount}
-                    </span>
-                    <span className="text-2xl font-bold text-white">{timeString}</span>
+                    <div className="flex items-center gap-3 ml-auto sm:ml-0">
+                        <span className="text-sm text-white/60">
+                            {completedCount}/{totalCount}
+                        </span>
+                        <span className="text-2xl font-bold text-white tabular-nums tracking-tight">{timeString}</span>
+                    </div>
                 </div>
             </div>
 

@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { HealthProfile, ShoppingList, ShoppingItem } from '@/types';
 import { useAuth } from './authContext';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 interface HealthContextType {
     // State
@@ -65,9 +66,13 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
 
             if (!error) {
                 await loadHealthProfile();
+                toast.success('Perfil de saúde salvo com sucesso!');
+            } else {
+                throw error;
             }
         } catch (error) {
             console.error('Save health profile error:', error);
+            toast.error('Erro ao salvar perfil. Tente novamente.');
         } finally {
             setIsLoading(false);
         }

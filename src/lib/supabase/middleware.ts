@@ -33,8 +33,34 @@ export async function updateSession(request: NextRequest) {
         }
     );
 
-    // refreshing the auth token
-    await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Protect private routes
+    if (!user && (
+        request.nextUrl.pathname.startsWith('/dashboard') ||
+        request.nextUrl.pathname.startsWith('/agenda') ||
+        request.nextUrl.pathname.startsWith('/rotina') ||
+        request.nextUrl.pathname.startsWith('/saude') ||
+        request.nextUrl.pathname.startsWith('/estudos') ||
+        request.nextUrl.pathname.startsWith('/projetos') ||
+        request.nextUrl.pathname.startsWith('/biblioteca') ||
+        request.nextUrl.pathname.startsWith('/configuracoes')
+    )) {
+        const url = request.nextUrl.clone();
+        url.pathname = '/login';
+        return NextResponse.redirect(url);
+    }
+
+    // Redirect authenticated users from public routes
+    if (user && (
+        request.nextUrl.pathname === '/' ||
+        request.nextUrl.pathname === '/login' ||
+        request.nextUrl.pathname === '/register'
+    )) {
+        const url = request.nextUrl.clone();
+        url.pathname = '/dashboard';
+        return NextResponse.redirect(url);
+    }
 
     return response;
 }

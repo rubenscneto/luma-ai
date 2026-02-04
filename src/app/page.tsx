@@ -38,14 +38,17 @@ export default function LandingPage() {
       </div>
 
       {/* Navbar */}
-      <nav className="flex items-center justify-between px-8 py-6 max-w-7xl mx-auto w-full z-50 relative">
+      <nav
+        className="flex items-center justify-between px-6 py-4 md:px-8 md:py-6 max-w-7xl mx-auto w-full z-50 relative"
+        style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top))' }}
+      >
         <div className="flex items-center gap-3">
           <div className="relative w-10 h-10 md:w-14 md:h-14">
             <img src="/brand/logo.png" alt="LumaAI Logo" className="object-contain w-full h-full drop-shadow-md" />
           </div>
           <span className="font-bold text-xl tracking-tight text-[var(--luma-black)] dark:text-[var(--luma-mint)]">LumaAI</span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-6">
           <Link href="/login" className="font-medium hover:text-[var(--luma-slate)] transition-colors text-sm">Entrar</Link>
           <Link href="/register">
             <Button className="bg-[var(--luma-black)] hover:opacity-90 text-[var(--luma-mint)] rounded-full px-6 font-semibold shadow-md transition-all">

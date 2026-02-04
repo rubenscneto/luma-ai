@@ -52,6 +52,13 @@ export default function SaudePage() {
     const [loadingMeal, setLoadingMeal] = useState(false);
     const [loadingShopping, setLoadingShopping] = useState(false);
 
+    // Close onboarding when completed
+    React.useEffect(() => {
+        if (hasCompletedOnboarding) {
+            setShowOnboarding(false);
+        }
+    }, [hasCompletedOnboarding]);
+
     const handleGenerateMeal = async (type: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
         setLoadingMeal(true);
         const result = await generateMealSuggestion(type);
