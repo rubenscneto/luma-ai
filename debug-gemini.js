@@ -1,6 +1,6 @@
 const https = require('https');
 
-const apiKey = "AIzaSyCMz9CFOq-wBF7FF_tzcLfZQuF5F3V5xNc";
+const apiKey = "AIzaSyBTYNuy2OL2QH6dk3VSpPpsEh-2RTYCo0A";
 const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
 
 console.log("🔍 Querying Google API directly (bypassing SDK)...");
