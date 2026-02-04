@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X } from "lucide-react";
+import { X, Loader2, Send } from "lucide-react";
+import { useAuth } from "@/context/authContext";
 
 interface AssistantDrawerProps {
     isOpen: boolean;
@@ -19,20 +20,52 @@ export function AssistantDrawer({ isOpen, onClose }: AssistantDrawerProps) {
         return () => window.removeEventListener("resize", checkMobile);
     }, []);
 
-    // Placeholder interaction for now
+    const { user } = useAuth(); // Need auth context
+    const [isLoading, setIsLoading] = useState(false);
     const [messages, setMessages] = useState<{ role: 'user' | 'assistant', text: string }[]>([
         { role: 'assistant', text: 'Olá! Como posso ajudar você a ser mais produtivo hoje?' }
     ]);
     const [input, setInput] = useState("");
 
-    const handleSend = () => {
-        if (!input.trim()) return;
-        setMessages([...messages, { role: 'user', text: input }]);
+    const handleSend = async () => {
+        if (!input.trim() || isLoading) return;
+
+        const userMsg = input.trim();
         setInput("");
-        // Simulate response
-        setTimeout(() => {
-            setMessages(prev => [...prev, { role: 'assistant', text: 'Entendi. Estou processando sua solicitação...' }]);
-        }, 1000);
+        setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+        setIsLoading(true);
+
+        try {
+            const response = await fetch('/api/ai/assistant-actions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: user?.id, // Sent user_id
+                    message: userMsg,
+                    conversation_history: messages.map(m => ({ role: m.role, content: m.text }))
+                })
+            });
+
+            if (!response.ok) throw new Error('Falha na comunicação');
+
+            const data = await response.json();
+
+            // Add assistant response
+            setMessages(prev => [...prev, { role: 'assistant', text: data.message_to_user }]);
+
+            // Handle actions if needed (e.g. refresh data)
+            if (data.executed_actions && data.executed_actions.length > 0) {
+                // Ideally trigger a global refresh here
+                // for now just log
+                console.log("Actions executed:", data.executed_actions);
+            }
+
+        } catch (error) {
+            console.error(error);
+            setMessages(prev => [...prev, { role: 'assistant', text: 'Desculpe, tive um erro ao processar. Tente novamente.' }]);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -105,11 +138,16 @@ export function AssistantDrawer({ isOpen, onClose }: AssistantDrawerProps) {
                                     type="text"
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
-                                    placeholder="Digite sua mensagem..."
-                                    className="w-full bg-zinc-50 dark:bg-zinc-900 border-none rounded-full px-5 py-3 pr-12 text-sm focus:ring-2 focus:ring-[var(--luma-sky)] outline-none min-h-[44px]"
+                                    placeholder={isLoading ? "Processando..." : "Digite sua mensagem..."}
+                                    disabled={isLoading}
+                                    className="w-full bg-zinc-50 dark:bg-zinc-900 border-none rounded-full px-5 py-3 pr-12 text-sm focus:ring-2 focus:ring-[var(--luma-sky)] outline-none min-h-[44px] disabled:opacity-50"
                                 />
-                                <button type="submit" className="absolute right-2 p-2.5 bg-[var(--luma-black)] text-white rounded-full hover:opacity-90 transition-opacity min-w-[44px] min-h-[44px] flex items-center justify-center">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
+                                <button
+                                    type="submit"
+                                    disabled={!input.trim() || isLoading}
+                                    className="absolute right-2 p-2.5 bg-[var(--luma-black)] text-white rounded-full hover:opacity-90 transition-opacity min-w-[44px] min-h-[44px] flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                                 </button>
                             </form>
                         </div>

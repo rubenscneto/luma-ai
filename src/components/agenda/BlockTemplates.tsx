@@ -90,6 +90,72 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
         setTimeout(() => setCopiedId(null), 2000);
     };
 
+    // Use Template State
+    const [selectedTemplate, setSelectedTemplate] = useState<BlockTemplate | null>(null);
+    const [useFormData, setUseFormData] = useState({
+        date: new Date().toISOString().split('T')[0],
+        startTime: '09:00'
+    });
+    const { user } = useAuth(); // Ensure user is available
+
+    const handleConfirmUse = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedTemplate || !user) return;
+
+        // Calculate end time
+        const [hours, minutes] = useFormData.startTime.split(':').map(Number);
+        const start = new Date(`${useFormData.date}T${useFormData.startTime}:00`);
+        const end = new Date(start.getTime() + selectedTemplate.duration_minutes * 60000);
+
+        const start_datetime = start.toISOString();
+        const end_datetime = end.toISOString();
+
+        try {
+            const { error } = await supabase.from('daily_blocks').insert({
+                user_id: user.id,
+                title: selectedTemplate.title,
+                category: selectedTemplate.category,
+                start_datetime: start_datetime, // Use full ISO datetime
+                end_datetime: end_datetime,
+                is_done: false,
+                source: 'template'
+            });
+
+            if (error) throw error;
+
+            setSelectedTemplate(null);
+            // Optional: trigger refresh or notify user
+            // toast.success("Bloco agendado!");
+        } catch (error) {
+            console.error("Error using template:", error);
+            // toast.error("Erro ao agendar.");
+        }
+    };
+
+    const openUseModal = (template: BlockTemplate) => {
+        // Default time to next hour
+        const nextHour = new Date();
+        nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
+        const timeStr = nextHour.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+        setUseFormData({
+            date: new Date().toISOString().split('T')[0],
+            startTime: timeStr
+        });
+        setSelectedTemplate(template);
+    };
+
+    // Original handleUseTemplate adjusted
+    const handleUseTemplate = (template: BlockTemplate) => {
+        if (onUseTemplate) {
+            onUseTemplate(template);
+        } else {
+            openUseModal(template);
+        }
+        setCopiedId(template.id);
+        setTimeout(() => setCopiedId(null), 2000);
+    };
+
     const presets = templates.filter(t => t.is_preset);
     const customTemplates = templates.filter(t => !t.is_preset);
 
@@ -97,6 +163,7 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
         <div className="space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
+
                 <div>
                     <h2 className="text-xl font-semibold text-white">Templates de Blocos</h2>
                     <p className="text-sm text-white/60">
@@ -212,6 +279,85 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
                 </div>
             )}
 
+
+            {/* Use Template Modal */}
+            <AnimatePresence>
+                {selectedTemplate && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                        onClick={() => setSelectedTemplate(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            onClick={e => e.stopPropagation()}
+                            className="bg-[#1a1a2e] rounded-2xl p-6 w-full max-w-sm border border-white/10"
+                        >
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-semibold text-white">Usar Template</h3>
+                                <button onClick={() => setSelectedTemplate(null)} className="p-2 rounded-lg hover:bg-white/10">
+                                    <X className="w-5 h-5 text-white/60" />
+                                </button>
+                            </div>
+
+                            <div className="mb-6 p-3 bg-white/5 rounded-xl border border-white/10">
+                                <h4 className="font-medium text-white">{selectedTemplate.title}</h4>
+                                <div className="flex items-center gap-2 mt-1 text-xs text-white/60">
+                                    <Clock className="w-3 h-3" />
+                                    <span>{selectedTemplate.duration_minutes} min</span>
+                                    <span>•</span>
+                                    <span className="capitalize">{getCategoryInfo(selectedTemplate.category).label}</span>
+                                </div>
+                            </div>
+
+                            <form onSubmit={handleConfirmUse} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm text-white/60 mb-1">Data</label>
+                                    <input
+                                        type="date"
+                                        value={useFormData.date}
+                                        onChange={e => setUseFormData(prev => ({ ...prev, date: e.target.value }))}
+                                        className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-purple-500/50"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm text-white/60 mb-1">Horário de Início</label>
+                                    <input
+                                        type="time"
+                                        value={useFormData.startTime}
+                                        onChange={e => setUseFormData(prev => ({ ...prev, startTime: e.target.value }))}
+                                        className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-purple-500/50"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="flex gap-3 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedTemplate(null)}
+                                        className="flex-1 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white/60 hover:bg-white/10 transition-colors"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl text-white font-medium hover:opacity-90 transition-opacity"
+                                    >
+                                        Agendar
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Create Form Modal */}
             <AnimatePresence>
                 {showForm && (
@@ -261,8 +407,8 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
                                                     type="button"
                                                     onClick={() => setFormData(prev => ({ ...prev, category: cat.value }))}
                                                     className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${isSelected
-                                                            ? `bg-gradient-to-r ${cat.color} text-white`
-                                                            : 'bg-white/5 text-white/60 hover:bg-white/10'
+                                                        ? `bg-gradient-to-r ${cat.color} text-white`
+                                                        : 'bg-white/5 text-white/60 hover:bg-white/10'
                                                         }`}
                                                 >
                                                     <Icon className="w-4 h-4" />

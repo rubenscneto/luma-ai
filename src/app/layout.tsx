@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { AppBackgroundGlow } from "@/components/AppBackgroundGlow";
+import { PWAManager } from "@/components/pwa/PWAManager";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -45,6 +46,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <Providers>
           <AppBackgroundGlow />
+          <PWAManager />
           {children}
         </Providers>
       </body>

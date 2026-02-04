@@ -48,23 +48,58 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
             }
 
             if (user) {
-                const { data, error } = await supabase
+                // Load Routines (Legacy)
+                const { data: routinesData, error: routinesError } = await supabase
                     .from('routines')
                     .select('*')
                     .order('start_time', { ascending: true });
 
-                if (data && !error && data.length > 0) {
-                    // Map DB snake_case to TS camelCase
-                    const dbRoutines: RoutineBlock[] = data.map(r => ({
+                if (routinesData && !routinesError && routinesData.length > 0) {
+                    const dbRoutines: RoutineBlock[] = routinesData.map(r => ({
                         id: r.id,
                         title: r.title,
-                        startTime: r.start_time.slice(0, 5), // '07:00:00' -> '07:00'
+                        startTime: r.start_time.slice(0, 5),
                         duration: r.duration,
                         type: r.type as any,
-                        completed: false // DB doesn't track daily completion yet
+                        completed: false
                     }));
                     setRoutineState(dbRoutines);
-                    return;
+                }
+
+                // Load Profile and Fixed Tasks
+                try {
+                    const [profileRes, fixedRes] = await Promise.all([
+                        supabase.from('profiles').select('*').eq('id', user.id).single(),
+                        supabase.from('fixed_blocks').select('*').eq('user_id', user.id)
+                    ]);
+
+                    if (profileRes.data) {
+                        const p = profileRes.data;
+                        const loadedProfile: RoutineProfile = {
+                            occupation: p.occupation || '',
+                            peakProductivity: p.peak_productivity || '',
+                            energyLevel: p.energy_level || '',
+                            style: p.style || 'balanced',
+                            userSettings: {
+                                user_id: user.id,
+                                wake_up_time: p.wake_up_time || '07:00',
+                                bed_time: p.bed_time || '22:00'
+                            },
+                            fixedTasks: (fixedRes.data || []).map((f: any) => ({
+                                id: f.id,
+                                user_id: f.user_id,
+                                title: f.title,
+                                start_time: f.start_time?.slice(0, 5) || '00:00',
+                                end_time: f.end_time?.slice(0, 5) || '00:00',
+                                days_of_week: [f.day_of_week]
+                            }))
+                        };
+                        setProfileState(loadedProfile);
+                        // Update local storage
+                        localStorage.setItem('luma_profile', JSON.stringify(loadedProfile));
+                    }
+                } catch (e) {
+                    console.error("Error loading profile:", e);
                 }
             }
 
@@ -101,10 +136,30 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
         if (user) saveToSupabase(newRoutine);
     };
 
-    const setProfile = (newProfile: RoutineProfile) => {
+    const setProfile = async (newProfile: RoutineProfile) => {
         setProfileState(newProfile);
         localStorage.setItem('luma_profile', JSON.stringify(newProfile));
-        // TODO: Sync profile to DB too if needed
+
+        if (user) {
+            try {
+                // Update specific profile fields
+                const { error } = await supabase
+                    .from('profiles')
+                    .update({
+                        occupation: newProfile.occupation,
+                        peak_productivity: newProfile.peakProductivity,
+                        energy_level: newProfile.energyLevel,
+                        style: newProfile.style,
+                        wake_up_time: newProfile.userSettings?.wake_up_time,
+                        bed_time: newProfile.userSettings?.bed_time
+                    })
+                    .eq('id', user.id);
+
+                if (error) console.error("Failed to sync profile:", error);
+            } catch (e) {
+                console.error(e);
+            }
+        }
     };
 
     const setMotivation = (data: { text: string; author: string }) => {

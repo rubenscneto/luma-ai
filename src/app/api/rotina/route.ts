@@ -50,7 +50,7 @@ export async function POST(request: Request) {
 
     // 2. Save Fixed Commitments (Delete old & Insert new)
     if (body.fixedTasks && body.fixedTasks.length > 0) {
-        await supabase.from('fixed_commitments').delete().eq('user_id', user.id);
+        await supabase.from('fixed_blocks').delete().eq('user_id', user.id);
 
         const fixedToInsert = body.fixedTasks.map((t: any) => ({
             user_id: user.id,
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
             category: "fixed"
         }));
 
-        const { error: fixedError } = await supabase.from('fixed_commitments').insert(fixedToInsert);
+        const { error: fixedError } = await supabase.from('fixed_blocks').insert(fixedToInsert);
         if (fixedError) console.error("Error saving fixed:", fixedError);
     }
 

@@ -13,6 +13,8 @@ import {
     BookOpen,
     FolderKanban,
     Settings,
+    ListChecks,
+    Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,11 +27,13 @@ interface TabItem {
 const mainTabs: TabItem[] = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Início" },
     { href: "/agenda", icon: Calendar, label: "Agenda" },
+    { href: "/rotina", icon: ListChecks, label: "Rotina" },
     { href: "/saude", icon: Heart, label: "Saúde" },
-    { href: "/estudos", icon: GraduationCap, label: "Estudos" },
 ];
 
 const moreTabs: TabItem[] = [
+    { href: "/estudos", icon: GraduationCap, label: "Estudos" },
+    { href: "/dashboard/assistant", icon: Bot, label: "Assistente" },
     { href: "/projetos", icon: FolderKanban, label: "Projetos" },
     { href: "/biblioteca", icon: BookOpen, label: "Biblioteca" },
     { href: "/configuracoes", icon: Settings, label: "Config" },

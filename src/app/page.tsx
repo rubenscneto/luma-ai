@@ -70,9 +70,9 @@ export default function LandingPage() {
             Seu assistente pessoal para produtividade e aprendizado. Organize seus dias, planeje projetos e alcance objetivos.
           </p>
 
-          <div className="flex items-center gap-4 pt-4">
-            <Link href="/register">
-              <Button className="h-12 px-8 text-base bg-[var(--luma-black)] text-[var(--luma-mint)] hover:bg-[var(--luma-slate)] transition-all rounded-full shadow-lg">
+          <div className="flex flex-col sm:flex-row items-center gap-4 pt-4 w-full sm:w-auto">
+            <Link href="/register" className="w-full sm:w-auto">
+              <Button className="h-12 px-8 text-base bg-[var(--luma-black)] text-[var(--luma-mint)] hover:bg-[var(--luma-slate)] transition-all rounded-full shadow-lg w-full sm:w-auto">
                 Comece gratuitamente
               </Button>
             </Link>
