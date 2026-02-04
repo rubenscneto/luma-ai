@@ -82,13 +82,7 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
         setTemplates(prev => prev.filter(t => t.id !== id));
     };
 
-    const handleUseTemplate = (template: BlockTemplate) => {
-        if (onUseTemplate) {
-            onUseTemplate(template);
-        }
-        setCopiedId(template.id);
-        setTimeout(() => setCopiedId(null), 2000);
-    };
+
 
     // Use Template State
     const [selectedTemplate, setSelectedTemplate] = useState<BlockTemplate | null>(null);
