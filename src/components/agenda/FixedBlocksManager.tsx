@@ -33,14 +33,12 @@ const DAYS = [
 ];
 
 const CATEGORIES = [
-    { value: 'trabalho', label: 'Trabalho', icon: Briefcase, color: 'from-blue-500 to-blue-600' },
-    { value: 'estudo', label: 'Estudo', icon: GraduationCap, color: 'from-purple-500 to-purple-600' },
-    { value: 'treino', label: 'Treino', icon: Dumbbell, color: 'from-green-500 to-green-600' },
-    { value: 'alimentacao', label: 'Alimentação', icon: Utensils, color: 'from-orange-500 to-orange-600' },
-    { value: 'descanso', label: 'Descanso', icon: Moon, color: 'from-indigo-500 to-indigo-600' },
-    { value: 'saude', label: 'Saúde', icon: Heart, color: 'from-red-500 to-red-600' },
-    { value: 'social', label: 'Social', icon: Users, color: 'from-pink-500 to-pink-600' },
-    { value: 'outro', label: 'Outro', icon: Sparkles, color: 'from-gray-500 to-gray-600' },
+    { value: 'work', label: 'Trabalho', icon: Briefcase, color: 'from-blue-500 to-blue-600' },
+    { value: 'study', label: 'Estudo', icon: GraduationCap, color: 'from-purple-500 to-purple-600' },
+    { value: 'health', label: 'Treino/Saúde', icon: Dumbbell, color: 'from-green-500 to-green-600' },
+    { value: 'meal', label: 'Alimentação', icon: Utensils, color: 'from-orange-500 to-orange-600' },
+    { value: 'leisure', label: 'Lazer/Descanso', icon: Moon, color: 'from-indigo-500 to-indigo-600' },
+    { value: 'admin', label: 'Administrativo', icon: Sparkles, color: 'from-gray-500 to-gray-600' },
 ];
 
 interface FixedBlockFormData {
@@ -59,7 +57,7 @@ export default function FixedBlocksManager() {
     const [editingBlock, setEditingBlock] = useState<FixedBlock | null>(null);
     const [formData, setFormData] = useState<FixedBlockFormData>({
         title: '',
-        category: 'trabalho',
+        category: 'work',
         day_of_week: [],
         start_time: '09:00',
         end_time: '10:00',
@@ -163,7 +161,7 @@ export default function FixedBlocksManager() {
     const resetForm = () => {
         setFormData({
             title: '',
-            category: 'trabalho',
+            category: 'work',
             day_of_week: [],
             start_time: '09:00',
             end_time: '10:00',
@@ -341,8 +339,8 @@ export default function FixedBlocksManager() {
                                                     type="button"
                                                     onClick={() => setFormData(prev => ({ ...prev, category: cat.value }))}
                                                     className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${isSelected
-                                                            ? `bg-gradient-to-r ${cat.color} text-white`
-                                                            : 'bg-white/5 text-white/60 hover:bg-white/10'
+                                                        ? `bg-gradient-to-r ${cat.color} text-white`
+                                                        : 'bg-white/5 text-white/60 hover:bg-white/10'
                                                         }`}
                                                 >
                                                     <Icon className="w-4 h-4" />
@@ -367,8 +365,8 @@ export default function FixedBlocksManager() {
                                                     type="button"
                                                     onClick={() => toggleDay(day.value)}
                                                     className={`flex-1 py-2 rounded-xl text-xs font-medium transition-all ${isSelected
-                                                            ? 'bg-purple-500 text-white'
-                                                            : 'bg-white/5 text-white/60 hover:bg-white/10'
+                                                        ? 'bg-purple-500 text-white'
+                                                        : 'bg-white/5 text-white/60 hover:bg-white/10'
                                                         }`}
                                                 >
                                                     {day.label}

@@ -19,27 +19,25 @@ interface BlockTemplate {
 }
 
 const CATEGORIES = [
-    { value: 'trabalho', label: 'Trabalho', icon: Briefcase, color: 'from-blue-500 to-blue-600' },
-    { value: 'estudo', label: 'Estudo', icon: GraduationCap, color: 'from-purple-500 to-purple-600' },
-    { value: 'treino', label: 'Treino', icon: Dumbbell, color: 'from-green-500 to-green-600' },
-    { value: 'alimentacao', label: 'Alimentação', icon: Utensils, color: 'from-orange-500 to-orange-600' },
-    { value: 'descanso', label: 'Descanso', icon: Moon, color: 'from-indigo-500 to-indigo-600' },
-    { value: 'saude', label: 'Saúde', icon: Heart, color: 'from-red-500 to-red-600' },
-    { value: 'social', label: 'Social', icon: Users, color: 'from-pink-500 to-pink-600' },
-    { value: 'outro', label: 'Outro', icon: Sparkles, color: 'from-gray-500 to-gray-600' },
+    { value: 'work', label: 'Trabalho', icon: Briefcase, color: 'from-blue-500 to-blue-600' },
+    { value: 'study', label: 'Estudo', icon: GraduationCap, color: 'from-purple-500 to-purple-600' },
+    { value: 'health', label: 'Treino/Saúde', icon: Dumbbell, color: 'from-green-500 to-green-600' },
+    { value: 'meal', label: 'Alimentação', icon: Utensils, color: 'from-orange-500 to-orange-600' },
+    { value: 'leisure', label: 'Lazer/Descanso', icon: Moon, color: 'from-indigo-500 to-indigo-600' },
+    { value: 'admin', label: 'Administrativo', icon: Sparkles, color: 'from-gray-500 to-gray-600' },
 ];
 
 // Default presets
 const DEFAULT_PRESETS: Omit<BlockTemplate, 'id'>[] = [
-    { title: 'Reunião rápida', category: 'trabalho', duration_minutes: 30, description: 'Reunião de alinhamento', is_preset: true },
-    { title: 'Deep Work', category: 'trabalho', duration_minutes: 90, description: 'Foco intenso sem interrupções', is_preset: true },
-    { title: 'Sessão de estudo', category: 'estudo', duration_minutes: 45, description: 'Estudo com técnica Pomodoro', is_preset: true },
-    { title: 'Revisão de flashcards', category: 'estudo', duration_minutes: 20, description: 'Revisão espaçada', is_preset: true },
-    { title: 'Treino HIIT', category: 'treino', duration_minutes: 30, description: 'Treino intervalado', is_preset: true },
-    { title: 'Alongamento', category: 'treino', duration_minutes: 15, description: 'Flexibilidade e relaxamento', is_preset: true },
-    { title: 'Almoço', category: 'alimentacao', duration_minutes: 60, description: 'Refeição e descanso', is_preset: true },
-    { title: 'Meditação', category: 'descanso', duration_minutes: 15, description: 'Mindfulness', is_preset: true },
-    { title: 'Power nap', category: 'descanso', duration_minutes: 20, description: 'Cochilo restaurador', is_preset: true },
+    { title: 'Reunião rápida', category: 'work', duration_minutes: 30, description: 'Reunião de alinhamento', is_preset: true },
+    { title: 'Deep Work', category: 'work', duration_minutes: 90, description: 'Foco intenso sem interrupções', is_preset: true },
+    { title: 'Sessão de estudo', category: 'study', duration_minutes: 45, description: 'Estudo com técnica Pomodoro', is_preset: true },
+    { title: 'Revisão de flashcards', category: 'study', duration_minutes: 20, description: 'Revisão espaçada', is_preset: true },
+    { title: 'Treino HIIT', category: 'health', duration_minutes: 30, description: 'Treino intervalado', is_preset: true },
+    { title: 'Alongamento', category: 'health', duration_minutes: 15, description: 'Flexibilidade e relaxamento', is_preset: true },
+    { title: 'Almoço', category: 'meal', duration_minutes: 60, description: 'Refeição e descanso', is_preset: true },
+    { title: 'Meditação', category: 'leisure', duration_minutes: 15, description: 'Mindfulness', is_preset: true },
+    { title: 'Power nap', category: 'leisure', duration_minutes: 20, description: 'Cochilo restaurador', is_preset: true },
 ];
 
 interface BlockTemplatesProps {
@@ -55,7 +53,7 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [formData, setFormData] = useState({
         title: '',
-        category: 'trabalho',
+        category: 'work',
         duration_minutes: 30,
         description: '',
     });
@@ -74,7 +72,7 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
         };
 
         setTemplates(prev => [...prev, newTemplate]);
-        setFormData({ title: '', category: 'trabalho', duration_minutes: 30, description: '' });
+        setFormData({ title: '', category: 'work', duration_minutes: 30, description: '' });
         setShowForm(false);
     };
 
