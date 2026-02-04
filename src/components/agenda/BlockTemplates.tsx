@@ -96,7 +96,7 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
         date: new Date().toISOString().split('T')[0],
         startTime: '09:00'
     });
-    const { user } = useAuth(); // Ensure user is available
+
 
     const handleConfirmUse = async (e: React.FormEvent) => {
         e.preventDefault();
