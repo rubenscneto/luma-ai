@@ -21,6 +21,13 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const { user_id, message, conversation_history = [] } = body;
 
+        if (!process.env.GEMINI_API_KEY) {
+            return NextResponse.json({ error: 'Configuração ausente: GEMINI_API_KEY não encontrada.' }, { status: 500 });
+        }
+        if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+            return NextResponse.json({ error: 'Configuração ausente: SUPABASE_SERVICE_ROLE_KEY não encontrada.' }, { status: 500 });
+        }
+
         if (!user_id || !message) {
             return NextResponse.json({ error: 'user_id and message are required' }, { status: 400 });
         }

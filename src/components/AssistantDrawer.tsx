@@ -46,7 +46,10 @@ export function AssistantDrawer({ isOpen, onClose }: AssistantDrawerProps) {
                 })
             });
 
-            if (!response.ok) throw new Error('Falha na comunicação');
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Falha na comunicação');
+            }
 
             const data = await response.json();
 
@@ -60,9 +63,9 @@ export function AssistantDrawer({ isOpen, onClose }: AssistantDrawerProps) {
                 console.log("Actions executed:", data.executed_actions);
             }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            setMessages(prev => [...prev, { role: 'assistant', text: 'Desculpe, tive um erro ao processar. Tente novamente.' }]);
+            setMessages(prev => [...prev, { role: 'assistant', text: error.message || 'Desculpe, tive um erro ao processar. Tente novamente.' }]);
         } finally {
             setIsLoading(false);
         }
