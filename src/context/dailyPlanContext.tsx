@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { DailyPlan, DailyBlock, DailyBlockWithStatus, BlockStatus, FixedBlock } from '@/types';
 import { useAuth } from './authContext';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 interface DailyPlanContextType {
     // State
@@ -197,10 +198,17 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
             });
 
             if (response.ok) {
+                const data = await response.json();
+                toast.success(`Agenda gerada: ${data.blocks_count?.total || 0} blocos criados!`);
                 await loadTodayPlan();
+            } else {
+                const errorData = await response.json().catch(() => ({}));
+                console.error('Generate plan error response:', errorData);
+                toast.error(errorData.error || 'Erro ao gerar agenda. Tente novamente.');
             }
         } catch (error) {
             console.error('Generate plan error:', error);
+            toast.error('Erro de conexão ao gerar agenda.');
         } finally {
             setIsLoading(false);
         }

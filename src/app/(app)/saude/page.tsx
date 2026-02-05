@@ -105,8 +105,8 @@ export default function SaudePage() {
 
     if (showOnboarding || !hasCompletedOnboarding) {
         return (
-            <div className="p-6">
-                <HealthOnboarding />
+            <div className="p-6 pb-24">
+                <HealthOnboarding onComplete={() => setShowOnboarding(false)} />
             </div>
         );
     }

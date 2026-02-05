@@ -11,10 +11,14 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 // Fallback response when AI fails
-const FALLBACK_RESPONSE: AssistantActionsAIResponse = {
-    message_to_user: "Desculpe, tive um problema ao processar seu pedido. Pode reformular?",
+const getFallbackResponse = (errorType?: string): AssistantActionsAIResponse => ({
+    message_to_user: errorType === 'parse_error'
+        ? "Desculpe, recebi uma resposta inválida. Pode tentar novamente?"
+        : errorType === 'api_error'
+            ? "Desculpe, estou com problemas de conexão. Tente novamente em alguns segundos."
+            : "Desculpe, tive um problema ao processar seu pedido. Pode reformular?",
     actions: [{ type: 'ask_user', questions: ['O que você gostaria de fazer?'] }]
-};
+});
 
 export async function POST(req: NextRequest) {
     try {
@@ -133,7 +137,7 @@ ${message}
                 retryCount++;
                 if (retryCount > maxRetries) {
                     console.error('Max retries reached, using fallback');
-                    aiResponse = FALLBACK_RESPONSE;
+                    aiResponse = getFallbackResponse('parse_error');
                     break;
                 }
                 // Retry with correction prompt
@@ -337,9 +341,10 @@ ${message}
 
     } catch (error: any) {
         console.error('Assistant actions error:', error);
+        const fallback = getFallbackResponse('api_error');
         return NextResponse.json({
-            message_to_user: FALLBACK_RESPONSE.message_to_user,
-            actions: FALLBACK_RESPONSE.actions,
+            message_to_user: fallback.message_to_user,
+            actions: fallback.actions,
             error: error.message
         }, { status: 500 });
     }

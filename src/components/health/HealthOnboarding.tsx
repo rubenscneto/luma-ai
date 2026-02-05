@@ -49,7 +49,11 @@ const equipmentOptions = [
     'Bicicleta', 'Esteira', 'Academia Completa'
 ];
 
-export function HealthOnboarding() {
+interface HealthOnboardingProps {
+    onComplete?: () => void;
+}
+
+export function HealthOnboarding({ onComplete }: HealthOnboardingProps) {
     const { saveHealthProfile, isLoading } = useHealth();
     const [currentStep, setCurrentStep] = useState(0);
 
@@ -96,6 +100,8 @@ export function HealthOnboarding() {
             wake_time: wakeTime,
             sleep_time: sleepTime,
         });
+        // Call onComplete callback after successful save
+        onComplete?.();
     };
 
     const renderStep = () => {
