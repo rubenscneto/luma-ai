@@ -1,18 +1,78 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Compass, Settings, CheckCircle2 } from "lucide-react";
+import { Compass, Settings, CheckCircle2, Loader2 } from "lucide-react";
 import { RoutineManualForm } from "@/components/routine/RoutineManualForm";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useAuth } from "@/context/authContext";
+import { supabase } from "@/lib/supabase";
+
+interface RoutineProfile {
+    occupation?: string;
+    peak_productivity?: string;
+    wake_up_time?: string;
+    bed_time?: string;
+    style?: string;
+}
 
 export default function RoutineCentralPage() {
     const router = useRouter();
+    const { user } = useAuth();
+    const [profile, setProfile] = useState<RoutineProfile | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function loadProfile() {
+            if (!user) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                const { data } = await supabase
+                    .from("routine_profiles")
+                    .select("*")
+                    .eq("user_id", user.id)
+                    .single();
+
+                setProfile(data);
+            } catch (error) {
+                console.error("Error loading profile:", error);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        loadProfile();
+    }, [user]);
+
+    const translateOccupation = (occ?: string) => {
+        if (!occ) return "Não definido";
+        return occ; // Already user-entered text
+    };
+
+    const translateFocusPeak = (peak?: string) => {
+        const map: Record<string, string> = {
+            morning: "Manhã",
+            manha: "Manhã",
+            afternoon: "Tarde",
+            tarde: "Tarde",
+            night: "Noite",
+            noite: "Noite",
+        };
+        return peak ? map[peak.toLowerCase()] || peak : "Não definido";
+    };
+
+    const formatSleep = () => {
+        if (!profile?.wake_up_time && !profile?.bed_time) return "Não definido";
+        return `${profile?.wake_up_time || "?"} - ${profile?.bed_time || "?"}`;
+    };
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 p-6 pb-24">
             <div className="flex flex-col gap-1">
                 <h1 className="text-3xl font-bold tracking-tight">Central de Rotina</h1>
                 <p className="text-zinc-500">Gerencie como a IA entende e organiza seu dia.</p>
@@ -73,20 +133,27 @@ export default function RoutineCentralPage() {
                     <CheckCircle2 className="text-green-500" size={20} />
                     <h3 className="font-semibold">Status da Configuração Atual</h3>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div className="p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
-                        <p className="text-zinc-400 text-xs uppercase font-bold mb-1">Perfil</p>
-                        <p className="font-medium">Estudante</p>
+
+                {loading ? (
+                    <div className="flex items-center justify-center py-4">
+                        <Loader2 className="animate-spin text-zinc-400" size={24} />
                     </div>
-                    <div className="p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
-                        <p className="text-zinc-400 text-xs uppercase font-bold mb-1">Sono</p>
-                        <p className="font-medium">07:00 - 23:00</p>
+                ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div className="p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                            <p className="text-zinc-400 text-xs uppercase font-bold mb-1">Perfil</p>
+                            <p className="font-medium">{translateOccupation(profile?.occupation)}</p>
+                        </div>
+                        <div className="p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                            <p className="text-zinc-400 text-xs uppercase font-bold mb-1">Sono</p>
+                            <p className="font-medium">{formatSleep()}</p>
+                        </div>
+                        <div className="p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                            <p className="text-zinc-400 text-xs uppercase font-bold mb-1">Foco</p>
+                            <p className="font-medium">{translateFocusPeak(profile?.peak_productivity)}</p>
+                        </div>
                     </div>
-                    <div className="p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
-                        <p className="text-zinc-400 text-xs uppercase font-bold mb-1">Foco</p>
-                        <p className="font-medium">Manhã</p>
-                    </div>
-                </div>
+                )}
             </div>
         </div>
     );
