@@ -33,7 +33,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // 1. Save Profile (Upsert)
+    // 1. Save Profile (Upsert) - includes objectives and hobbies
     const profileData = {
         user_id: user.id,
         occupation: body.occupation,
@@ -42,7 +42,10 @@ export async function POST(request: Request) {
         style: body.style,
         wake_up_time: body.userSettings?.wake_up_time,
         bed_time: body.userSettings?.bed_time,
-        goal: body.goal || "Maximizar produtividade"
+        goal: body.goal || "Maximizar produtividade",
+        objectives: body.objectives || [],
+        hobbies: body.hobbies || [],
+        updated_at: new Date().toISOString(),
     };
 
     const { error: profileError } = await supabase.from('routine_profiles').upsert(profileData);
@@ -52,17 +55,42 @@ export async function POST(request: Request) {
     if (body.fixedTasks && body.fixedTasks.length > 0) {
         await supabase.from('fixed_blocks').delete().eq('user_id', user.id);
 
-        const fixedToInsert = body.fixedTasks.map((t: any) => ({
-            user_id: user.id,
-            title: t.title,
-            start_time: t.start_time,
-            end_time: t.end_time,
-            days_of_week: t.days_of_week,
-            category: "fixed"
-        }));
+        // Create separate entries for each day (day_of_week is integer 0-6)
+        const fixedToInsert: any[] = [];
 
-        const { error: fixedError } = await supabase.from('fixed_blocks').insert(fixedToInsert);
-        if (fixedError) console.error("Error saving fixed:", fixedError);
+        for (const task of body.fixedTasks) {
+            // days_of_week can be array of day numbers or names
+            const days = task.days_of_week || task.day_of_week || [];
+            const daysArray = Array.isArray(days) ? days : [days];
+
+            for (const day of daysArray) {
+                // Convert day name to number if needed
+                let dayNum = day;
+                if (typeof day === 'string') {
+                    const dayMap: Record<string, number> = {
+                        'sunday': 0, 'segunda': 1, 'monday': 1, 'terça': 2, 'tuesday': 2,
+                        'quarta': 3, 'wednesday': 3, 'quinta': 4, 'thursday': 4,
+                        'sexta': 5, 'friday': 5, 'sabado': 6, 'saturday': 6, 'domingo': 0
+                    };
+                    dayNum = dayMap[day.toLowerCase()] ?? parseInt(day);
+                }
+
+                fixedToInsert.push({
+                    user_id: user.id,
+                    title: task.title,
+                    start_time: task.start_time,
+                    end_time: task.end_time,
+                    day_of_week: dayNum,
+                    category: task.category || 'fixed',
+                    is_active: true
+                });
+            }
+        }
+
+        if (fixedToInsert.length > 0) {
+            const { error: fixedError } = await supabase.from('fixed_blocks').insert(fixedToInsert);
+            if (fixedError) console.error("Error saving fixed:", fixedError);
+        }
     }
 
     // 3. Generate Routine (AI)

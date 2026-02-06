@@ -69,16 +69,16 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(true);
         try {
             const now = new Date();
-            const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+            const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
             const todayDate = today;
 
-            // Load fixed blocks for today
+            // Load fixed blocks for today (day_of_week is integer 0-6)
             const { data: fixed } = await supabase
                 .from('fixed_blocks')
                 .select('*')
                 .eq('user_id', user.id)
                 .eq('is_active', true)
-                .contains('days_of_week', [dayOfWeek]);
+                .eq('day_of_week', dayOfWeek);
 
             setFixedBlocks(fixed || []);
 

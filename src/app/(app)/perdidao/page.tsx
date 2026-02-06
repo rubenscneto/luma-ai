@@ -19,7 +19,26 @@ const STEPS = [
     { id: 3, title: "Nível de Energia", description: "Como você costuma se sentir?" },
     { id: 4, title: "Ciclo de Sono", description: "Que horas seu dia começa e termina?" },
     { id: 5, title: "Compromissos Fixos", description: "Trabalho, Aulas, Treinos..." },
-    { id: 6, title: "Estilo de Rotina", description: "Focada, Flexível, Equilibrada..." },
+    { id: 6, title: "Seus Objetivos", description: "O que você quer conquistar?" },
+    { id: 7, title: "Hobbies & Lazer", description: "O que você gosta de fazer no tempo livre?" },
+    { id: 8, title: "Estilo de Rotina", description: "Focada, Flexível, Equilibrada..." },
+];
+
+const OBJECTIVE_OPTIONS = [
+    "Ser mais produtivo",
+    "Ter mais tempo livre",
+    "Melhorar a saúde",
+    "Aprender algo novo",
+    "Reduzir estresse",
+    "Organizar a vida",
+    "Focar na carreira",
+    "Equilibrar trabalho e vida pessoal",
+];
+
+const HOBBY_OPTIONS = [
+    "Leitura", "Exercícios", "Jogos", "Música", "Filmes/Séries",
+    "Cozinhar", "Meditação", "Passeios", "Redes Sociais", "Artesanato",
+    "Esportes", "Voluntariado",
 ];
 
 export default function PerdidaoPage() {
@@ -34,21 +53,27 @@ export default function PerdidaoPage() {
         energyLevel: "",
         style: "",
     });
+    const [objectives, setObjectives] = useState<string[]>([]);
+    const [hobbies, setHobbies] = useState<string[]>([]);
 
     const [userSettings, setUserSettings] = useState({ wake_up_time: "07:00", bed_time: "23:00" });
     const [fixedTasks, setFixedTasks] = useState<FixedTask[]>([]);
 
+    const totalSteps = STEPS.length;
+
     const handleNext = async () => {
-        if (currentStep < 6) {
+        if (currentStep < totalSteps) {
             setCurrentStep(c => c + 1);
         } else {
             // Submit
             setLoading(true);
             try {
-                // Save profile
+                // Save profile with objectives and hobbies
                 const profile = {
                     ...formData,
                     fixedTasks,
+                    objectives,
+                    hobbies,
                     userSettings: { ...userSettings, user_id: '' },
                     style: formData.style as any
                 };
@@ -135,6 +160,49 @@ export default function PerdidaoPage() {
                     />
                 );
             case 6:
+                // Objectives
+                return (
+                    <div className="grid grid-cols-2 gap-3">
+                        {OBJECTIVE_OPTIONS.map(opt => (
+                            <button
+                                key={opt}
+                                onClick={() => {
+                                    if (objectives.includes(opt)) {
+                                        setObjectives(prev => prev.filter(o => o !== opt));
+                                    } else {
+                                        setObjectives(prev => [...prev, opt]);
+                                    }
+                                }}
+                                className={`p-3 rounded-xl border transition-all text-sm ${objectives.includes(opt) ? 'bg-black text-white border-black dark:bg-white dark:text-black' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}
+                            >
+                                {opt}
+                            </button>
+                        ))}
+                    </div>
+                );
+            case 7:
+                // Hobbies
+                return (
+                    <div className="grid grid-cols-3 gap-3">
+                        {HOBBY_OPTIONS.map(opt => (
+                            <button
+                                key={opt}
+                                onClick={() => {
+                                    if (hobbies.includes(opt)) {
+                                        setHobbies(prev => prev.filter(h => h !== opt));
+                                    } else {
+                                        setHobbies(prev => [...prev, opt]);
+                                    }
+                                }}
+                                className={`p-3 rounded-xl border transition-all text-sm ${hobbies.includes(opt) ? 'bg-black text-white border-black dark:bg-white dark:text-black' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}
+                            >
+                                {opt}
+                            </button>
+                        ))}
+                    </div>
+                );
+            case 8:
+                // Style
                 return (
                     <div className="grid grid-cols-3 gap-3">
                         {["Focada", "Equilibrada", "Relaxada"].map(opt => (
@@ -157,21 +225,21 @@ export default function PerdidaoPage() {
         <div className="flex flex-col items-center justify-center min-h-[80vh] max-w-2xl mx-auto">
             <div className="text-center mb-10 space-y-2">
                 <h1 className="text-4xl font-bold">O Perdidão</h1>
-                <p className="text-zinc-500">Vamos encontrar o seu caminho em 6 passos.</p>
+                <p className="text-zinc-500">Vamos encontrar o seu caminho em {totalSteps} passos.</p>
             </div>
 
             <Card className="w-full p-8 shadow-xl border-zinc-200/60 dark:border-zinc-800 bg-white dark:bg-black/50">
                 {/* Progress Bar ... */}
                 <div className="mb-8">
                     <div className="flex justify-between items-center text-sm font-medium mb-4 text-zinc-400">
-                        <span>Passo {currentStep} de 6</span>
-                        <span>{Math.round((currentStep / 6) * 100)}%</span>
+                        <span>Passo {currentStep} de {totalSteps}</span>
+                        <span>{Math.round((currentStep / totalSteps) * 100)}%</span>
                     </div>
                     <div className="h-2 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                         <motion.div
                             className="h-full bg-black dark:bg-white"
                             initial={{ width: 0 }}
-                            animate={{ width: `${(currentStep / 6) * 100}%` }}
+                            animate={{ width: `${(currentStep / totalSteps) * 100}%` }}
                         />
                     </div>
                 </div>

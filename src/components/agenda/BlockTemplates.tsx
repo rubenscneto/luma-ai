@@ -89,13 +89,15 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
         startTime: '09:00'
     });
 
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleConfirmUse = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedTemplate || !user) return;
+        if (!selectedTemplate || !user || isSubmitting) return;
+
+        setIsSubmitting(true);
 
         // Calculate end time
-        const [hours, minutes] = useFormData.startTime.split(':').map(Number);
         const start = new Date(`${useFormData.date}T${useFormData.startTime}:00`);
         const end = new Date(start.getTime() + selectedTemplate.duration_minutes * 60000);
 
@@ -103,24 +105,56 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
         const end_datetime = end.toISOString();
 
         try {
+            // Get or create daily_plan for the selected date
+            let { data: existingPlan } = await supabase
+                .from('daily_plan')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('plan_date', useFormData.date)
+                .single();
+
+            let planId = existingPlan?.id;
+
+            if (!planId) {
+                // Create new plan
+                const { data: newPlan, error: planError } = await supabase
+                    .from('daily_plan')
+                    .insert({
+                        user_id: user.id,
+                        plan_date: useFormData.date,
+                        timezone: 'America/Sao_Paulo',
+                        status: 'active',
+                    })
+                    .select('id')
+                    .single();
+
+                if (planError) throw planError;
+                planId = newPlan?.id;
+            }
+
+            if (!planId) throw new Error('Could not get or create plan');
+
             const { error } = await supabase.from('daily_blocks').insert({
+                plan_id: planId,
                 user_id: user.id,
                 title: selectedTemplate.title,
                 category: selectedTemplate.category,
-                start_datetime: start_datetime, // Use full ISO datetime
+                start_datetime: start_datetime,
                 end_datetime: end_datetime,
                 is_done: false,
-                source: 'template'
+                source: 'manual',
             });
 
             if (error) throw error;
 
             setSelectedTemplate(null);
-            // Optional: trigger refresh or notify user
-            // toast.success("Bloco agendado!");
+            // Feedback visual
+            alert('Bloco agendado com sucesso!');
         } catch (error) {
             console.error("Error using template:", error);
-            // toast.error("Erro ao agendar.");
+            alert('Erro ao agendar bloco.');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 

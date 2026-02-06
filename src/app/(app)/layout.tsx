@@ -10,6 +10,7 @@ import { HealthProvider } from "@/context/healthContext";
 import { ToastProvider } from "@/context/toastContext";
 import NotificationManager from "@/components/notifications/NotificationManager";
 import { useState } from "react";
+import { motion } from "framer-motion";
 
 export default function AppLayout({
     children,
@@ -21,28 +22,33 @@ export default function AppLayout({
 
     return (
         <div
-            className="flex bg-[#EEF4ED] dark:bg-[#090C08] min-h-[100dvh] text-zinc-900 dark:text-zinc-100 relative font-sans"
+            className="flex bg-bg dark:bg-bg min-h-[100dvh] text-text dark:text-text relative font-sans"
             style={{
                 minHeight: "100dvh",
-                /* Fallback for older browsers */
             }}
         >
-            {/* Global Glow Background */}
+            {/* Global Glow Background - Subtle with slow animation */}
             <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden" aria-hidden="true">
                 {/* Top Right Sky Glow */}
-                <div
-                    className="absolute top-[-15%] right-[-15%] w-[60vw] h-[60vw] rounded-full"
+                <motion.div
+                    className="absolute top-[-15%] right-[-15%] w-[60vw] h-[60vw] rounded-full glow-animate"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 1 }}
                     style={{
-                        background: "radial-gradient(circle, rgba(134, 187, 216, 0.35) 0%, rgba(134, 187, 216, 0.15) 40%, transparent 70%)",
+                        background: "radial-gradient(circle, rgba(134, 187, 216, 0.12) 0%, rgba(134, 187, 216, 0.05) 40%, transparent 70%)",
                         filter: "blur(80px)",
                     }}
                 />
 
                 {/* Bottom Left Rose Glow */}
-                <div
-                    className="absolute bottom-[-15%] left-[-15%] w-[55vw] h-[55vw] rounded-full"
+                <motion.div
+                    className="absolute bottom-[-15%] left-[-15%] w-[55vw] h-[55vw] rounded-full glow-animate-delayed"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 1, delay: 0.3 }}
                     style={{
-                        background: "radial-gradient(circle, rgba(172, 136, 135, 0.30) 0%, rgba(172, 136, 135, 0.12) 40%, transparent 70%)",
+                        background: "radial-gradient(circle, rgba(172, 136, 135, 0.10) 0%, rgba(172, 136, 135, 0.04) 40%, transparent 70%)",
                         filter: "blur(90px)",
                     }}
                 />

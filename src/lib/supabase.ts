@@ -7,4 +7,12 @@ if (!supabaseUrl || !supabaseKey) {
     console.warn("Missing Supabase Env Vars - Auth will not work properly.");
 }
 
-export const supabase = createBrowserClient(supabaseUrl, supabaseKey);
+export const supabase = createBrowserClient(supabaseUrl, supabaseKey, {
+    auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storageKey: 'luma-auth-token',
+        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    },
+});

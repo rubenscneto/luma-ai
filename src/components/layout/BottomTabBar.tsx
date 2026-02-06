@@ -15,6 +15,7 @@ import {
     Settings,
     ListChecks,
     Bot,
+    BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -27,11 +28,12 @@ interface TabItem {
 const mainTabs: TabItem[] = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Início" },
     { href: "/agenda", icon: Calendar, label: "Agenda" },
-    { href: "/rotina", icon: ListChecks, label: "Rotina" },
+    { href: "/dashboard/routine", icon: ListChecks, label: "Rotina" },
     { href: "/saude", icon: Heart, label: "Saúde" },
 ];
 
 const moreTabs: TabItem[] = [
+    { href: "/analytics", icon: BarChart3, label: "Analytics" },
     { href: "/estudos", icon: GraduationCap, label: "Estudos" },
     { href: "/dashboard/assistant", icon: Bot, label: "Assistente" },
     { href: "/projetos", icon: FolderKanban, label: "Projetos" },
