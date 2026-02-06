@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setLoading(false);
 
             if (_event === "SIGNED_IN") router.push("/dashboard");
-            if (_event === "SIGNED_OUT") router.push("/");
+            // if (_event === "SIGNED_OUT") router.push("/"); // Disabled to prevent aggressive redirects
         });
 
         return () => subscription.unsubscribe();
@@ -53,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const signOut = async () => {
         await supabase.auth.signOut();
+        router.push("/");
     };
 
     return (

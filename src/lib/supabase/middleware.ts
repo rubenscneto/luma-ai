@@ -16,7 +16,7 @@ const PROTECTED_ROUTES = [
 ];
 
 // Public routes that should redirect to dashboard if logged in
-const PUBLIC_ROUTES = ['/', '/login', '/register'];
+const PUBLIC_ROUTES = ['/', '/login', '/register', '/auth/callback'];
 
 export async function updateSession(request: NextRequest) {
     let response = NextResponse.next({
