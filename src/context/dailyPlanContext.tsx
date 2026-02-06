@@ -182,7 +182,12 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
     }, [loadTodayPlan]);
 
     const generatePlan = async (date?: string, mode: 'first_time' | 'regenerate' | 'fill_gaps' = 'first_time') => {
-        if (!user) return;
+        console.log('generatePlan called', { date, mode, user: user?.id });
+        if (!user) {
+            console.error('generatePlan aborted: No user');
+            toast.error('Erro de autenticação. Tente recarregar a página.');
+            return;
+        }
 
         setIsLoading(true);
         try {

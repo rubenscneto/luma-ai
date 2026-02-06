@@ -174,6 +174,8 @@ export async function POST(request: NextRequest) {
         });
 
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        console.log('Generating plan with Gemini 2.0 Flash...');
+
         const result = await model.generateContent({
             contents: [
                 { role: 'user', parts: [{ text: AGENDA_PLANNER_SYSTEM_PROMPT }] },

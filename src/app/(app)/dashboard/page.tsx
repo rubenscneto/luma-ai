@@ -26,7 +26,7 @@ export default function DashboardPage() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [newPriority, setNewPriority] = useState("");
 
-    const userName = user?.user_metadata?.full_name?.split(' ')[0] || "Visionário";
+    const userName = user?.user_metadata?.name?.split(' ')[0] || user?.user_metadata?.full_name?.split(' ')[0] || "Visionário";
 
     // Dynamic greeting based on time of day
     const getGreeting = () => {
