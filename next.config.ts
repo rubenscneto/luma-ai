@@ -76,6 +76,19 @@ const withPWA = require("@ducanh2912/next-pwa").default({
         urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
         handler: "NetworkOnly",
       },
+      // CRITICAL: Never cache auth pages (prevents stale sessions)
+      {
+        urlPattern: /^\/auth\/.*/i,
+        handler: "NetworkOnly",
+      },
+      {
+        urlPattern: /^\/login$/i,
+        handler: "NetworkOnly",
+      },
+      {
+        urlPattern: /^\/register$/i,
+        handler: "NetworkOnly",
+      },
       // Default fallback
       {
         urlPattern: /.*/i,

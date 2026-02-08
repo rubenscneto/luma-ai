@@ -16,9 +16,38 @@ const PROTECTED_ROUTES = [
 ];
 
 // Public routes that should redirect to dashboard if logged in
-const PUBLIC_ROUTES = ['/', '/login', '/register', '/auth/callback'];
+const PUBLIC_ROUTES = ['/', '/login', '/register'];
 
 export async function updateSession(request: NextRequest) {
+    const pathname = request.nextUrl.pathname;
+
+    // CRITICAL: Always allow auth callback without any processing
+    if (pathname.startsWith('/auth/callback')) {
+        return NextResponse.next();
+    }
+
+    // Skip middleware for PWA/SW files (prevent interference with auth flow)
+    if (
+        pathname === "/sw.js" ||
+        pathname === "/push-sw.js" ||
+        pathname.startsWith("/workbox-") ||
+        pathname === "/manifest.webmanifest" ||
+        pathname === "/manifest.json" ||
+        pathname === "/favicon.ico"
+    ) {
+        return NextResponse.next();
+    }
+
+    // Skip middleware for assets and API health checks
+    if (
+        pathname.startsWith('/_next') ||
+        pathname.startsWith('/icons') ||
+        pathname.startsWith('/images') ||
+        pathname.startsWith('/api/healthcheck')
+    ) {
+        return NextResponse.next();
+    }
+
     let response = NextResponse.next({
         request: {
             headers: request.headers,
@@ -34,31 +63,21 @@ export async function updateSession(request: NextRequest) {
                     return request.cookies.getAll();
                 },
                 setAll(cookiesToSet) {
-                    cookiesToSet.forEach(({ name, value }) =>
-                        request.cookies.set(name, value)
-                    );
+                    // CRITICAL: Use pure setAll without overriding Supabase options
+                    // Overriding httpOnly/secure/maxAge breaks OAuth/PKCE flow
                     response = NextResponse.next({
-                        request: {
-                            headers: request.headers,
-                        },
+                        request: { headers: request.headers },
                     });
-                    cookiesToSet.forEach(({ name, value, options }) =>
-                        response.cookies.set(name, value, {
-                            ...options,
-                            // Ensure cookies persist properly
-                            httpOnly: true,
-                            secure: process.env.NODE_ENV === 'production',
-                            sameSite: 'lax',
-                            maxAge: 60 * 60 * 24 * 365, // 1 year
-                        })
-                    );
+
+                    cookiesToSet.forEach(({ name, value, options }) => {
+                        response.cookies.set(name, value, options);
+                    });
                 },
             },
         }
     );
 
     const { data: { user } } = await supabase.auth.getUser();
-    const pathname = request.nextUrl.pathname;
 
     // Check if current path is protected
     const isProtectedRoute = PROTECTED_ROUTES.some(route =>

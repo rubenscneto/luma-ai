@@ -35,8 +35,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(session?.user ?? null);
             setLoading(false);
 
-            if (_event === "SIGNED_IN") router.push("/dashboard");
-            // if (_event === "SIGNED_OUT") router.push("/"); // Disabled to prevent aggressive redirects
+            // Prevent conflict with middleware + callback redirect
+            // Only redirect if stuck on /login page with active session
+            if (session && typeof window !== 'undefined' && window.location.pathname === "/login") {
+                router.replace("/dashboard");
+            }
+            // SIGNED_OUT redirect disabled to prevent aggressive redirects
         });
 
         return () => subscription.unsubscribe();

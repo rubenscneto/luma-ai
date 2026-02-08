@@ -12,29 +12,41 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[var(--luma-mint)] dark:bg-[var(--luma-black)] text-[var(--luma-black)] dark:text-[var(--luma-mint)] flex flex-col overflow-hidden font-sans relative">
 
-      {/* Landing Page Glow Background - NO center blob */}
+      {/* Landing Page Glow Background - Subtle brand palette glows */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden" aria-hidden="true">
-        {/* Top Right Sky Glow */}
+        {/* Top Right Sky Glow - 86BBD8 */}
         <motion.div
-          className="absolute top-[-10%] right-[-10%] w-[60vw] h-[60vw] rounded-full"
+          className="absolute top-[-15%] right-[-15%] w-[70vw] h-[70vw] rounded-full"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 1.5 }}
           style={{
-            background: "radial-gradient(circle, rgba(134, 187, 216, 0.35) 0%, rgba(134, 187, 216, 0.15) 35%, transparent 65%)",
-            filter: "blur(70px)",
+            background: "radial-gradient(circle, rgba(134, 187, 216, 0.18) 0%, rgba(134, 187, 216, 0.08) 40%, transparent 70%)",
+            filter: "blur(100px)",
           }}
         />
 
-        {/* Bottom Left Rose Glow */}
+        {/* Bottom Left Rose Glow - AC8887 */}
         <motion.div
-          className="absolute bottom-[-10%] left-[-10%] w-[55vw] h-[55vw] rounded-full"
+          className="absolute bottom-[-15%] left-[-15%] w-[65vw] h-[65vw] rounded-full"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 1.5, delay: 0.2 }}
           style={{
-            background: "radial-gradient(circle, rgba(172, 136, 135, 0.30) 0%, rgba(172, 136, 135, 0.12) 35%, transparent 65%)",
-            filter: "blur(80px)",
+            background: "radial-gradient(circle, rgba(172, 136, 135, 0.15) 0%, rgba(172, 136, 135, 0.06) 40%, transparent 70%)",
+            filter: "blur(110px)",
+          }}
+        />
+
+        {/* Center Slate Accent - 4D626A */}
+        <motion.div
+          className="absolute top-[40%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[50vw] h-[50vw] rounded-full"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 2, delay: 0.4 }}
+          style={{
+            background: "radial-gradient(circle, rgba(77, 98, 106, 0.10) 0%, rgba(77, 98, 106, 0.04) 45%, transparent 70%)",
+            filter: "blur(120px)",
           }}
         />
       </div>
@@ -66,19 +78,17 @@ export default function LandingPage() {
           </Link>
         </div>
 
-        {/* Mobile: Single CTA + Menu */}
-        <div className="flex md:hidden items-center gap-3">
-          <Link href="/login">
-            <Button
-              variant="ghost"
-              className="text-[var(--luma-black)] dark:text-[var(--luma-mint)] font-medium btn-sm px-3"
-            >
-              Entrar
-            </Button>
+        {/* Mobile: Text Link + Menu */}
+        <div className="flex md:hidden items-center gap-4">
+          <Link
+            href="/login"
+            className="text-[var(--luma-slate)] hover:text-[var(--luma-black)] dark:hover:text-[var(--luma-mint)] font-medium text-sm transition-colors min-h-[44px] flex items-center px-2"
+          >
+            Entrar
           </Link>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+            className="p-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="Menu"
           >
             {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
