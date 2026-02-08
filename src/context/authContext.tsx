@@ -9,6 +9,7 @@ interface AuthContextType {
     user: User | null;
     session: Session | null;
     loading: boolean;
+    isSigningIn: boolean;
     signInWithGoogle: () => Promise<void>;
     signOut: () => Promise<void>;
 }
@@ -19,6 +20,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
+    const [isSigningIn, setIsSigningIn] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
@@ -47,12 +49,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [router]);
 
     const signInWithGoogle = async () => {
-        await supabase.auth.signInWithOAuth({
-            provider: "google",
-            options: {
-                redirectTo: `${window.location.origin}/auth/callback`,
-            },
-        });
+        if (isSigningIn) return; // Prevent double-click PKCE corruption
+
+        setIsSigningIn(true);
+        try {
+            await supabase.auth.signInWithOAuth({
+                provider: "google",
+                options: {
+                    redirectTo: `${window.location.origin}/auth/callback`,
+                },
+            });
+        } catch (error) {
+            console.error('OAuth initiation error:', error);
+            setIsSigningIn(false);
+        }
     };
 
     const signOut = async () => {
@@ -61,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, session, loading, signInWithGoogle, signOut }}>
+        <AuthContext.Provider value={{ user, session, loading, isSigningIn, signInWithGoogle, signOut }}>
             {children}
         </AuthContext.Provider>
     );
