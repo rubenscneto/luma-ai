@@ -4,21 +4,23 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Heart, User, Utensils, ShoppingCart, Sparkles,
-    ChevronRight, Plus, Loader2, Edit2, Calendar
+    ChevronRight, Plus, Loader2, Edit2, Calendar, Package
 } from 'lucide-react';
 import { useHealth } from '@/context/healthContext';
 import { HealthOnboarding } from '@/components/health/HealthOnboarding';
 import { ShoppingListCard } from '@/components/health/ShoppingListCard';
 import MealCalendar from '@/components/health/MealCalendar';
+import PantryManager from '@/components/health/PantryManager';
 import { cn } from '@/lib/utils';
 
-type Tab = 'profile' | 'meals' | 'calendar' | 'shopping';
+type Tab = 'profile' | 'meals' | 'calendar' | 'shopping' | 'pantry';
 
 const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: 'profile', label: 'Perfil', icon: User },
     { id: 'meals', label: 'Refeições', icon: Utensils },
     { id: 'calendar', label: 'Cardápio', icon: Calendar },
     { id: 'shopping', label: 'Compras', icon: ShoppingCart },
+    { id: 'pantry', label: 'Despensa', icon: Package },
 ];
 
 const goalLabels: Record<string, string> = {
@@ -322,6 +324,17 @@ export default function SaudePage() {
                                 </p>
                             </div>
                         )}
+                    </motion.div>
+                )}
+
+                {activeTab === 'pantry' && (
+                    <motion.div
+                        key="pantry"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                    >
+                        <PantryManager />
                     </motion.div>
                 )}
             </AnimatePresence>

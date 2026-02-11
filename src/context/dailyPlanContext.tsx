@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { DailyPlan, DailyBlock, DailyBlockWithStatus, BlockStatus, FixedBlock } from '@/types';
+import { DailyPlan, DailyBlock, DailyBlockWithStatus, BlockStatus, FixedBlock, AIGeneratedPlan, RecurrenceSuggestion } from '@/types';
 import { useAuth } from './authContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -15,9 +15,20 @@ interface DailyPlanContextType {
     nextBlock: DailyBlockWithStatus | null;
     isLoading: boolean;
 
+    // A/B Plan State
+    abPlans: { planA: AIGeneratedPlan | null; planB: AIGeneratedPlan | null };
+    isABLoading: boolean;
+
+    // Recurrence State
+    recurrenceSuggestions: RecurrenceSuggestion[];
+    isRecurrenceLoading: boolean;
+
     // Actions
     loadTodayPlan: () => Promise<void>;
     generatePlan: (date?: string, mode?: 'first_time' | 'regenerate' | 'fill_gaps') => Promise<void>;
+    generateABPlan: (date?: string) => Promise<void>;
+    selectPlan: (plan: 'A' | 'B') => Promise<void>;
+    clearABPlans: () => void;
     generateHealthBlocks: (options?: { includeMeals?: boolean; includeWorkouts?: boolean }) => Promise<void>;
     markBlockDone: (blockId: string) => Promise<void>;
     skipBlock: (blockId: string, reason?: string) => Promise<void>;
@@ -25,6 +36,11 @@ interface DailyPlanContextType {
     addBlock: (block: Partial<DailyBlock>) => Promise<void>;
     replanDay: (userNote?: string) => Promise<void>;
     refreshBlocks: () => void;
+
+    // Recurrence Actions
+    detectRecurrences: () => Promise<void>;
+    addRecurrenceAsFixed: (suggestion: RecurrenceSuggestion) => Promise<void>;
+    dismissRecurrence: (id: string) => void;
 }
 
 const DailyPlanContext = createContext<DailyPlanContextType | undefined>(undefined);
@@ -60,6 +76,14 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
     const [todayBlocks, setTodayBlocks] = useState<DailyBlockWithStatus[]>([]);
     const [fixedBlocks, setFixedBlocks] = useState<FixedBlock[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+
+    // A/B Plan state
+    const [abPlans, setABPlans] = useState<{ planA: AIGeneratedPlan | null; planB: AIGeneratedPlan | null }>({ planA: null, planB: null });
+    const [isABLoading, setIsABLoading] = useState(false);
+
+    // Recurrence state
+    const [recurrenceSuggestions, setRecurrenceSuggestions] = useState<RecurrenceSuggestion[]>([]);
+    const [isRecurrenceLoading, setIsRecurrenceLoading] = useState(false);
 
     const today = new Date().toISOString().split('T')[0];
 
@@ -376,6 +400,145 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    // ========== A/B Plan Methods ==========
+
+    const generateABPlan = async (date?: string) => {
+        if (!user) return;
+
+        setIsABLoading(true);
+        try {
+            const response = await fetch('/api/ai/agenda/plan-day', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: user.id,
+                    date: date || today,
+                    mode: 'generate_ab',
+                    timezone: 'America/Sao_Paulo',
+                }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setABPlans({
+                    planA: data.planA || null,
+                    planB: data.planB || null,
+                });
+                toast.success('Dois planos gerados! Escolha o melhor para você.');
+            } else {
+                const errorData = await response.json().catch(() => ({}));
+                toast.error(errorData.error || 'Erro ao gerar planos A/B.');
+            }
+        } catch (error) {
+            console.error('Generate A/B plan error:', error);
+            toast.error('Erro de conexão ao gerar planos.');
+        } finally {
+            setIsABLoading(false);
+        }
+    };
+
+    const selectPlan = async (plan: 'A' | 'B') => {
+        if (!user) return;
+
+        const selectedPlan = plan === 'A' ? abPlans.planA : abPlans.planB;
+        if (!selectedPlan) return;
+
+        setIsLoading(true);
+        try {
+            const response = await fetch('/api/ai/agenda/plan-day', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: user.id,
+                    date: today,
+                    mode: 'confirm_plan',
+                    selected_plan: plan,
+                    plan_blocks: selectedPlan.blocks,
+                    timezone: 'America/Sao_Paulo',
+                }),
+            });
+
+            if (response.ok) {
+                toast.success(`Plano ${plan} aplicado com sucesso!`);
+                setABPlans({ planA: null, planB: null });
+                await loadTodayPlan();
+            } else {
+                const errorData = await response.json().catch(() => ({}));
+                toast.error(errorData.error || 'Erro ao confirmar plano.');
+            }
+        } catch (error) {
+            console.error('Select plan error:', error);
+            toast.error('Erro de conexão ao confirmar plano.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const clearABPlans = () => {
+        setABPlans({ planA: null, planB: null });
+    };
+
+    // ========== Recurrence Detection Methods ==========
+
+    const detectRecurrences = async () => {
+        if (!user) return;
+
+        setIsRecurrenceLoading(true);
+        try {
+            const response = await fetch('/api/ai/agenda/detect-recurrence', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: user.id }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setRecurrenceSuggestions(data.suggestions || []);
+                if (data.suggestions?.length > 0) {
+                    toast.success(`${data.suggestions.length} padrão(ões) detectado(s)!`);
+                } else {
+                    toast.info('Nenhum padrão recorrente detectado ainda.');
+                }
+            } else {
+                toast.error('Erro ao detectar recorrências.');
+            }
+        } catch (error) {
+            console.error('Detect recurrences error:', error);
+            toast.error('Erro de conexão.');
+        } finally {
+            setIsRecurrenceLoading(false);
+        }
+    };
+
+    const addRecurrenceAsFixed = async (suggestion: RecurrenceSuggestion) => {
+        if (!user) return;
+
+        try {
+            const newBlocks = suggestion.days.map(day => ({
+                user_id: user.id,
+                title: suggestion.title,
+                category: suggestion.category,
+                day_of_week: day,
+                start_time: suggestion.start_time,
+                end_time: suggestion.end_time,
+                is_active: true,
+            }));
+
+            const { error } = await supabase.from('fixed_blocks').insert(newBlocks);
+            if (error) throw error;
+
+            toast.success(`"${suggestion.title}" adicionado como bloco fixo!`);
+            setRecurrenceSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
+        } catch (error) {
+            console.error('Add recurrence as fixed error:', error);
+            toast.error('Erro ao criar bloco fixo.');
+        }
+    };
+
+    const dismissRecurrence = (id: string) => {
+        setRecurrenceSuggestions(prev => prev.filter(s => s.id !== id));
+    };
+
     // Computed values
     const currentBlock = todayBlocks.find(b => b.status === 'current') || null;
     const nextBlock = todayBlocks.find(b => b.status === 'upcoming') || null;
@@ -388,8 +551,15 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
             currentBlock,
             nextBlock,
             isLoading,
+            abPlans,
+            isABLoading,
+            recurrenceSuggestions,
+            isRecurrenceLoading,
             loadTodayPlan,
             generatePlan,
+            generateABPlan,
+            selectPlan,
+            clearABPlans,
             generateHealthBlocks,
             markBlockDone,
             skipBlock,
@@ -397,6 +567,9 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
             addBlock,
             replanDay,
             refreshBlocks,
+            detectRecurrences,
+            addRecurrenceAsFixed,
+            dismissRecurrence,
         }}>
             {children}
         </DailyPlanContext.Provider>

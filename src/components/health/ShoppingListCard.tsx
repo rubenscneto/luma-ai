@@ -2,7 +2,10 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Check, Trash2, ShoppingCart } from 'lucide-react';
+import {
+    Check, Trash2, ShoppingCart, Package, Ban,
+    RefreshCw
+} from 'lucide-react';
 import { ShoppingList, ShoppingItem } from '@/types';
 import { useHealth } from '@/context/healthContext';
 import { cn } from '@/lib/utils';
@@ -16,11 +19,14 @@ const categoryColors: Record<string, string> = {
     verduras: 'bg-emerald-500/20 text-emerald-400',
     proteinas: 'bg-red-500/20 text-red-400',
     graos: 'bg-amber-500/20 text-amber-400',
+    laticinios: 'bg-blue-500/20 text-blue-400',
+    temperos: 'bg-yellow-500/20 text-yellow-400',
+    bebidas: 'bg-cyan-500/20 text-cyan-400',
     outros: 'bg-gray-500/20 text-gray-400',
 };
 
 export function ShoppingListCard({ list }: ShoppingListCardProps) {
-    const { toggleShoppingItem, deleteShoppingList } = useHealth();
+    const { toggleShoppingItem, deleteShoppingList, addPantryItem, saveFeedback } = useHealth();
 
     const checkedCount = list.items.filter(i => i.checked).length;
     const progress = list.items.length > 0
@@ -34,6 +40,24 @@ export function ShoppingListCard({ list }: ShoppingListCardProps) {
         acc[cat].push({ ...item, originalIndex: index });
         return acc;
     }, {} as Record<string, (ShoppingItem & { originalIndex: number })[]>);
+
+    const handleAlreadyHave = async (item: ShoppingItem & { originalIndex: number }) => {
+        // Mark as checked + add to pantry
+        await toggleShoppingItem(list.id, item.originalIndex);
+        await addPantryItem({
+            name: item.name,
+            category: item.category || 'outros',
+            unit: item.unit || 'un',
+            qty_current: item.qty ? parseFloat(String(item.qty)) : 1,
+            qty_min: 0,
+        });
+    };
+
+    const handleDontConsume = async (item: ShoppingItem & { originalIndex: number }) => {
+        // Mark as checked (remove from visible list) + save dislike
+        await toggleShoppingItem(list.id, item.originalIndex);
+        await saveFeedback('food', item.name, 'never');
+    };
 
     return (
         <motion.div
@@ -87,33 +111,60 @@ export function ShoppingListCard({ list }: ShoppingListCardProps) {
 
                         <div className="space-y-1">
                             {items.map((item) => (
-                                <button
+                                <div
                                     key={item.originalIndex}
-                                    onClick={() => toggleShoppingItem(list.id, item.originalIndex)}
-                                    className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors text-left"
+                                    className="group flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors"
                                 >
-                                    <div className={cn(
-                                        "w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-colors",
-                                        item.checked
-                                            ? "bg-brand-primary border-brand-primary"
-                                            : "border-white/20"
-                                    )}>
-                                        {item.checked && <Check className="w-3 h-3 text-white" />}
-                                    </div>
+                                    {/* Checkbox */}
+                                    <button
+                                        onClick={() => toggleShoppingItem(list.id, item.originalIndex)}
+                                        className="shrink-0"
+                                    >
+                                        <div className={cn(
+                                            "w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-colors",
+                                            item.checked
+                                                ? "bg-brand-primary border-brand-primary"
+                                                : "border-white/20"
+                                        )}>
+                                            {item.checked && <Check className="w-3 h-3 text-white" />}
+                                        </div>
+                                    </button>
 
+                                    {/* Name */}
                                     <span className={cn(
-                                        "flex-1",
+                                        "flex-1 text-sm",
                                         item.checked ? "line-through text-white/40" : "text-white"
                                     )}>
                                         {item.name}
                                     </span>
 
+                                    {/* Quantity */}
                                     {item.qty && (
-                                        <span className="text-sm text-white/50">
+                                        <span className="text-sm text-white/50 shrink-0">
                                             {item.qty} {item.unit || ''}
                                         </span>
                                     )}
-                                </button>
+
+                                    {/* Quick actions (visible on hover) */}
+                                    {!item.checked && (
+                                        <div className="hidden group-hover:flex items-center gap-1 shrink-0">
+                                            <button
+                                                onClick={() => handleAlreadyHave(item)}
+                                                title="Já tenho"
+                                                className="p-1 rounded hover:bg-green-500/20 text-white/30 hover:text-green-400 transition-colors"
+                                            >
+                                                <Package className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDontConsume(item)}
+                                                title="Não consumo"
+                                                className="p-1 rounded hover:bg-red-500/20 text-white/30 hover:text-red-400 transition-colors"
+                                            >
+                                                <Ban className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             ))}
                         </div>
                     </div>

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
-import { SHOPPING_LIST_PROMPT } from '@/ai/prompts/healthCoachPrompt';
+import { createShoppingListPrompt } from '@/ai/prompts/healthCoachPrompt';
 import { ShoppingListAIResponseSchema } from '@/ai/schemas/aiSchemas';
+import { parseAIResponse, loadHealthProfile, loadPantryItems, logAISuggestion } from '@/lib/ai/aiHelpers';
 
-// Force dynamic to avoid static generation issues
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
@@ -23,59 +23,73 @@ export async function POST(req: NextRequest) {
         }
 
         // Load health profile
-        const { data: healthProfile } = await supabase
-            .from('health_profile')
-            .select('*')
+        const healthProfile = await loadHealthProfile(user_id);
+
+        // Load pantry items
+        const pantryItems = await loadPantryItems(user_id);
+
+        // Load planned meals for the period
+        const startDate = new Date().toISOString().split('T')[0];
+        const endDate = new Date(Date.now() + days * 86400000).toISOString().split('T')[0];
+        const { data: plannedMealsData } = await supabase
+            .from('planned_meals')
+            .select('name')
             .eq('user_id', user_id)
-            .single();
+            .gte('date', startDate)
+            .lte('date', endDate);
+        const plannedMeals = (plannedMealsData || []).map(m => m.name);
 
-        const contextPrompt = `
-FOCO DA LISTA: ${focus}
-PERÍODO: ${days} dias
+        // Load user dislikes
+        const { data: prefsData } = await supabase
+            .from('user_preferences')
+            .select('item_name')
+            .eq('user_id', user_id)
+            .in('preference_type', ['dislike', 'never'])
+            .eq('category', 'food');
+        const dislikes = (prefsData || []).map(p => p.item_name);
 
-PERFIL DO USUÁRIO:
-- Objetivo: ${healthProfile?.goal || 'bem-estar geral'}
-- Preferências alimentares: ${(healthProfile?.dietary_preferences || []).join(', ') || 'nenhuma'}
-- Alergias/Restrições: ${(healthProfile?.allergies_restrictions || []).join(', ') || 'nenhuma'}
-
-Gere uma lista de compras organizada por categoria para ${days} dias, considerando o perfil acima.
-`;
+        // Build enhanced prompt
+        const prompt = createShoppingListPrompt({
+            forWhat: focus,
+            days,
+            healthProfile,
+            pantryItems: pantryItems.map(i => ({
+                name: i.name,
+                qty_current: i.qty_current,
+                qty_min: i.qty_min,
+            })),
+            plannedMeals,
+            dislikes,
+        });
 
         const model = genAI.getGenerativeModel({
             model: 'gemini-2.0-flash',
-            generationConfig: { responseMimeType: 'application/json' }
+            generationConfig: { responseMimeType: 'application/json', temperature: 0.6 }
         });
-
-        const prompt = `${SHOPPING_LIST_PROMPT}\n\n${contextPrompt}`;
 
         const result = await model.generateContent(prompt);
         const responseText = result.response.text();
+        const parsed = parseAIResponse(responseText, ShoppingListAIResponseSchema);
 
-        let parsed;
-        try {
-            const jsonStr = responseText.replace(/```json|```/g, '').trim();
-            parsed = JSON.parse(jsonStr);
-        } catch {
-            const match = responseText.match(/\{[\s\S]*\}/);
-            if (match) {
-                parsed = JSON.parse(match[0]);
-            } else {
-                throw new Error('No JSON found in response');
-            }
+        if (!parsed.success) {
+            console.error('Shopping list parse error:', parsed.error);
+            return NextResponse.json({
+                success: false,
+                status: 'error',
+                errorMessage: 'Não foi possível gerar a lista de compras.',
+                retryHint: 'Tente novamente.',
+            }, { status: 500 });
         }
-
-        // Validate with Zod
-        const validated = ShoppingListAIResponseSchema.parse(parsed);
 
         // Save to database
         const { data: savedList, error: saveError } = await supabase
             .from('shopping_list')
             .insert({
                 user_id,
-                title: validated.title,
-                items: validated.items.map(item => ({
+                title: parsed.data.title,
+                items: parsed.data.items.map(item => ({
                     ...item,
-                    checked: false
+                    checked: false,
                 })),
                 source: 'ai',
             })
@@ -86,30 +100,26 @@ Gere uma lista de compras organizada por categoria para ${days} dias, consideran
             console.error('Error saving shopping list:', saveError);
         }
 
+        // Log for anti-repetition
+        await logAISuggestion(user_id, 'shopping_list', parsed.data.title);
+
         return NextResponse.json({
             success: true,
             list: savedList || {
-                title: validated.title,
-                items: validated.items,
+                title: parsed.data.title,
+                items: parsed.data.items,
             },
-            estimated_cost: validated.estimated_cost,
-            disclaimer: validated.disclaimer,
+            estimated_cost: parsed.data.estimated_cost,
+            disclaimer: parsed.data.disclaimer,
         });
 
     } catch (error: any) {
         console.error('Shopping list error:', error);
         return NextResponse.json({
             success: false,
-            error: error.message,
-            list: {
-                title: 'Lista Básica',
-                items: [
-                    { name: 'Frutas variadas', qty: 1, unit: 'kg', category: 'frutas' },
-                    { name: 'Verduras', qty: 1, unit: 'maço', category: 'verduras' },
-                    { name: 'Proteína', qty: 500, unit: 'g', category: 'proteinas' },
-                ],
-            },
-            disclaimer: 'Lista genérica. Personalize de acordo com suas necessidades.'
+            status: 'error',
+            errorMessage: error.message || 'Erro ao gerar lista de compras.',
+            retryHint: 'Verifique sua conexão e tente novamente.',
         }, { status: 500 });
     }
 }

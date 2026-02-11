@@ -151,6 +151,18 @@ export const MealIngredientSchema = z.object({
     unit: z.string(),
 });
 
+export const MealAlternativeSchema = z.object({
+    mealTitle: z.string(),
+    keyChange: z.string(),
+});
+
+export const NutritionEstimateSchema = z.object({
+    calories: z.number().optional(),
+    protein: z.number().optional(),
+    carbs: z.number().optional(),
+    fat: z.number().optional(),
+});
+
 export const MealSuggestionSchema = z.object({
     meal: z.object({
         name: z.string(),
@@ -158,7 +170,9 @@ export const MealSuggestionSchema = z.object({
         prep_time: z.number(),
         ingredients: z.array(MealIngredientSchema),
         instructions: z.array(z.string()),
-        alternatives: z.array(z.string()).optional(),
+        alternatives: z.array(MealAlternativeSchema).optional(),
+        nutritionEstimate: NutritionEstimateSchema.optional(),
+        whyFitsUser: z.string().optional(),
     }),
     tip: z.string().optional(),
     disclaimer: z.string(),
@@ -172,6 +186,8 @@ export const ShoppingItemSchema = z.object({
     unit: z.string().optional(),
     category: z.string().optional(),
     checked: z.boolean().optional(),
+    reason: z.string().optional(),
+    priority: z.enum(['essential', 'recommended', 'optional']).optional(),
 });
 
 export const ShoppingListAIResponseSchema = z.object({

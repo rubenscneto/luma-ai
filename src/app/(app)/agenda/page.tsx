@@ -2,14 +2,15 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, List, Settings, Layout } from 'lucide-react';
+import { Calendar, List, Settings, Layout, TrendingUp } from 'lucide-react';
 import { DayView } from '@/components/agenda/DayView';
 import WeekView from '@/components/agenda/WeekView';
 import FixedBlocksManager from '@/components/agenda/FixedBlocksManager';
 import BlockTemplates from '@/components/agenda/BlockTemplates';
+import RecurrenceSuggestions from '@/components/agenda/RecurrenceSuggestions';
 import { cn } from '@/lib/utils';
 
-type ViewMode = 'day' | 'week' | 'fixed' | 'templates';
+type ViewMode = 'day' | 'week' | 'fixed' | 'templates' | 'recurrences';
 
 export default function AgendaPage() {
     const [viewMode, setViewMode] = useState<ViewMode>('day');
@@ -75,6 +76,18 @@ export default function AgendaPage() {
                         <Layout className="w-4 h-4" />
                         Templates
                     </button>
+                    <button
+                        onClick={() => setViewMode('recurrences')}
+                        className={cn(
+                            "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap",
+                            viewMode === 'recurrences'
+                                ? "bg-brand-primary text-white"
+                                : "text-white/60 hover:text-white"
+                        )}
+                    >
+                        <TrendingUp className="w-4 h-4" />
+                        Recorrências
+                    </button>
                 </div>
             </div>
 
@@ -91,6 +104,7 @@ export default function AgendaPage() {
                     {viewMode === 'week' && <WeekView />}
                     {viewMode === 'fixed' && <FixedBlocksManager />}
                     {viewMode === 'templates' && <BlockTemplates />}
+                    {viewMode === 'recurrences' && <RecurrenceSuggestions />}
                 </motion.div>
             </AnimatePresence>
         </div>

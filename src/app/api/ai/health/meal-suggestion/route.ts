@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
-import { MEAL_SUGGESTION_PROMPT } from '@/ai/prompts/healthCoachPrompt';
+import { createMealSuggestionPrompt } from '@/ai/prompts/healthCoachPrompt';
 import { MealSuggestionSchema } from '@/ai/schemas/aiSchemas';
+import { parseAIResponse, getAlreadySuggested, logAISuggestion, loadHealthProfile } from '@/lib/ai/aiHelpers';
 
-// Force dynamic to avoid static generation issues
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
@@ -16,92 +16,116 @@ export async function POST(req: NextRequest) {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
         const body = await req.json();
-        const { user_id, meal_type = 'lunch' } = body;
+        const { user_id, meal_type = 'lunch', cooking_time_available } = body;
 
         if (!user_id) {
             return NextResponse.json({ error: 'user_id is required' }, { status: 400 });
         }
 
         // Load health profile
-        const { data: healthProfile } = await supabase
-            .from('health_profile')
-            .select('*')
+        const healthProfile = await loadHealthProfile(user_id);
+
+        // Load recent meals (last 7 days) for anti-repetition
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const { data: recentMealsData } = await supabase
+            .from('planned_meals')
+            .select('name, meal_type')
             .eq('user_id', user_id)
-            .single();
+            .gte('date', sevenDaysAgo.toISOString().split('T')[0])
+            .order('date', { ascending: false })
+            .limit(20);
 
-        // Build context
-        const mealTypeLabels: Record<string, string> = {
-            breakfast: 'café da manhã',
-            lunch: 'almoço',
-            dinner: 'jantar',
-            snack: 'lanche'
-        };
-        const mealTypeLabel = mealTypeLabels[meal_type] || 'refeição';
+        const recentMeals = (recentMealsData || []).map(m => m.name);
 
-        const contextPrompt = `
-TIPO DE REFEIÇÃO: ${mealTypeLabel}
+        // Load user preferences (dislikes)
+        const { data: prefsData } = await supabase
+            .from('user_preferences')
+            .select('item_name')
+            .eq('user_id', user_id)
+            .in('preference_type', ['dislike', 'never'])
+            .eq('category', 'food');
 
-PERFIL DO USUÁRIO:
-- Objetivo: ${healthProfile?.goal || 'bem-estar geral'}
-- Nível de treino: ${healthProfile?.training_level || 'iniciante'}
-- Preferências alimentares: ${(healthProfile?.dietary_preferences || []).join(', ') || 'nenhuma'}
-- Alergias/Restrições: ${(healthProfile?.allergies_restrictions || []).join(', ') || 'nenhuma'}
-- Equipamentos disponíveis: ${(healthProfile?.equipment || []).join(', ') || 'cozinha básica'}
+        const dislikes = (prefsData || []).map(p => p.item_name);
 
-Gere uma sugestão de ${mealTypeLabel} saudável e prática, considerando o perfil acima.
-`;
+        // Also get AI suggestion history
+        const alreadySuggested = await getAlreadySuggested(user_id, `meal_${meal_type}`, 7);
+
+        // Build enhanced prompt
+        const prompt = createMealSuggestionPrompt({
+            mealType: meal_type,
+            healthProfile,
+            preferences: healthProfile?.dietary_preferences || [],
+            restrictions: healthProfile?.allergies_restrictions || [],
+            recentMeals: [...recentMeals, ...alreadySuggested],
+            dislikes,
+            cookingTimeAvailable: cooking_time_available,
+        });
 
         const model = genAI.getGenerativeModel({
             model: 'gemini-2.0-flash',
-            generationConfig: { responseMimeType: 'application/json' }
+            generationConfig: { responseMimeType: 'application/json', temperature: 0.8 }
         });
-
-        const prompt = `${MEAL_SUGGESTION_PROMPT}\n\n${contextPrompt}`;
 
         const result = await model.generateContent(prompt);
         const responseText = result.response.text();
+        const parsed = parseAIResponse(responseText, MealSuggestionSchema);
 
-        let parsed;
-        try {
-            const jsonStr = responseText.replace(/```json|```/g, '').trim();
-            parsed = JSON.parse(jsonStr);
-        } catch {
-            const match = responseText.match(/\{[\s\S]*\}/);
-            if (match) {
-                parsed = JSON.parse(match[0]);
-            } else {
-                throw new Error('No JSON found in response');
-            }
+        if (!parsed.success) {
+            console.error('Meal suggestion parse error:', parsed.error);
+            return NextResponse.json({
+                success: false,
+                status: 'error',
+                errorMessage: 'Não foi possível gerar a sugestão de refeição.',
+                retryHint: 'Tente novamente.',
+            }, { status: 500 });
         }
 
-        // Validate with Zod
-        const validated = MealSuggestionSchema.parse(parsed);
+        // Log for anti-repetition
+        await logAISuggestion(
+            user_id,
+            `meal_${meal_type}`,
+            parsed.data.meal.name,
+            { ingredients: parsed.data.meal.ingredients.map((i: any) => i.name) }
+        );
+
+        // Save to planned_meals (persist)
+        const today = new Date().toISOString().split('T')[0];
+        const mealData = {
+            user_id,
+            date: today,
+            meal_type,
+            name: parsed.data.meal.name,
+            description: parsed.data.meal.description,
+            prep_time_min: parsed.data.meal.prep_time,
+            ingredients: parsed.data.meal.ingredients,
+            instructions: parsed.data.meal.instructions,
+            nutrition: parsed.data.meal.nutritionEstimate || {},
+            why_fits_user: parsed.data.meal.whyFitsUser || '',
+            alternatives: parsed.data.meal.alternatives || [],
+        };
+
+        const { error: upsertError } = await supabase.from('planned_meals')
+            .upsert(mealData, { onConflict: 'user_id,date,meal_type' });
+
+        if (upsertError) {
+            // Fallback: try insert if upsert fails
+            await supabase.from('planned_meals').insert(mealData);
+        }
 
         return NextResponse.json({
             success: true,
-            meal_type: meal_type,
-            suggestion: validated,
+            meal_type,
+            suggestion: parsed.data,
         });
 
     } catch (error: any) {
         console.error('Meal suggestion error:', error);
         return NextResponse.json({
             success: false,
-            error: error.message,
-            suggestion: {
-                meal: {
-                    name: 'Salada Nutritiva',
-                    description: 'Uma salada simples e saudável',
-                    prep_time: 15,
-                    ingredients: [
-                        { name: 'Folhas verdes', quantity: '100', unit: 'g' },
-                        { name: 'Tomate', quantity: '1', unit: 'unidade' },
-                        { name: 'Azeite', quantity: '1', unit: 'colher de sopa' }
-                    ],
-                    instructions: ['Lave as folhas', 'Corte o tomate', 'Tempere com azeite'],
-                },
-                disclaimer: 'Sugestão genérica. Consulte um nutricionista para orientação personalizada.'
-            }
+            status: 'error',
+            errorMessage: error.message || 'Erro ao gerar sugestão de refeição.',
+            retryHint: 'Verifique sua conexão e tente novamente.',
         }, { status: 500 });
     }
 }

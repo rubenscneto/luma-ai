@@ -2,9 +2,10 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Sparkles, Loader2, Calendar, RefreshCw, Heart } from 'lucide-react';
+import { Plus, Sparkles, Loader2, Calendar, RefreshCw, Heart, GitCompareArrows, X, Target, Zap, Clock, Lightbulb } from 'lucide-react';
 import { useDailyPlan } from '@/context/dailyPlanContext';
 import { BlockCard } from './BlockCard';
+import { AIGeneratedPlan, AIBlock } from '@/types';
 
 interface AddBlockModalProps {
     isOpen: boolean;
@@ -127,9 +128,254 @@ function AddBlockModal({ isOpen, onClose, onAdd }: AddBlockModalProps) {
     );
 }
 
+// ========== A/B Plan Comparison Modal ==========
+
+const categoryLabels: Record<string, string> = {
+    work: 'Trabalho',
+    study: 'Estudo',
+    health: 'Saúde',
+    leisure: 'Lazer',
+    admin: 'Admin',
+    meal: 'Refeição',
+    sleep: 'Sono',
+    commute: 'Desloc.',
+    fixed: 'Fixo',
+};
+
+function PlanCard({
+    plan,
+    label,
+    icon: Icon,
+    accentColor,
+    onSelect,
+    isLoading,
+}: {
+    plan: AIGeneratedPlan;
+    label: string;
+    icon: React.ElementType;
+    accentColor: string;
+    onSelect: () => void;
+    isLoading: boolean;
+}) {
+    // Count blocks by category
+    const categoryCounts = plan.blocks.reduce((acc, b) => {
+        acc[b.category] = (acc[b.category] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex-1 p-5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all"
+        >
+            {/* Plan Name */}
+            <div className="flex items-center gap-2 mb-3">
+                <div className={`w-8 h-8 rounded-lg ${accentColor} flex items-center justify-center`}>
+                    <Icon className="w-4 h-4 text-white" />
+                </div>
+                <h4 className="text-lg font-semibold text-white">{label}</h4>
+            </div>
+
+            {/* Summary */}
+            <p className="text-sm text-white/70 mb-4 line-clamp-2">{plan.summary}</p>
+
+            {/* Insight */}
+            {plan.insight && (
+                <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-4">
+                    <Lightbulb className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                    <p className="text-xs text-amber-300">{plan.insight}</p>
+                </div>
+            )}
+
+            {/* Category breakdown */}
+            <div className="flex flex-wrap gap-1.5 mb-4">
+                {Object.entries(categoryCounts).map(([cat, count]) => (
+                    <span key={cat} className="px-2 py-0.5 text-xs rounded-full bg-white/10 text-white/70">
+                        {categoryLabels[cat] || cat}: {count}
+                    </span>
+                ))}
+            </div>
+
+            {/* Timeline preview */}
+            <div className="space-y-1.5 mb-4 max-h-48 overflow-y-auto pr-1">
+                {plan.blocks.map((block, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                        <span className="text-white/40 w-[72px] shrink-0 font-mono">
+                            {block.start_time}-{block.end_time}
+                        </span>
+                        <div className="flex-1 px-2 py-1 rounded bg-white/5 text-white/80 truncate">
+                            {block.title}
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Stats */}
+            <div className="flex items-center gap-4 text-xs text-white/50 mb-4">
+                <span>{plan.blocks.length} blocos</span>
+                <span>•</span>
+                <span>{Object.keys(categoryCounts).length} categorias</span>
+            </div>
+
+            {/* Select button */}
+            <button
+                onClick={onSelect}
+                disabled={isLoading}
+                className={`w-full py-2.5 rounded-xl font-medium text-white transition-all disabled:opacity-50 ${accentColor} hover:opacity-90`}
+            >
+                {isLoading ? (
+                    <Loader2 className="w-4 h-4 mx-auto animate-spin" />
+                ) : (
+                    `Escolher ${label}`
+                )}
+            </button>
+        </motion.div>
+    );
+}
+
+function ABPlanComparison() {
+    const { abPlans, selectPlan, clearABPlans, isLoading } = useDailyPlan();
+
+    if (!abPlans.planA || !abPlans.planB) return null;
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        >
+            <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[#12122a] border border-white/10 p-6"
+            >
+                {/* Header */}
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h3 className="text-xl font-bold text-white">Comparar Planos</h3>
+                        <p className="text-sm text-white/50 mt-1">
+                            Escolha o estilo que melhor se encaixa no seu dia
+                        </p>
+                    </div>
+                    <button
+                        onClick={clearABPlans}
+                        className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                    >
+                        <X className="w-5 h-5 text-white/60" />
+                    </button>
+                </div>
+
+                {/* Plans side by side */}
+                <div className="flex flex-col sm:flex-row gap-4">
+                    <PlanCard
+                        plan={abPlans.planA}
+                        label="Foco"
+                        icon={Target}
+                        accentColor="bg-blue-600"
+                        onSelect={() => selectPlan('A')}
+                        isLoading={isLoading}
+                    />
+                    <PlanCard
+                        plan={abPlans.planB}
+                        label="Equilíbrio"
+                        icon={Zap}
+                        accentColor="bg-emerald-600"
+                        onSelect={() => selectPlan('B')}
+                        isLoading={isLoading}
+                    />
+                </div>
+            </motion.div>
+        </motion.div>
+    );
+}
+
+// ========== Generate Mode Selector ==========
+
+function GenerateModePicker({
+    isOpen,
+    onClose,
+    onGenerate,
+    onGenerateAB,
+    isLoading,
+    isABLoading,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    onGenerate: () => void;
+    onGenerateAB: () => void;
+    isLoading: boolean;
+    isABLoading: boolean;
+}) {
+    if (!isOpen) return null;
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={onClose}
+        >
+            <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="w-full max-w-sm p-6 rounded-2xl bg-[#1a1a2e] border border-white/10"
+                onClick={e => e.stopPropagation()}
+            >
+                <h3 className="text-lg font-semibold text-white mb-2">Gerar Agenda com IA</h3>
+                <p className="text-sm text-white/50 mb-5">Escolha como deseja gerar o plano do dia</p>
+
+                <div className="space-y-3">
+                    <button
+                        onClick={() => { onGenerate(); onClose(); }}
+                        disabled={isLoading || isABLoading}
+                        className="w-full flex items-center gap-3 p-4 rounded-xl bg-brand-primary/20 hover:bg-brand-primary/30 border border-brand-primary/30 transition-all disabled:opacity-50"
+                    >
+                        <div className="w-10 h-10 rounded-lg bg-brand-primary/30 flex items-center justify-center shrink-0">
+                            <Sparkles className="w-5 h-5 text-brand-primary" />
+                        </div>
+                        <div className="text-left">
+                            <p className="text-sm font-medium text-white">Plano Único</p>
+                            <p className="text-xs text-white/50">Gere o melhor plano automaticamente</p>
+                        </div>
+                        {isLoading && <Loader2 className="w-4 h-4 text-brand-primary animate-spin ml-auto" />}
+                    </button>
+
+                    <button
+                        onClick={() => { onGenerateAB(); onClose(); }}
+                        disabled={isLoading || isABLoading}
+                        className="w-full flex items-center gap-3 p-4 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 transition-all disabled:opacity-50"
+                    >
+                        <div className="w-10 h-10 rounded-lg bg-purple-500/30 flex items-center justify-center shrink-0">
+                            <GitCompareArrows className="w-5 h-5 text-purple-400" />
+                        </div>
+                        <div className="text-left">
+                            <p className="text-sm font-medium text-white">Comparar A/B</p>
+                            <p className="text-xs text-white/50">Dois estilos para você escolher</p>
+                        </div>
+                        {isABLoading && <Loader2 className="w-4 h-4 text-purple-400 animate-spin ml-auto" />}
+                    </button>
+                </div>
+            </motion.div>
+        </motion.div>
+    );
+}
+
+// ========== Main DayView ==========
+
 export function DayView() {
-    const { todayBlocks, todayPlan, isLoading, generatePlan, generateHealthBlocks, addBlock, replanDay } = useDailyPlan();
+    const {
+        todayBlocks, todayPlan, isLoading, generatePlan,
+        generateHealthBlocks, addBlock, replanDay,
+        generateABPlan, abPlans, isABLoading,
+    } = useDailyPlan();
+
     const [showAddModal, setShowAddModal] = useState(false);
+    const [showGenerateModal, setShowGenerateModal] = useState(false);
     const [isReplanning, setIsReplanning] = useState(false);
     const [isGeneratingHealth, setIsGeneratingHealth] = useState(false);
 
@@ -163,6 +409,10 @@ export function DayView() {
             setIsGeneratingHealth(false);
         }
     };
+
+    // Current time position for timeline (6:00 to 22:00 range)
+    const currentHour = now.getHours() + now.getMinutes() / 60;
+    const timelineProgress = Math.max(0, Math.min(100, ((currentHour - 6) / 16) * 100));
 
     return (
         <div className="space-y-6">
@@ -214,11 +464,11 @@ export function DayView() {
                     </button>
 
                     <button
-                        onClick={() => generatePlan()}
-                        disabled={isLoading}
+                        onClick={() => setShowGenerateModal(true)}
+                        disabled={isLoading || isABLoading}
                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-primary hover:bg-brand-primary/90 text-white transition-colors disabled:opacity-50"
                     >
-                        {isLoading ? (
+                        {isLoading || isABLoading ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
                             <Sparkles className="w-4 h-4" />
@@ -228,8 +478,23 @@ export function DayView() {
                 </div>
             </div>
 
+            {/* A/B Loading state */}
+            {isABLoading && (
+                <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center gap-3 p-4 rounded-xl bg-purple-500/10 border border-purple-500/20"
+                >
+                    <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
+                    <div>
+                        <p className="text-sm font-medium text-purple-300">Gerando dois planos alternativos...</p>
+                        <p className="text-xs text-purple-300/60">Plano A (Foco) e Plano B (Equilíbrio)</p>
+                    </div>
+                </motion.div>
+            )}
+
             {/* No plan state */}
-            {!todayPlan && !isLoading && (
+            {!todayPlan && !isLoading && !isABLoading && (
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -242,13 +507,24 @@ export function DayView() {
                     <p className="text-white/60 max-w-sm mb-6">
                         Gere um plano com IA baseado nos seus compromissos fixos e objetivos, ou adicione blocos manualmente.
                     </p>
-                    <button
-                        onClick={() => generatePlan()}
-                        className="flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-primary hover:bg-brand-primary/90 text-white font-medium transition-colors"
-                    >
-                        <Sparkles className="w-5 h-5" />
-                        Gerar Plano do Dia
-                    </button>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={() => generatePlan()}
+                            disabled={isLoading}
+                            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-primary hover:bg-brand-primary/90 text-white font-medium transition-colors"
+                        >
+                            <Sparkles className="w-5 h-5" />
+                            Plano Único
+                        </button>
+                        <button
+                            onClick={() => generateABPlan()}
+                            disabled={isABLoading}
+                            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-600/90 text-white font-medium transition-colors"
+                        >
+                            <GitCompareArrows className="w-5 h-5" />
+                            Comparar A/B
+                        </button>
+                    </div>
                 </motion.div>
             )}
 
@@ -260,9 +536,47 @@ export function DayView() {
                 </div>
             )}
 
-            {/* Blocks list */}
+            {/* Blocks list with timeline */}
             {todayPlan && !isLoading && (
                 <div className="space-y-6">
+                    {/* Mini timeline progress bar */}
+                    <div className="relative">
+                        <div className="flex justify-between text-[10px] text-white/30 mb-1">
+                            <span>06:00</span>
+                            <span>10:00</span>
+                            <span>14:00</span>
+                            <span>18:00</span>
+                            <span>22:00</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                            <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: `${timelineProgress}%` }}
+                                transition={{ duration: 1, ease: 'easeOut' }}
+                                className="h-full rounded-full bg-gradient-to-r from-brand-primary to-purple-500"
+                            />
+                        </div>
+                        {/* Block dots on timeline */}
+                        <div className="relative h-2 mt-0.5">
+                            {todayBlocks.map(block => {
+                                const start = new Date(block.start_datetime);
+                                const startH = start.getHours() + start.getMinutes() / 60;
+                                const left = Math.max(0, Math.min(100, ((startH - 6) / 16) * 100));
+                                return (
+                                    <div
+                                        key={block.id}
+                                        className={`absolute w-1.5 h-1.5 rounded-full -translate-x-0.5 ${block.is_done ? 'bg-green-400' :
+                                                block.is_skipped ? 'bg-red-400/50' :
+                                                    block.status === 'current' ? 'bg-brand-primary' :
+                                                        'bg-white/30'
+                                            }`}
+                                        style={{ left: `${left}%` }}
+                                    />
+                                );
+                            })}
+                        </div>
+                    </div>
+
                     {/* Delayed blocks warning */}
                     {delayedBlocks.length > 0 && (
                         <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
@@ -316,7 +630,7 @@ export function DayView() {
                 </div>
             )}
 
-            {/* Add block modal */}
+            {/* Modals */}
             <AnimatePresence>
                 {showAddModal && (
                     <AddBlockModal
@@ -325,6 +639,21 @@ export function DayView() {
                         onAdd={addBlock}
                     />
                 )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                <GenerateModePicker
+                    isOpen={showGenerateModal}
+                    onClose={() => setShowGenerateModal(false)}
+                    onGenerate={() => generatePlan()}
+                    onGenerateAB={() => generateABPlan()}
+                    isLoading={isLoading}
+                    isABLoading={isABLoading}
+                />
+            </AnimatePresence>
+
+            <AnimatePresence>
+                <ABPlanComparison />
             </AnimatePresence>
         </div>
     );

@@ -16,6 +16,7 @@ import {
     ListChecks,
     Bot,
     BarChart3,
+    Dumbbell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +29,7 @@ interface TabItem {
 const mainTabs: TabItem[] = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Início" },
     { href: "/agenda", icon: Calendar, label: "Agenda" },
-    { href: "/dashboard/routine", icon: ListChecks, label: "Rotina" },
+    { href: "/treino", icon: Dumbbell, label: "Treino" },
     { href: "/saude", icon: Heart, label: "Saúde" },
 ];
 

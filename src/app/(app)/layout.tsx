@@ -7,6 +7,7 @@ import { FloatingAssistantOrb } from "@/components/FloatingAssistantOrb";
 import { AssistantDrawer } from "@/components/AssistantDrawer";
 import { DailyPlanProvider } from "@/context/dailyPlanContext";
 import { HealthProvider } from "@/context/healthContext";
+import { TrainingProvider } from "@/context/trainingContext";
 import { ToastProvider } from "@/context/toastContext";
 import NotificationManager from "@/components/notifications/NotificationManager";
 import { useState } from "react";
@@ -67,27 +68,29 @@ export default function AppLayout({
             <ToastProvider>
                 <DailyPlanProvider>
                     <HealthProvider>
-                        {/* Main Content */}
-                        <main
-                            className="flex-1 md:ml-64 overflow-y-auto relative z-10"
-                            style={{
-                                paddingTop: "calc(env(safe-area-inset-top, 0px) + 56px)",
-                                paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)",
-                                paddingLeft: "16px",
-                                paddingRight: "16px",
-                            }}
-                        >
-                            {/* Desktop padding adjustments */}
-                            <div className="hidden md:block" style={{ marginTop: "-56px" }} />
-                            <div className="md:p-8 md:pt-8 md:pb-8">
-                                <div className="max-w-7xl mx-auto">
-                                    {children}
+                        <TrainingProvider>
+                            {/* Main Content */}
+                            <main
+                                className="flex-1 md:ml-64 overflow-y-auto relative z-10"
+                                style={{
+                                    paddingTop: "calc(env(safe-area-inset-top, 0px) + 56px)",
+                                    paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)",
+                                    paddingLeft: "16px",
+                                    paddingRight: "16px",
+                                }}
+                            >
+                                {/* Desktop padding adjustments */}
+                                <div className="hidden md:block" style={{ marginTop: "-56px" }} />
+                                <div className="md:p-8 md:pt-8 md:pb-8">
+                                    <div className="max-w-7xl mx-auto">
+                                        {children}
+                                    </div>
                                 </div>
-                            </div>
-                        </main>
+                            </main>
 
-                        {/* Notification Manager */}
-                        <NotificationManager />
+                            {/* Notification Manager */}
+                            <NotificationManager />
+                        </TrainingProvider>
                     </HealthProvider>
                 </DailyPlanProvider>
             </ToastProvider>

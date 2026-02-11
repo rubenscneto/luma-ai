@@ -245,3 +245,201 @@ export interface DailyBlockWithStatus extends DailyBlock {
     timeUntilEnd?: number; // minutes
 }
 
+// ========== AI-Generated Plan Types ==========
+
+export type PlanStyle = 'focused' | 'balanced';
+
+export interface AIBlock {
+    title: string;
+    category: BlockCategory;
+    start_time: string; // HH:MM
+    end_time: string; // HH:MM
+    suggested_reason?: string;
+    energyLevel?: 'low' | 'medium' | 'high';
+}
+
+export interface AIGeneratedPlan {
+    blocks: AIBlock[];
+    summary: string;
+    insight?: string;
+    style: PlanStyle;
+}
+
+export interface RecurrenceSuggestion {
+    id: string;
+    title: string;
+    category: BlockCategory;
+    pattern: string; // human-readable, e.g. "Seg, Qua, Sex"
+    days: number[]; // [1, 3, 5]
+    start_time: string; // HH:MM
+    end_time: string; // HH:MM
+    confidence: number; // 0-100
+    occurrences: number; // how many times detected in 14 days
+}
+
+// ========== AI Request State ==========
+
+export type AIRequestStatus = 'idle' | 'loading' | 'success' | 'empty' | 'error';
+
+// ========== Training Module Types ==========
+
+export type TrainingGoal = 'hypertrophy' | 'definition' | 'conditioning' | 'strength' | 'general';
+
+export interface WorkoutExercise {
+    exerciseId: string;
+    name: string;
+    machineOrType: string;
+    setsTarget: number;
+    repsTarget: string; // e.g. "8-12"
+    restSecTarget: number;
+    notes?: string;
+}
+
+export interface TrainingPlanDay {
+    dayOfWeek: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+    focus: string;
+    workout: WorkoutExercise[];
+}
+
+export interface TrainingPlanWeekly {
+    id: string;
+    user_id: string;
+    week_start: string;
+    plan_data: TrainingPlanDay[];
+    goal?: string;
+    level?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface WorkoutSet {
+    id: string;
+    session_id: string;
+    user_id: string;
+    exercise_id: string;
+    exercise_name: string;
+    set_number: number;
+    weight_kg: number | null;
+    reps: number | null;
+    rest_sec: number | null;
+    rpe: number | null;
+    created_at?: string;
+}
+
+export interface WorkoutSession {
+    id: string;
+    user_id: string;
+    plan_id?: string;
+    date: string;
+    day_of_week?: string;
+    focus?: string;
+    duration_min?: number;
+    status: 'in_progress' | 'completed';
+    notes?: string;
+    created_at?: string;
+    completed_at?: string;
+}
+
+export interface BodyMetric {
+    id: string;
+    user_id: string;
+    date: string;
+    weight_kg: number | null;
+    notes?: string;
+    created_at?: string;
+}
+
+export interface ProgressionSuggestion {
+    exerciseId: string;
+    exerciseName: string;
+    suggestion: string;
+    type: 'increase_weight' | 'increase_reps' | 'decrease_rest' | 'maintain' | 'deload';
+    detail: string;
+}
+
+// ========== Pantry & Consumption Types ==========
+
+export interface PantryItem {
+    id: string;
+    user_id: string;
+    name: string;
+    category?: string;
+    unit: string;
+    qty_current: number;
+    qty_min: number;
+    last_updated?: string;
+}
+
+export interface ConsumptionLog {
+    id: string;
+    user_id: string;
+    date: string;
+    item_name: string;
+    qty_used: number;
+    source: 'meal' | 'workout' | 'manual';
+    created_at?: string;
+}
+
+// ========== Planned Meals ==========
+
+export interface PlannedMealDB {
+    id: string;
+    user_id: string;
+    date: string;
+    meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+    name: string;
+    description?: string;
+    prep_time_min?: number;
+    ingredients: { name: string; qty: string }[];
+    instructions: string[];
+    nutrition: { calories?: number; protein?: number; carbs?: number; fat?: number };
+    why_fits_user?: string;
+    alternatives: { mealTitle: string; keyChange: string }[];
+    created_at?: string;
+}
+
+// ========== User Preferences ==========
+
+export interface UserPreference {
+    id: string;
+    user_id: string;
+    category: string;
+    item_name: string;
+    preference_type: 'like' | 'dislike' | 'never';
+    expires_at?: string;
+    created_at?: string;
+}
+
+// ========== Memory & Personalization ==========
+
+export interface MemoryRecent {
+    recentMeals: string[];
+    recentAgendaBlocks: string[];
+    recentWorkouts: string[];
+    dislikes: string[];
+    favorites: string[];
+}
+
+// ========== Recurrence ==========
+
+export interface RecurrenceSuggestion {
+    titleDetected: string;
+    suggestedDays: string[];
+    suggestedTimeRange: string;
+    confidence: number;
+    questionToUser: string;
+}
+
+export interface RecurringBlockRule {
+    id: string;
+    user_id: string;
+    title: string;
+    category: string;
+    days_of_week: number[];
+    start_time: string;
+    duration_min: number;
+    priority: string;
+    is_active: boolean;
+    created_at?: string;
+}
+

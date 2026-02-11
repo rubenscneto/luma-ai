@@ -1,17 +1,20 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ChevronLeft, ChevronRight, Plus, Utensils, Coffee,
-    Moon, Cookie, RefreshCw, Sparkles, X
+    Moon, Cookie, RefreshCw, Sparkles, X, AlertCircle,
+    ThumbsUp, ThumbsDown, Clock, Flame
 } from 'lucide-react';
-import { useHealth } from '@/context/healthContext';
+import { useHealth, PlannedMealDB } from '@/context/healthContext';
+import { toast } from 'sonner';
 
 const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const FULL_DAYS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+type SlotState = 'idle' | 'loading' | 'error';
 
 interface MealSlot {
     type: MealType;
@@ -26,15 +29,6 @@ const MEAL_SLOTS: MealSlot[] = [
     { type: 'dinner', label: 'Jantar', icon: Moon, color: 'from-indigo-500/20 to-purple-500/20 border-indigo-500/30' },
     { type: 'snack', label: 'Lanche', icon: Cookie, color: 'from-pink-500/20 to-rose-500/20 border-pink-500/30' },
 ];
-
-interface PlannedMeal {
-    id: string;
-    date: string;
-    type: MealType;
-    name: string;
-    description?: string;
-    prepTime?: number;
-}
 
 function getWeekDates(baseDate: Date): Date[] {
     const start = new Date(baseDate);
@@ -52,19 +46,30 @@ function formatDateKey(date: Date): string {
 }
 
 export default function MealCalendar() {
-    const { generateMealSuggestion, hasCompletedOnboarding } = useHealth();
+    const {
+        generateMealSuggestion, hasCompletedOnboarding,
+        plannedMeals, loadPlannedMeals, saveFeedback
+    } = useHealth();
+
     const [currentWeekStart, setCurrentWeekStart] = useState(() => {
         const today = new Date();
         today.setDate(today.getDate() - today.getDay());
         return today;
     });
-    const [plannedMeals, setPlannedMeals] = useState<PlannedMeal[]>([]);
-    const [generatingFor, setGeneratingFor] = useState<string | null>(null);
-    const [selectedMeal, setSelectedMeal] = useState<PlannedMeal | null>(null);
+    const [slotStates, setSlotStates] = useState<Record<string, SlotState>>({});
+    const [selectedMeal, setSelectedMeal] = useState<PlannedMealDB | null>(null);
+    const [generatingWeek, setGeneratingWeek] = useState(false);
 
     const weekDates = useMemo(() => getWeekDates(currentWeekStart), [currentWeekStart]);
     const today = new Date();
     const todayKey = formatDateKey(today);
+
+    // Reload meals when week changes
+    useEffect(() => {
+        const start = formatDateKey(weekDates[0]);
+        const end = formatDateKey(weekDates[6]);
+        loadPlannedMeals(start, end);
+    }, [weekDates, loadPlannedMeals]);
 
     const navigateWeek = (direction: 'prev' | 'next') => {
         setCurrentWeekStart(prev => {
@@ -92,59 +97,49 @@ export default function MealCalendar() {
         return `${start.getDate()} ${startMonth} - ${end.getDate()} ${endMonth}`;
     }, [weekDates]);
 
-    const getMealForSlot = (date: Date, mealType: MealType): PlannedMeal | undefined => {
+    const getMealForSlot = (date: Date, mealType: MealType): PlannedMealDB | undefined => {
         const dateKey = formatDateKey(date);
-        return plannedMeals.find(m => m.date === dateKey && m.type === mealType);
+        return plannedMeals.find(m => m.date === dateKey && m.meal_type === mealType);
     };
 
     const handleGenerateMeal = async (date: Date, mealType: MealType) => {
         const dateKey = formatDateKey(date);
         const slotKey = `${dateKey}-${mealType}`;
 
-        setGeneratingFor(slotKey);
+        setSlotStates(prev => ({ ...prev, [slotKey]: 'loading' }));
 
         try {
             const suggestion = await generateMealSuggestion(mealType);
 
             if (suggestion?.meal) {
-                const newMeal: PlannedMeal = {
-                    id: `meal-${Date.now()}`,
-                    date: dateKey,
-                    type: mealType,
-                    name: suggestion.meal.name,
-                    description: suggestion.meal.description,
-                    prepTime: suggestion.meal.prep_time,
-                };
-
-                // Remove existing meal for this slot if any
-                setPlannedMeals(prev => [
-                    ...prev.filter(m => !(m.date === dateKey && m.type === mealType)),
-                    newMeal
-                ]);
+                setSlotStates(prev => ({ ...prev, [slotKey]: 'idle' }));
+                toast.success(`${suggestion.meal.name} sugerido!`);
+            } else {
+                setSlotStates(prev => ({ ...prev, [slotKey]: 'error' }));
             }
         } catch (error) {
             console.error('Error generating meal:', error);
-        } finally {
-            setGeneratingFor(null);
+            setSlotStates(prev => ({ ...prev, [slotKey]: 'error' }));
         }
     };
 
-    const handleRemoveMeal = (mealId: string) => {
-        setPlannedMeals(prev => prev.filter(m => m.id !== mealId));
-        setSelectedMeal(null);
-    };
-
     const handleGenerateWeek = async () => {
+        setGeneratingWeek(true);
         for (const date of weekDates) {
             for (const slot of MEAL_SLOTS.filter(s => s.type !== 'snack')) {
                 const existing = getMealForSlot(date, slot.type);
                 if (!existing) {
                     await handleGenerateMeal(date, slot.type);
-                    // Small delay to avoid rate limiting
                     await new Promise(resolve => setTimeout(resolve, 500));
                 }
             }
         }
+        setGeneratingWeek(false);
+    };
+
+    const handleFeedback = async (meal: PlannedMealDB, type: 'like' | 'dislike') => {
+        await saveFeedback('meal', meal.name, type);
+        setSelectedMeal(null);
     };
 
     if (!hasCompletedOnboarding) {
@@ -190,10 +185,15 @@ export default function MealCalendar() {
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={handleGenerateWeek}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl text-white text-sm font-medium"
+                    disabled={generatingWeek}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl text-white text-sm font-medium disabled:opacity-50"
                 >
-                    <Sparkles className="w-4 h-4" />
-                    Gerar Semana
+                    {generatingWeek ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                        <Sparkles className="w-4 h-4" />
+                    )}
+                    {generatingWeek ? 'Gerando...' : 'Gerar Semana'}
                 </motion.button>
             </div>
 
@@ -236,7 +236,7 @@ export default function MealCalendar() {
                                 const isToday = dateKey === todayKey;
                                 const meal = getMealForSlot(date, slot.type);
                                 const slotKey = `${dateKey}-${slot.type}`;
-                                const isGenerating = generatingFor === slotKey;
+                                const state = slotStates[slotKey] || 'idle';
 
                                 return (
                                     <div
@@ -253,19 +253,32 @@ export default function MealCalendar() {
                                                 <p className="text-xs font-medium text-white truncate">
                                                     {meal.name}
                                                 </p>
-                                                {meal.prepTime && (
+                                                {meal.prep_time_min && (
                                                     <p className="text-[10px] text-white/60 mt-0.5">
-                                                        {meal.prepTime} min
+                                                        {meal.prep_time_min} min
+                                                    </p>
+                                                )}
+                                                {meal.nutrition?.calories && (
+                                                    <p className="text-[10px] text-white/50 mt-0.5">
+                                                        {meal.nutrition.calories} kcal
                                                     </p>
                                                 )}
                                             </motion.button>
+                                        ) : state === 'error' ? (
+                                            <button
+                                                onClick={() => handleGenerateMeal(date, slot.type)}
+                                                className="w-full h-full flex flex-col items-center justify-center rounded-lg border border-dashed border-red-500/30 bg-red-500/5 hover:bg-red-500/10 transition-all gap-1"
+                                            >
+                                                <AlertCircle className="w-4 h-4 text-red-400/60" />
+                                                <span className="text-[10px] text-red-400/60">Tentar de novo</span>
+                                            </button>
                                         ) : (
                                             <button
                                                 onClick={() => handleGenerateMeal(date, slot.type)}
-                                                disabled={isGenerating}
+                                                disabled={state === 'loading'}
                                                 className="w-full h-full flex items-center justify-center rounded-lg border border-dashed border-white/10 hover:border-white/30 hover:bg-white/5 transition-all group"
                                             >
-                                                {isGenerating ? (
+                                                {state === 'loading' ? (
                                                     <RefreshCw className="w-4 h-4 text-white/40 animate-spin" />
                                                 ) : (
                                                     <Plus className="w-4 h-4 text-white/20 group-hover:text-white/40" />
@@ -295,14 +308,14 @@ export default function MealCalendar() {
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
                             onClick={e => e.stopPropagation()}
-                            className="bg-[#1a1a2e] rounded-2xl p-6 w-full max-w-md border border-white/10"
+                            className="bg-[#1a1a2e] rounded-2xl p-6 w-full max-w-md border border-white/10 max-h-[80vh] overflow-y-auto"
                         >
                             <div className="flex items-start justify-between mb-4">
                                 <div>
                                     <h3 className="text-lg font-semibold text-white">{selectedMeal.name}</h3>
                                     <p className="text-sm text-white/60">
-                                        {FULL_DAYS[new Date(selectedMeal.date).getDay()]} • {
-                                            MEAL_SLOTS.find(s => s.type === selectedMeal.type)?.label
+                                        {FULL_DAYS[new Date(selectedMeal.date + 'T12:00:00').getDay()]} • {
+                                            MEAL_SLOTS.find(s => s.type === selectedMeal.meal_type)?.label
                                         }
                                     </p>
                                 </div>
@@ -318,25 +331,108 @@ export default function MealCalendar() {
                                 <p className="text-sm text-white/70 mb-4">{selectedMeal.description}</p>
                             )}
 
-                            {selectedMeal.prepTime && (
-                                <div className="flex items-center gap-2 text-sm text-white/60 mb-4">
-                                    <span>⏱️ Tempo de preparo: {selectedMeal.prepTime} min</span>
+                            {/* Why it fits */}
+                            {selectedMeal.why_fits_user && (
+                                <div className="mb-4 p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                                    <p className="text-xs text-purple-300">
+                                        <Sparkles className="w-3 h-3 inline mr-1" />
+                                        {selectedMeal.why_fits_user}
+                                    </p>
                                 </div>
                             )}
 
-                            <div className="flex gap-3 pt-2">
+                            {/* Nutrition */}
+                            {selectedMeal.nutrition && (selectedMeal.nutrition.calories || selectedMeal.nutrition.protein) && (
+                                <div className="grid grid-cols-4 gap-2 mb-4">
+                                    {selectedMeal.nutrition.calories != null && (
+                                        <div className="text-center p-2 rounded-lg bg-orange-500/10">
+                                            <Flame className="w-3.5 h-3.5 text-orange-400 mx-auto mb-1" />
+                                            <div className="text-sm font-medium text-white">{selectedMeal.nutrition.calories}</div>
+                                            <div className="text-[10px] text-white/50">kcal</div>
+                                        </div>
+                                    )}
+                                    {selectedMeal.nutrition.protein != null && (
+                                        <div className="text-center p-2 rounded-lg bg-blue-500/10">
+                                            <div className="text-sm font-medium text-white">{selectedMeal.nutrition.protein}g</div>
+                                            <div className="text-[10px] text-white/50">Proteína</div>
+                                        </div>
+                                    )}
+                                    {selectedMeal.nutrition.carbs != null && (
+                                        <div className="text-center p-2 rounded-lg bg-yellow-500/10">
+                                            <div className="text-sm font-medium text-white">{selectedMeal.nutrition.carbs}g</div>
+                                            <div className="text-[10px] text-white/50">Carbs</div>
+                                        </div>
+                                    )}
+                                    {selectedMeal.nutrition.fat != null && (
+                                        <div className="text-center p-2 rounded-lg bg-red-500/10">
+                                            <div className="text-sm font-medium text-white">{selectedMeal.nutrition.fat}g</div>
+                                            <div className="text-[10px] text-white/50">Gordura</div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Prep time */}
+                            {selectedMeal.prep_time_min && (
+                                <div className="flex items-center gap-2 text-sm text-white/60 mb-4">
+                                    <Clock className="w-4 h-4" />
+                                    <span>Tempo de preparo: {selectedMeal.prep_time_min} min</span>
+                                </div>
+                            )}
+
+                            {/* Ingredients */}
+                            {selectedMeal.ingredients && selectedMeal.ingredients.length > 0 && (
+                                <div className="mb-4">
+                                    <h4 className="text-sm font-medium text-white mb-2">Ingredientes</h4>
+                                    <ul className="space-y-1">
+                                        {selectedMeal.ingredients.map((ing: any, i: number) => (
+                                            <li key={i} className="text-sm text-white/60 flex items-start gap-2">
+                                                <span className="text-purple-400 mt-1">•</span>
+                                                {ing.quantity} {ing.unit} {ing.name}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {/* Instructions */}
+                            {selectedMeal.instructions && selectedMeal.instructions.length > 0 && (
+                                <div className="mb-4">
+                                    <h4 className="text-sm font-medium text-white mb-2">Preparo</h4>
+                                    <ol className="space-y-1">
+                                        {selectedMeal.instructions.map((step: string, i: number) => (
+                                            <li key={i} className="text-sm text-white/60 flex items-start gap-2">
+                                                <span className="text-purple-400 font-medium shrink-0">{i + 1}.</span>
+                                                {step}
+                                            </li>
+                                        ))}
+                                    </ol>
+                                </div>
+                            )}
+
+                            {/* Feedback + Actions */}
+                            <div className="flex gap-2 pt-2 border-t border-white/10">
                                 <button
-                                    onClick={() => handleRemoveMeal(selectedMeal.id)}
-                                    className="flex-1 py-2.5 bg-red-500/20 border border-red-500/30 rounded-xl text-red-400 hover:bg-red-500/30 transition-all"
+                                    onClick={() => handleFeedback(selectedMeal, 'like')}
+                                    className="flex items-center gap-1.5 px-3 py-2 bg-green-500/10 border border-green-500/20 rounded-xl text-green-400 hover:bg-green-500/20 transition-all text-sm"
                                 >
-                                    Remover
+                                    <ThumbsUp className="w-3.5 h-3.5" />
+                                    Gostei
                                 </button>
                                 <button
+                                    onClick={() => handleFeedback(selectedMeal, 'dislike')}
+                                    className="flex items-center gap-1.5 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 hover:bg-red-500/20 transition-all text-sm"
+                                >
+                                    <ThumbsDown className="w-3.5 h-3.5" />
+                                    Não gostei
+                                </button>
+                                <div className="flex-1" />
+                                <button
                                     onClick={() => {
-                                        handleGenerateMeal(new Date(selectedMeal.date), selectedMeal.type);
+                                        handleGenerateMeal(new Date(selectedMeal.date + 'T12:00:00'), selectedMeal.meal_type);
                                         setSelectedMeal(null);
                                     }}
-                                    className="flex-1 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl text-white font-medium"
+                                    className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl text-white text-sm font-medium"
                                 >
                                     Regenerar
                                 </button>

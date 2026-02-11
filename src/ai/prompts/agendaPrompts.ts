@@ -1,8 +1,12 @@
 // Agenda Intelligence Prompts for LumaAI
 // Used by plan-day and replan-day endpoints
 
-export const AGENDA_PLANNER_SYSTEM_PROMPT = `Você é o planejador de agenda inteligente do LumaAI.
-Sua função é criar e otimizar a rotina diária do usuário, preenchendo lacunas entre compromissos fixos com atividades produtivas.
+import { LUMA_BASE_SYSTEM_PROMPT, buildUserContextBlock } from './baseSystemPrompt';
+
+export const AGENDA_PLANNER_SYSTEM_PROMPT = `${LUMA_BASE_SYSTEM_PROMPT}
+
+PAPEL: Planejador de agenda inteligente do LumaAI.
+Sua função é criar e otimizar a rotina diária, preenchendo lacunas com atividades produtivas e personalizadas.
 
 REGRAS OBRIGATÓRIAS:
 1. NUNCA sobreponha blocos - sempre verifique horários antes de sugerir
@@ -10,6 +14,8 @@ REGRAS OBRIGATÓRIAS:
 3. Intervalos mínimos de 10-15 minutos entre blocos longos (>1h)
 4. Blocos fixos (source='fixed') são IMUTÁVEIS - não altere nem mova
 5. Considere o contexto: se usuário tem "academia" às 18h, sugira hidratação antes ou alimentação leve depois
+6. Atribua estimativa de energia (low/medium/high) para cada bloco
+7. Inclua "rationale" explicando por que escolheu cada atividade
 
 CATEGORIAS DISPONÍVEIS:
 - work: trabalho, reuniões, tarefas profissionais
@@ -30,13 +36,17 @@ Retorne APENAS um JSON válido com a estrutura:
       "category": "categoria",
       "start_time": "HH:MM",
       "end_time": "HH:MM",
-      "suggested_reason": "Por que essa atividade foi sugerida"
+      "suggested_reason": "Por que essa atividade foi sugerida",
+      "energyLevel": "low|medium|high"
     }
   ],
-  "summary": "Resumo breve do plano gerado"
+  "summary": "Resumo breve do plano gerado",
+  "insight": "Observação proativa curta sobre o dia (ex: 'Dia com bastante foco — inclui uma pausa ativa às 15h')"
 }`;
 
-export const AGENDA_REPLANNER_SYSTEM_PROMPT = `Você é o replanejador de agenda do LumaAI.
+export const AGENDA_REPLANNER_SYSTEM_PROMPT = `${LUMA_BASE_SYSTEM_PROMPT}
+
+PAPEL: Replanejador de agenda do LumaAI.
 Sua função é ajustar a rotina do dia quando o usuário está atrasado ou precisa reorganizar.
 
 SINAIS QUE VOCÊ RECEBE:
@@ -86,13 +96,13 @@ AÇÕES DISPONÍVEIS:
 5. plan_day - Gerar plano do dia
    Dados opcionais: date, mode (first_time, regenerate, fill_gaps)
 
-FLUXO PARA add_block:
+FLUXO:
 Se o usuário disser algo como "coloca estudar às 14h":
 1. Extraia informações disponíveis
-2. Pergunte o que falta (1 pergunta por vez, curto e direto)
+2. Pergunte o que falta (1 pergunta por vez)
 3. Quando tiver tudo, retorne o JSON de ação
 
-EXEMPLO DE RESPOSTA ESTRUTURADA:
+EXEMPLO:
 {
   "action": "add_block",
   "payload": {
@@ -107,72 +117,89 @@ EXEMPLO DE RESPOSTA ESTRUTURADA:
 }`;
 
 export function buildPlanDayPrompt(context: {
-    date: string;
-    dayOfWeek: number;
-    fixedBlocks: { title: string; start: string; end: string; category: string }[];
-    existingBlocks: { title: string; start: string; end: string; source: string }[];
-    healthProfile?: {
-        goal?: string;
-        wake_time?: string;
-        sleep_time?: string;
-        dietary_preferences?: string[];
-    };
-    mode: 'first_time' | 'regenerate' | 'fill_gaps';
+  date: string;
+  dayOfWeek: number;
+  fixedBlocks: { title: string; start: string; end: string; category: string }[];
+  existingBlocks: { title: string; start: string; end: string; source: string }[];
+  healthProfile?: {
+    goal?: string;
+    wake_time?: string;
+    sleep_time?: string;
+    dietary_preferences?: string[];
+    training_level?: string;
+    equipment?: string[];
+  };
+  mode: 'first_time' | 'regenerate' | 'fill_gaps';
+  recentAgendaBlocks?: string[];
+  energyPreference?: string;
 }): string {
-    const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+  const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
-    let prompt = `CONTEXTO DO DIA:
+  let prompt = `CONTEXTO DO DIA:
 Data: ${context.date} (${dayNames[context.dayOfWeek]})
 Modo: ${context.mode}
 
 BLOCOS FIXOS DO DIA (imutáveis):
 ${context.fixedBlocks.length > 0
-            ? context.fixedBlocks.map(b => `- ${b.start}-${b.end}: ${b.title} (${b.category})`).join('\n')
-            : '- Nenhum bloco fixo hoje'}
+      ? context.fixedBlocks.map(b => `- ${b.start}-${b.end}: ${b.title} (${b.category})`).join('\n')
+      : '- Nenhum bloco fixo hoje'}
 
 `;
 
-    if (context.existingBlocks.length > 0 && context.mode !== 'first_time') {
-        prompt += `BLOCOS JÁ EXISTENTES:
+  if (context.existingBlocks.length > 0 && context.mode !== 'first_time') {
+    prompt += `BLOCOS JÁ EXISTENTES:
 ${context.existingBlocks.map(b => `- ${b.start}-${b.end}: ${b.title} (${b.source})`).join('\n')}
 
 `;
-    }
+  }
 
-    if (context.healthProfile) {
-        prompt += `PERFIL DO USUÁRIO:
-- Objetivo: ${context.healthProfile.goal || 'não definido'}
-- Acordar: ${context.healthProfile.wake_time || '07:00'}
-- Dormir: ${context.healthProfile.sleep_time || '23:00'}
-- Preferências alimentares: ${context.healthProfile.dietary_preferences?.join(', ') || 'nenhuma'}
+  if (context.healthProfile) {
+    prompt += buildUserContextBlock({
+      userProfile: {
+        goal: context.healthProfile.goal,
+        wake_time: context.healthProfile.wake_time || '07:00',
+        sleep_time: context.healthProfile.sleep_time || '23:00',
+        preferences: context.healthProfile.dietary_preferences,
+        training_level: context.healthProfile.training_level,
+        equipment: context.healthProfile.equipment,
+      },
+      memoryRecent: {
+        recentAgendaBlocks: context.recentAgendaBlocks || [],
+      },
+    });
+    prompt += '\n';
+  }
 
-`;
-    }
+  if (context.energyPreference) {
+    prompt += `PREFERÊNCIA DE ENERGIA DO DIA: ${context.energyPreference}\n\n`;
+  }
 
-    prompt += `TAREFA:
+  prompt += `TAREFA:
 ${context.mode === 'first_time'
-            ? 'Gere um plano completo para o dia, preenchendo os horários livres com atividades produtivas.'
-            : context.mode === 'fill_gaps'
-                ? 'Preencha APENAS as lacunas entre os blocos existentes. NÃO altere blocos já criados.'
-                : 'Regenere os blocos de IA (source=ai), mantendo os fixos e manuais. Melhore as sugestões.'}
+      ? 'Gere um plano completo para o dia, preenchendo os horários livres com atividades produtivas.'
+      : context.mode === 'fill_gaps'
+        ? 'Preencha APENAS as lacunas entre os blocos existentes. NÃO altere blocos já criados.'
+        : 'Regenere os blocos de IA (source=ai), mantendo os fixos e manuais. Melhore as sugestões.'}
 
 Considere:
 - Refeições nos horários adequados (café ~7h-9h, almoço ~12h-14h, jantar ~19h-21h)
 - Pausas curtas entre atividades longas
-- Atividades de saúde se o objetivo do usuário indicar`;
+- Atividades de saúde se o objetivo do usuário indicar
+- energyLevel para cada bloco (low para manhã cedo/noite, high para períodos produtivos)
+- Não repita atividades muito similares à agenda recente: ${context.recentAgendaBlocks?.slice(0, 5).join(', ') || 'N/A'}`;
 
-    return prompt;
+  return prompt;
 }
 
 export function buildReplanPrompt(context: {
-    currentTime: string;
-    signal: 'late' | 'done' | 'skip' | 'manual_request';
-    pendingBlocks: { id: string; title: string; start: string; end: string; locked: boolean; source: string }[];
-    completedToday: number;
-    skippedToday: number;
-    userNote?: string;
+  currentTime: string;
+  signal: 'late' | 'done' | 'skip' | 'manual_request';
+  pendingBlocks: { id: string; title: string; start: string; end: string; locked: boolean; source: string }[];
+  completedToday: number;
+  skippedToday: number;
+  userNote?: string;
 }): string {
-    return `SITUAÇÃO ATUAL:
+  return `SITUAÇÃO ATUAL:
 Hora: ${context.currentTime}
 Sinal: ${context.signal}
 ${context.userNote ? `Nota do usuário: ${context.userNote}` : ''}
@@ -183,15 +210,126 @@ ESTATÍSTICAS DO DIA:
 
 BLOCOS PENDENTES (ordenados por horário):
 ${context.pendingBlocks.map(b =>
-        `- [${b.id.slice(0, 8)}] ${b.start}-${b.end}: ${b.title} ${b.locked ? '🔒LOCKED' : ''} (${b.source})`
-    ).join('\n')}
+    `- [${b.id.slice(0, 8)}] ${b.start}-${b.end}: ${b.title} ${b.locked ? '🔒LOCKED' : ''} (${b.source})`
+  ).join('\n')}
 
 TAREFA:
 ${context.signal === 'late'
-            ? 'O usuário está atrasado. Reorganize os blocos pendentes para os próximos horários disponíveis.'
-            : context.signal === 'done'
-                ? 'O usuário concluiu uma tarefa. Verifique se há ajustes necessários nos próximos blocos.'
-                : context.signal === 'skip'
-                    ? 'O usuário pulou uma tarefa. Redistribua o tempo liberado ou mantenha como está se apropriado.'
-                    : 'O usuário pediu replanejamento manual. Otimize a rotina restante do dia.'}`;
+      ? 'O usuário está atrasado. Reorganize os blocos pendentes para os próximos horários disponíveis.'
+      : context.signal === 'done'
+        ? 'O usuário concluiu uma tarefa. Verifique se há ajustes necessários nos próximos blocos.'
+        : context.signal === 'skip'
+          ? 'O usuário pulou uma tarefa. Redistribua o tempo liberado ou mantenha como está se apropriado.'
+          : 'O usuário pediu replanejamento manual. Otimize a rotina restante do dia.'}`;
 }
+
+export function buildABPlanPrompt(context: {
+  date: string;
+  dayOfWeek: number;
+  fixedBlocks: { title: string; start: string; end: string; category: string }[];
+  existingBlocks: { title: string; start: string; end: string; source: string }[];
+  healthProfile?: {
+    goal?: string;
+    wake_time?: string;
+    sleep_time?: string;
+    dietary_preferences?: string[];
+    training_level?: string;
+    equipment?: string[];
+  };
+  recentAgendaBlocks?: string[];
+  planStyle: 'focused' | 'balanced';
+}): string {
+  const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+
+  const styleInstructions = context.planStyle === 'focused'
+    ? `ESTILO DO PLANO: FOCO MÁXIMO
+- Priorize blocos longos de deep work (90-120 min) sem interrupções
+- Agrupe atividades similares para minimizar troca de contexto
+- Coloque tarefas de maior concentração nos horários de pico de energia
+- Menos pausas, porém mais longas e estratégicas
+- Reduza blocos de lazer ao mínimo essencial
+- Ideal para dias de alta produtividade`
+    : `ESTILO DO PLANO: EQUILÍBRIO
+- Alterne entre categorias diferentes para variedade
+- Inclua pausas curtas (10-15 min) a cada 45-60 min
+- Distribua atividades de saúde e lazer ao longo do dia
+- Otimize para ciclos de energia naturais (ultradian rhythms ~90 min)
+- Inclua pelo menos 1 bloco de autocuidado (meditação, alongamento, passeio)
+- Ideal para dias com foco no bem-estar e sustentabilidade`;
+
+  let prompt = `CONTEXTO DO DIA:
+Data: ${context.date} (${dayNames[context.dayOfWeek]})
+Modo: generate_ab
+
+BLOCOS FIXOS DO DIA (imutáveis):
+${context.fixedBlocks.length > 0
+      ? context.fixedBlocks.map(b => `- ${b.start}-${b.end}: ${b.title} (${b.category})`).join('\n')
+      : '- Nenhum bloco fixo hoje'}
+
+${styleInstructions}
+
+`;
+
+  if (context.existingBlocks.length > 0) {
+    prompt += `BLOCOS JÁ EXISTENTES (manter):
+${context.existingBlocks.map(b => `- ${b.start}-${b.end}: ${b.title} (${b.source})`).join('\n')}
+
+`;
+  }
+
+  if (context.healthProfile) {
+    prompt += buildUserContextBlock({
+      userProfile: {
+        goal: context.healthProfile.goal,
+        wake_time: context.healthProfile.wake_time || '07:00',
+        sleep_time: context.healthProfile.sleep_time || '23:00',
+        preferences: context.healthProfile.dietary_preferences,
+        training_level: context.healthProfile.training_level,
+        equipment: context.healthProfile.equipment,
+      },
+      memoryRecent: {
+        recentAgendaBlocks: context.recentAgendaBlocks || [],
+      },
+    });
+    prompt += '\n';
+  }
+
+  prompt += `TAREFA:
+Gere um plano completo para o dia no estilo especificado acima, preenchendo os horários livres.
+
+Considere:
+- Refeições nos horários adequados (café ~7h-9h, almoço ~12h-14h, jantar ~19h-21h)
+- energyLevel para cada bloco (low para manhã cedo/noite, high para períodos produtivos)
+- Não repita atividades muito similares à agenda recente: ${context.recentAgendaBlocks?.slice(0, 5).join(', ') || 'N/A'}`;
+
+  return prompt;
+}
+
+export const RECURRENCE_DETECTION_PROMPT = `${LUMA_BASE_SYSTEM_PROMPT}
+
+PAPEL: Detector de padrões de recorrência do LumaAI.
+Sua função é analisar o histórico de blocos do usuário e identificar padrões recorrentes que poderiam se tornar blocos fixos.
+
+REGRAS:
+1. Só reporte padrões que ocorrem pelo menos 2 vezes nos últimos 14 dias
+2. Agrupe semanticamente blocos similares (ex: "Treino HIIT" e "Treino Funcional" → "Treino")
+3. Identifique o horário mais comum para cada padrão
+4. Atribua um nível de confiança (0-100%) baseado na consistência
+5. Ignore blocos que já são source='fixed' — estamos buscando padrões NÃO-fixos
+
+FORMATO DE RESPOSTA (JSON):
+{
+  "suggestions": [
+    {
+      "title": "Nome genérico do padrão",
+      "category": "categoria predominante",
+      "days": [1, 3, 5],
+      "start_time": "HH:MM",
+      "end_time": "HH:MM",
+      "confidence": 85,
+      "occurrences": 6,
+      "pattern_description": "Treino detectado seg/qua/sex às 18h"
+    }
+  ]
+}`;
+
