@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
         // 1. Fetch Context (Profile + Fixed)
         const { data: profile } = await supabase.from("routine_profiles").select("*").eq("user_id", user.id).single();
-        const { data: fixed } = await supabase.from("fixed_commitments").select("*").eq("user_id", user.id);
+        const { data: fixed } = await supabase.from("fixed_blocks").select("*").eq("user_id", user.id).eq("is_active", true);
 
         if (!profile) {
             return NextResponse.json({ error: "Profile not found. Please configure Routine first." }, { status: 404 });

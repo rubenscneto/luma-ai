@@ -36,9 +36,23 @@ export function RoutineManualForm() {
                 });
             }
 
-            const { data: f } = await supabase.from("fixed_commitments").select("*").eq("user_id", user?.id);
-            if (f) {
-                setFixedTasks(f);
+            // fixed_blocks stores one row per day_of_week — group by title+start_time+end_time
+            const { data: f } = await supabase.from("fixed_blocks").select("*").eq("user_id", user?.id).eq("is_active", true);
+            if (f && f.length > 0) {
+                const grouped: Record<string, any> = {};
+                for (const block of f) {
+                    const key = `${block.title}|${block.start_time}|${block.end_time}`;
+                    if (!grouped[key]) {
+                        grouped[key] = {
+                            title: block.title,
+                            start_time: block.start_time,
+                            end_time: block.end_time,
+                            days_of_week: [],
+                        };
+                    }
+                    grouped[key].days_of_week.push(block.day_of_week);
+                }
+                setFixedTasks(Object.values(grouped));
             }
         } catch (e) {
             console.error(e);
@@ -55,21 +69,28 @@ export function RoutineManualForm() {
             });
             if (pErr) throw pErr;
 
-            // Save Fixed
-            // Simple strategy: delete all and re-insert (not efficient but effective for small lists)
-            await supabase.from("fixed_commitments").delete().eq("user_id", user?.id);
+            // Save Fixed Blocks — delete existing and re-insert
+            // fixed_blocks has one row per day, so we expand days_of_week arrays
+            await supabase.from("fixed_blocks").delete().eq("user_id", user?.id);
 
-            const fixedToInsert = fixedTasks.map(t => ({
-                user_id: user?.id,
-                title: t.title,
-                start_time: t.start_time,
-                end_time: t.end_time,
-                days_of_week: t.days_of_week || t.days, // Handle both formats if varied
-                category: "fixed"
-            }));
+            const fixedToInsert: any[] = [];
+            for (const t of fixedTasks) {
+                const days = t.days_of_week || t.days || [];
+                for (const day of days) {
+                    fixedToInsert.push({
+                        user_id: user?.id,
+                        title: t.title,
+                        start_time: t.start_time,
+                        end_time: t.end_time,
+                        day_of_week: day,
+                        category: 'fixed',
+                        is_active: true,
+                    });
+                }
+            }
 
             if (fixedToInsert.length > 0) {
-                const { error: fErr } = await supabase.from("fixed_commitments").insert(fixedToInsert);
+                const { error: fErr } = await supabase.from("fixed_blocks").insert(fixedToInsert);
                 if (fErr) throw fErr;
             }
 
