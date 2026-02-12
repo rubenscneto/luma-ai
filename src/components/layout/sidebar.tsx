@@ -7,6 +7,7 @@ import { LayoutDashboard, Calendar, Compass, GraduationCap, FolderKanban, Librar
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/authContext";
 import { motion } from "framer-motion";
+import { ThemeToggleSimple } from "../ui/ThemeToggle";
 
 const menuItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -103,6 +104,8 @@ export function Sidebar() {
                         <span className="text-xs text-[var(--luma-slate)]">Online & Ready</span>
                     </div>
                 </div>
+
+                <ThemeToggleSimple className="px-4 py-3 text-[var(--luma-slate)] hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-[var(--luma-black)] dark:hover:text-white" />
 
                 <button
                     onClick={handleSignOut}

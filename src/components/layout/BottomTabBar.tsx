@@ -29,6 +29,7 @@ interface TabItem {
 const mainTabs: TabItem[] = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Início" },
     { href: "/agenda", icon: Calendar, label: "Agenda" },
+    { href: "/dashboard/routine", icon: ListChecks, label: "Rotina" },
     { href: "/treino", icon: Dumbbell, label: "Treino" },
     { href: "/saude", icon: Heart, label: "Saúde" },
 ];
@@ -130,6 +131,8 @@ interface MoreMenuProps {
     onClose: () => void;
 }
 
+import { ThemeToggleSimple } from "../ui/ThemeToggle";
+
 export function MoreMenu({ isOpen, onClose }: MoreMenuProps) {
     const pathname = usePathname();
 
@@ -185,6 +188,12 @@ export function MoreMenu({ isOpen, onClose }: MoreMenuProps) {
                             </Link>
                         );
                     })}
+
+                    <div className="h-px bg-zinc-200 dark:bg-zinc-800 my-2" />
+
+                    <div className="px-4 py-2">
+                        <ThemeToggleSimple className="text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 p-2 rounded-xl" />
+                    </div>
                 </div>
             </motion.div>
         </div>
