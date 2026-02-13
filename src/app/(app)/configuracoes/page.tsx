@@ -12,6 +12,8 @@ import { useAuth } from '@/context/authContext';
 
 type SettingsTab = 'profile' | 'notifications' | 'data';
 
+import { useTheme } from "next-themes";
+
 export default function SettingsPage() {
     const { user, signOut } = useAuth();
     const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
@@ -22,7 +24,21 @@ export default function SettingsPage() {
         subscribe,
         unsubscribe
     } = usePushNotifications();
-    const [isDarkMode, setIsDarkMode] = useState(true);
+
+    // next-themes integration
+    const { theme, setTheme, resolvedTheme } = useTheme();
+    const [mounted, setMounted] = useState(false);
+
+    // Prevent hydration mismatch
+    React.useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    const isDarkMode = mounted ? (theme === 'dark' || (theme === 'system' && resolvedTheme === 'dark')) : false;
+
+    const toggleTheme = () => {
+        setTheme(isDarkMode ? 'light' : 'dark');
+    };
 
     const tabs = [
         { id: 'profile' as const, label: 'Perfil', icon: User },
@@ -63,8 +79,8 @@ export default function SettingsPage() {
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
                                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive
-                                            ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-white'
-                                            : 'text-white/60 hover:bg-white/5 hover:text-white'
+                                        ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-white'
+                                        : 'text-white/60 hover:bg-white/5 hover:text-white'
                                         }`}
                                 >
                                     <Icon className={`w-5 h-5 ${isActive ? 'text-purple-400' : ''}`} />
@@ -122,7 +138,7 @@ export default function SettingsPage() {
                                             </div>
                                         </div>
                                         <button
-                                            onClick={() => setIsDarkMode(!isDarkMode)}
+                                            onClick={toggleTheme}
                                             className={`w-12 h-6 rounded-full transition-colors ${isDarkMode ? 'bg-purple-500' : 'bg-white/20'
                                                 }`}
                                         >
