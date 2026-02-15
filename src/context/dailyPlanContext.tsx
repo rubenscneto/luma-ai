@@ -1,10 +1,19 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { DailyPlan, DailyBlock, DailyBlockWithStatus, BlockStatus, FixedBlock, AIGeneratedPlan, RecurrenceSuggestion } from '@/types';
 import { useAuth } from './authContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import {
+    solveTimeline,
+    dailyBlockToSolverBlock,
+    solverBlockToTimeFields,
+    minutesToTime,
+    SolverBlock,
+    SolverConflict,
+} from '@/lib/timelineSolver';
+import { processDerivedBlocks } from '@/lib/derivedBlocks';
 
 interface DailyPlanContextType {
     // State
@@ -36,6 +45,9 @@ interface DailyPlanContextType {
     addBlock: (block: Partial<DailyBlock>) => Promise<void>;
     replanDay: (userNote?: string) => Promise<void>;
     refreshBlocks: () => void;
+    selectedDate: string;
+    setSelectedDate: (date: string) => void;
+    loadPlanForDate: (date: string) => Promise<void>;
 
     // Recurrence Actions
     detectRecurrences: () => Promise<void>;
@@ -85,18 +97,24 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
     const [recurrenceSuggestions, setRecurrenceSuggestions] = useState<RecurrenceSuggestion[]>([]);
     const [isRecurrenceLoading, setIsRecurrenceLoading] = useState(false);
 
+    // Date selection (for future day support)
     const today = new Date().toISOString().split('T')[0];
+    const [selectedDate, setSelectedDate] = useState(today);
 
-    const loadTodayPlan = useCallback(async () => {
+    // Undo state ref
+    const undoRef = useRef<{ blocks: DailyBlockWithStatus[]; timeout: NodeJS.Timeout } | null>(null);
+
+    const loadPlanForDate = useCallback(async (dateOverride?: string) => {
         if (!user) return;
 
         setIsLoading(true);
         try {
+            const targetDate = dateOverride || selectedDate || today;
             const now = new Date();
-            const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
-            const todayDate = today;
+            const targetDateObj = new Date(targetDate + 'T12:00:00');
+            const dayOfWeek = targetDateObj.getDay();
 
-            // Load fixed blocks for today (day_of_week is integer 0-6)
+            // Load fixed blocks for this day of week
             const { data: fixed } = await supabase
                 .from('fixed_blocks')
                 .select('*')
@@ -106,28 +124,26 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
 
             setFixedBlocks(fixed || []);
 
-            // Load today's plan
+            // Load plan for the target date
             const { data: plan } = await supabase
                 .from('daily_plan')
                 .select('*')
                 .eq('user_id', user.id)
-                .eq('plan_date', todayDate)
+                .eq('plan_date', targetDate)
                 .single();
 
             if (plan) {
                 setTodayPlan(plan);
 
-                // Load daily blocks
                 const { data: blocks } = await supabase
                     .from('daily_blocks')
                     .select('*')
                     .eq('plan_id', plan.id)
                     .order('start_datetime', { ascending: true });
 
-                // Convert fixed blocks to daily block format for display
                 const fixedAsDailyBlocks: DailyBlockWithStatus[] = (fixed || []).map(fb => {
-                    const startDatetime = `${todayDate}T${fb.start_time}`;
-                    const endDatetime = `${todayDate}T${fb.end_time}`;
+                    const startDatetime = `${targetDate}T${fb.start_time}`;
+                    const endDatetime = `${targetDate}T${fb.end_time}`;
 
                     return enrichBlockWithStatus({
                         id: `fixed-${fb.id}`,
@@ -142,24 +158,32 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
                         is_skipped: false,
                         ai_suggested: false,
                         created_at: fb.created_at,
-                        is_fixed: true, // Mark as fixed block
+                        is_fixed: true,
                     } as any, now);
                 });
 
-                // Merge and sort all blocks by start time
                 const dailyEnriched = (blocks || []).map(b => enrichBlockWithStatus(b, now));
                 const allBlocks = [...dailyEnriched, ...fixedAsDailyBlocks].sort((a, b) =>
                     new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime()
                 );
 
+                try {
+                    const solverBlocks = allBlocks.map(b => dailyBlockToSolverBlock(b as any));
+                    const result = solveTimeline(solverBlocks);
+                    if (result.conflicts.length > 0) {
+                        console.warn('[TimelineSolver] Overlaps detected on load:', result.conflicts.map(c => c.reason));
+                    }
+                } catch (e) {
+                    console.warn('[TimelineSolver] Check failed:', e);
+                }
+
                 setTodayBlocks(allBlocks);
             } else {
                 setTodayPlan(null);
 
-                // Even without a plan, show fixed blocks
                 const fixedAsDailyBlocks: DailyBlockWithStatus[] = (fixed || []).map(fb => {
-                    const startDatetime = `${todayDate}T${fb.start_time}`;
-                    const endDatetime = `${todayDate}T${fb.end_time}`;
+                    const startDatetime = `${targetDate}T${fb.start_time}`;
+                    const endDatetime = `${targetDate}T${fb.end_time}`;
 
                     return enrichBlockWithStatus({
                         id: `fixed-${fb.id}`,
@@ -183,11 +207,14 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
                 ));
             }
         } catch (error) {
-            console.error('Load today plan error:', error);
+            console.error('Load plan error:', error);
         } finally {
             setIsLoading(false);
         }
-    }, [user, today]);
+    }, [user, selectedDate, today]);
+
+    // Alias for backwards compatibility
+    const loadTodayPlan = useCallback(() => loadPlanForDate(today), [loadPlanForDate, today]);
 
     const refreshBlocks = useCallback(() => {
         const now = new Date();
@@ -200,10 +227,10 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
         return () => clearInterval(interval);
     }, [refreshBlocks]);
 
-    // Load on mount
+    // Load on mount and when selectedDate changes
     useEffect(() => {
-        loadTodayPlan();
-    }, [loadTodayPlan]);
+        loadPlanForDate();
+    }, [loadPlanForDate]);
 
     const generatePlan = async (date?: string, mode: 'first_time' | 'regenerate' | 'fill_gaps' = 'first_time') => {
         console.log('generatePlan called', { date, mode, user: user?.id });
@@ -326,7 +353,60 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (planId) {
-            await supabase
+            // === SOLVER INTEGRATION ===
+            // Convert existing blocks + new block to solver format
+            const existingSolverBlocks = todayBlocks.map(b => dailyBlockToSolverBlock(b as any));
+
+            const newSolverBlock: SolverBlock = {
+                id: `new_${Date.now()}`,
+                title: block.title || 'Novo bloco',
+                category: block.category || 'work',
+                startMin: block.start_datetime
+                    ? new Date(block.start_datetime).getHours() * 60 + new Date(block.start_datetime).getMinutes()
+                    : 480,
+                endMin: block.end_datetime
+                    ? new Date(block.end_datetime).getHours() * 60 + new Date(block.end_datetime).getMinutes()
+                    : 540,
+                source: (block.source as 'fixed' | 'ai' | 'manual') || 'manual',
+                priority: 80, // manual blocks get high priority
+                canShorten: true,
+                canSplit: block.category === 'work' || block.category === 'study',
+                minDuration: 15,
+            };
+
+            // Add derived blocks (meal pauses)
+            const allWithDerived = processDerivedBlocks([...existingSolverBlocks, newSolverBlock]);
+
+            // Solve for conflicts
+            const result = solveTimeline(allWithDerived);
+
+            // Show conflict toasts
+            for (const conflict of result.conflicts) {
+                if (conflict.action === 'moved' && conflict.newStart !== undefined) {
+                    toast.info(
+                        `Ajustei "${conflict.blockTitle}" para ${minutesToTime(conflict.newStart)} para evitar conflito.`,
+                        { duration: 5000 }
+                    );
+                } else if (conflict.action === 'suggest_other_day') {
+                    toast.warning(
+                        `"${conflict.blockTitle}" não cabe hoje. Considere mover para outro dia.`,
+                        { duration: 5000 }
+                    );
+                }
+            }
+
+            // Find the resolved version of our new block
+            const resolvedNew = result.resolved.find(b => b.id === newSolverBlock.id);
+            if (!resolvedNew) {
+                toast.error('Não foi possível encaixar o bloco na agenda de hoje.');
+                return;
+            }
+
+            // Convert solver result back to datetime
+            const timeFields = solverBlockToTimeFields(resolvedNew, today);
+
+            // Save to Supabase with solved times
+            const { data: insertedBlock, error: insertError } = await supabase
                 .from('daily_blocks')
                 .insert({
                     plan_id: planId,
@@ -336,7 +416,37 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
                     is_skipped: false,
                     order_index: todayBlocks.length * 10,
                     ...block,
-                });
+                    start_datetime: timeFields.start_datetime,
+                    end_datetime: timeFields.end_datetime,
+                })
+                .select()
+                .single();
+
+            if (insertError) {
+                console.error('Insert block error:', insertError);
+                toast.error('Erro ao salvar bloco.');
+                return;
+            }
+
+            // Update any existing blocks that were moved by the solver
+            const movedConflicts = result.conflicts.filter(
+                c => c.action === 'moved' && c.blockId !== newSolverBlock.id && !c.blockId.startsWith('fixed-')
+            );
+
+            for (const conflict of movedConflicts) {
+                const resolved = result.resolved.find(b => b.id === conflict.blockId);
+                if (resolved && conflict.newStart !== undefined) {
+                    const movedTimes = solverBlockToTimeFields(resolved, today);
+                    await supabase
+                        .from('daily_blocks')
+                        .update({
+                            start_datetime: movedTimes.start_datetime,
+                            end_datetime: movedTimes.end_datetime,
+                        })
+                        .eq('id', conflict.blockId)
+                        .eq('user_id', user.id);
+                }
+            }
 
             await loadTodayPlan();
         }
@@ -570,6 +680,9 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
             detectRecurrences,
             addRecurrenceAsFixed,
             dismissRecurrence,
+            selectedDate,
+            setSelectedDate,
+            loadPlanForDate,
         }}>
             {children}
         </DailyPlanContext.Provider>

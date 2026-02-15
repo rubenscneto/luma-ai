@@ -9,6 +9,8 @@ import { Sparkles, Clock, Target, ArrowRight, Plus, X, Check, Trash2 } from "luc
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { LiveTimeline } from "@/components/dashboard/LiveTimeline";
+import { NextTaskBanner } from "@/components/dashboard/NextTaskBanner";
+import DailyReset from "@/components/agenda/DailyReset";
 import { useAuth } from "@/context/authContext";
 
 interface Priority {
@@ -68,7 +70,7 @@ export default function DashboardPage() {
                 .then((res) => res.json())
                 .then((data) => setInsight(data.insight));
         } else {
-            setInsight("Defina sua rotina no 'Perdidão' para receber insights personalizados.");
+            setInsight("Defina sua rotina no 'Meu Planejador' para receber insights personalizados.");
         }
     }, [routine]);
 
@@ -129,6 +131,9 @@ export default function DashboardPage() {
                     )}
                 </div>
             </motion.div>
+
+            {/* Next Task Banner */}
+            <NextTaskBanner />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Timeline Widget - New AI-powered */}
@@ -232,6 +237,9 @@ export default function DashboardPage() {
                     </Card>
                 </div>
             </div>
+
+            {/* Daily Check-in */}
+            <DailyReset />
 
             {/* Add Priority Modal */}
             <AnimatePresence>

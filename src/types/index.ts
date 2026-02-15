@@ -422,14 +422,6 @@ export interface MemoryRecent {
 
 // ========== Recurrence ==========
 
-export interface RecurrenceSuggestion {
-    titleDetected: string;
-    suggestedDays: string[];
-    suggestedTimeRange: string;
-    confidence: number;
-    questionToUser: string;
-}
-
 export interface RecurringBlockRule {
     id: string;
     user_id: string;

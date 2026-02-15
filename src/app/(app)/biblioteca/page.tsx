@@ -5,8 +5,9 @@ import { useLibrary } from "@/context/libraryContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Upload, FileText, Loader2 } from "lucide-react";
+import { Upload, FileText, Loader2, BookOpen, ArrowRight } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
+import Link from "next/link";
 
 export default function BibliotecaPage() {
     const { items, addItem } = useLibrary();
@@ -49,6 +50,24 @@ export default function BibliotecaPage() {
                 <h1 className="text-3xl font-bold">Biblioteca Inteligente</h1>
                 <p className="text-zinc-500">Seus materiais com resumos gerados por IA.</p>
             </header>
+
+            {/* Book Club CTA */}
+            <Link href="/biblioteca/clube" className="block">
+                <div className="bg-gradient-to-r from-purple-500/10 to-indigo-500/10 border border-purple-500/20 rounded-xl p-5 hover:border-purple-500/40 transition-all group">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                                <BookOpen className="w-5 h-5 text-purple-400" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium">📚 Clube do Livro</p>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400">Acompanhe suas leituras e registre sessões</p>
+                            </div>
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-zinc-400 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
+                    </div>
+                </div>
+            </Link>
 
             {/* Upload Area */}
             <Card className="p-8 border-dashed border-2 flex flex-col items-center justify-center gap-4 bg-zinc-50/50 dark:bg-zinc-900/20">

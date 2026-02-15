@@ -80,7 +80,7 @@ export default function RoutineCentralPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-                {/* Option A: Perdidão */}
+                {/* Option A: Meu Planejador */}
                 <Card className="p-6 space-y-4 border-2 border-dashed border-zinc-200 dark:border-zinc-800 hover:border-violet-500/50 transition-colors group cursor-pointer relative overflow-hidden"
                     onClick={() => router.push("/perdidao")}>
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">

@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Subject, StudyMaterial, Flashcard } from '@/types';
+import { StudyTopicManager, StudyTopic } from '@/components/education/StudyTopicManager';
+import { PDFAnalyzer } from '@/components/education/PDFAnalyzer';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -26,6 +28,7 @@ export default function SubjectDetailsPage() {
     const [loading, setLoading] = useState(true);
     const [isReviewing, setIsReviewing] = useState(false);
     const [activeTab, setActiveTab] = useState("overview");
+    const [topics, setTopics] = useState<StudyTopic[]>([]);
 
     const fetchData = async () => {
         if (!params.subjectId) return;
@@ -56,6 +59,10 @@ export default function SubjectDetailsPage() {
             .order('next_review', { ascending: true });
 
         if (fcData) setFlashcards(fcData as Flashcard[]);
+
+        // Load topics from localStorage
+        const savedTopics = localStorage.getItem(`luma_topics_${params.subjectId}`);
+        if (savedTopics) setTopics(JSON.parse(savedTopics));
 
         setLoading(false);
     };
@@ -88,10 +95,17 @@ export default function SubjectDetailsPage() {
         return <div className="p-8 text-center">Matéria não encontrada.</div>;
     }
 
+    const handleTopicsChange = (newTopics: StudyTopic[]) => {
+        setTopics(newTopics);
+        localStorage.setItem(`luma_topics_${params.subjectId}`, JSON.stringify(newTopics));
+    };
+
     const tabs = [
         { id: "overview", label: "Visão Geral" },
+        { id: "topics", label: "Tópicos" },
         { id: "materials", label: "Materiais" },
         { id: "flashcards", label: "Flashcards" },
+        { id: "pdf", label: "PDF / IA" },
         { id: "mindmap", label: "Mapa Mental" },
     ];
 
@@ -151,12 +165,18 @@ export default function SubjectDetailsPage() {
 
                 {/* OVERVIEW TAB */}
                 <TabsContent value="overview" className="mt-6 space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                         <StatCard
                             icon={<Clock className="h-4 w-4" />}
                             label="Tempo Estudado"
                             value="0h"
                             isActive={false}
+                        />
+                        <StatCard
+                            icon={<Target className="h-4 w-4" />}
+                            label="Tópicos"
+                            value={`${topics.filter(t => t.status === 'done').length}/${topics.length}`}
+                            isActive={topics.some(t => t.status === 'done')}
                         />
                         <StatCard
                             icon={<Layers className="h-4 w-4" />}
@@ -179,6 +199,15 @@ export default function SubjectDetailsPage() {
                             <BrainCircuit className="h-4 w-4" /> Gerar Plano
                         </Button>
                     </Card>
+                </TabsContent>
+
+                {/* TOPICS TAB */}
+                <TabsContent value="topics" className="mt-6">
+                    <StudyTopicManager
+                        topics={topics}
+                        onChange={handleTopicsChange}
+                        subjectName={subject.name}
+                    />
                 </TabsContent>
 
                 {/* MATERIALS TAB */}
@@ -293,6 +322,45 @@ export default function SubjectDetailsPage() {
                     <div className="h-[400px] rounded-xl border border-zinc-800 bg-zinc-950 flex items-center justify-center text-zinc-500">
                         Editor de Mapa Mental (Em Breve)
                     </div>
+                </TabsContent>
+
+                {/* PDF / AI TAB */}
+                <TabsContent value="pdf" className="mt-6">
+                    <Card className="p-6 border-zinc-800">
+                        <h3 className="text-lg font-semibold mb-1">Análise de PDF com IA</h3>
+                        <p className="text-sm text-zinc-500 mb-4">Envie um PDF e a IA extrairá resumo, tópicos e flashcards automaticamente.</p>
+                        <PDFAnalyzer
+                            subjectName={subject?.name || ''}
+                            onTopicsExtracted={(newTopics) => {
+                                const existingNames = topics.map(t => t.title);
+                                const toAdd = newTopics.filter(n => !existingNames.includes(n));
+                                if (toAdd.length > 0) {
+                                    setTopics(prev => [
+                                        ...prev,
+                                        ...toAdd.map((name, i) => ({
+                                            id: `pdf-${Date.now()}-${i}`,
+                                            title: name,
+                                            status: 'pending' as const,
+                                            notes: '',
+                                            order: prev.length + i,
+                                        })),
+                                    ]);
+                                }
+                            }}
+                            onFlashcardsGenerated={async (cards) => {
+                                if (!subject) return;
+                                for (const card of cards) {
+                                    await supabase.from('flashcards').insert({
+                                        subject_id: subject.id,
+                                        front: card.question,
+                                        back: card.answer,
+                                        difficulty: 'medium',
+                                    });
+                                }
+                                fetchData();
+                            }}
+                        />
+                    </Card>
                 </TabsContent>
             </Tabs>
         </div>

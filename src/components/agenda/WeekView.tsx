@@ -1,19 +1,30 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useMemo, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-    ChevronLeft, ChevronRight, Calendar,
+    ChevronLeft, ChevronRight, Calendar, Wand2, Loader2,
     Briefcase, GraduationCap, Dumbbell, Utensils,
-    Moon, Heart, Users, Sparkles, CheckCircle2
+    Moon, Heart, Users, Sparkles, CheckCircle2, Plus
 } from 'lucide-react';
 import { useDailyPlan } from '@/context/dailyPlanContext';
 import { DailyBlock } from '@/types';
+import { toast } from 'sonner';
 
 const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const HOURS = Array.from({ length: 16 }, (_, i) => i + 6); // 6:00 to 21:00
 
 const CATEGORY_CONFIG: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
+    work: { icon: Briefcase, color: 'text-blue-400', bg: 'bg-blue-500/20 border-blue-500/30' },
+    study: { icon: GraduationCap, color: 'text-purple-400', bg: 'bg-purple-500/20 border-purple-500/30' },
+    health: { icon: Dumbbell, color: 'text-green-400', bg: 'bg-green-500/20 border-green-500/30' },
+    meal: { icon: Utensils, color: 'text-orange-400', bg: 'bg-orange-500/20 border-orange-500/30' },
+    sleep: { icon: Moon, color: 'text-indigo-400', bg: 'bg-indigo-500/20 border-indigo-500/30' },
+    leisure: { icon: Heart, color: 'text-pink-400', bg: 'bg-pink-500/20 border-pink-500/30' },
+    admin: { icon: Users, color: 'text-cyan-400', bg: 'bg-cyan-500/20 border-cyan-500/30' },
+    commute: { icon: Sparkles, color: 'text-yellow-400', bg: 'bg-yellow-500/20 border-yellow-500/30' },
+    fixed: { icon: Calendar, color: 'text-red-400', bg: 'bg-red-500/20 border-red-500/30' },
+    // Legacy mappings
     trabalho: { icon: Briefcase, color: 'text-blue-400', bg: 'bg-blue-500/20 border-blue-500/30' },
     estudo: { icon: GraduationCap, color: 'text-purple-400', bg: 'bg-purple-500/20 border-purple-500/30' },
     treino: { icon: Dumbbell, color: 'text-green-400', bg: 'bg-green-500/20 border-green-500/30' },
@@ -21,8 +32,9 @@ const CATEGORY_CONFIG: Record<string, { icon: React.ElementType; color: string; 
     descanso: { icon: Moon, color: 'text-indigo-400', bg: 'bg-indigo-500/20 border-indigo-500/30' },
     saude: { icon: Heart, color: 'text-red-400', bg: 'bg-red-500/20 border-red-500/30' },
     social: { icon: Users, color: 'text-pink-400', bg: 'bg-pink-500/20 border-pink-500/30' },
-    outro: { icon: Sparkles, color: 'text-gray-400', bg: 'bg-gray-500/20 border-gray-500/30' },
 };
+
+const DEFAULT_CATEGORY = { icon: Sparkles, color: 'text-gray-400', bg: 'bg-gray-500/20 border-gray-500/30' };
 
 function getWeekDates(baseDate: Date): Date[] {
     const start = new Date(baseDate);
@@ -41,15 +53,18 @@ function formatDateKey(date: Date): string {
 
 interface WeekViewProps {
     weekBlocks?: Record<string, DailyBlock[]>;
+    onDayClick?: (date: string) => void;
 }
 
-export default function WeekView({ weekBlocks = {} }: WeekViewProps) {
-    const { todayBlocks } = useDailyPlan();
+export default function WeekView({ weekBlocks = {}, onDayClick }: WeekViewProps) {
+    const { todayBlocks, generatePlan } = useDailyPlan();
     const [currentWeekStart, setCurrentWeekStart] = useState(() => {
         const today = new Date();
         today.setDate(today.getDate() - today.getDay());
         return today;
     });
+    const [isWeekLoading, setIsWeekLoading] = useState(false);
+    const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
 
     const weekDates = useMemo(() => getWeekDates(currentWeekStart), [currentWeekStart]);
     const today = new Date();
@@ -67,6 +82,51 @@ export default function WeekView({ weekBlocks = {} }: WeekViewProps) {
         const today = new Date();
         today.setDate(today.getDate() - today.getDay());
         setCurrentWeekStart(today);
+    };
+
+    const handleDayClick = useCallback((date: Date) => {
+        const key = formatDateKey(date);
+        setSelectedDayKey(prev => prev === key ? null : key);
+        if (onDayClick) onDayClick(key);
+    }, [onDayClick]);
+
+    const handlePlanWeek = async () => {
+        setIsWeekLoading(true);
+        try {
+            const startDate = formatDateKey(weekDates[0]);
+            const response = await fetch('/api/ai/agenda/plan-week', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: '', // Will be set by the server from auth
+                    start_date: startDate,
+                    timezone: 'America/Sao_Paulo',
+                }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                toast.success(`Semana planejada! ${data.totalBlocks} blocos criados.`);
+            } else {
+                const errorData = await response.json().catch(() => ({}));
+                toast.error(errorData.error || 'Erro ao planejar semana.');
+            }
+        } catch (error) {
+            console.error('Plan week error:', error);
+            toast.error('Erro de conexão ao planejar semana.');
+        } finally {
+            setIsWeekLoading(false);
+        }
+    };
+
+    const handlePlanDay = async (date: Date) => {
+        const dateStr = formatDateKey(date);
+        try {
+            await generatePlan(dateStr, 'first_time');
+            toast.success(`Dia ${date.getDate()} planejado com sucesso!`);
+        } catch (error) {
+            toast.error('Erro ao planejar dia.');
+        }
     };
 
     // Get blocks for a specific date
@@ -107,8 +167,17 @@ export default function WeekView({ weekBlocks = {} }: WeekViewProps) {
         return `${start.getDate()} ${startMonth} - ${end.getDate()} ${endMonth}`;
     }, [weekDates]);
 
+    // Count blocks per day for summary
+    const dayBlockCounts = useMemo(() => {
+        return weekDates.reduce((acc, date) => {
+            const key = formatDateKey(date);
+            acc[key] = getBlocksForDate(date).length;
+            return acc;
+        }, {} as Record<string, number>);
+    }, [weekDates, todayBlocks, weekBlocks]);
+
     return (
-        <div className="bg-white/5 rounded-2xl border border-white/10 overflow-hidden">
+        <div className="bg-white/5 dark:bg-white/5 rounded-2xl border border-white/10 dark:border-white/10 overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-white/10">
                 <div className="flex items-center gap-3">
@@ -129,20 +198,34 @@ export default function WeekView({ weekBlocks = {} }: WeekViewProps) {
                     </button>
                 </div>
 
-                <button
-                    onClick={goToToday}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                >
-                    <Calendar className="w-4 h-4" />
-                    Hoje
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handlePlanWeek}
+                        disabled={isWeekLoading}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                        {isWeekLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Wand2 className="w-4 h-4" />
+                        )}
+                        Planejar Semana
+                    </button>
+                    <button
+                        onClick={goToToday}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                    >
+                        <Calendar className="w-4 h-4" />
+                        Hoje
+                    </button>
+                </div>
             </div>
 
             {/* Week Grid */}
             <div className="flex">
                 {/* Time Column */}
                 <div className="w-12 flex-shrink-0 border-r border-white/10">
-                    <div className="h-12 border-b border-white/10" /> {/* Header spacer */}
+                    <div className="h-16 border-b border-white/10" /> {/* Header spacer */}
                     <div className="relative" style={{ height: '640px' }}>
                         {HOURS.map(hour => (
                             <div
@@ -161,22 +244,43 @@ export default function WeekView({ weekBlocks = {} }: WeekViewProps) {
                     {weekDates.map((date, idx) => {
                         const dateKey = formatDateKey(date);
                         const isToday = dateKey === todayKey;
+                        const isSelected = dateKey === selectedDayKey;
                         const blocks = getBlocksForDate(date);
+                        const blockCount = dayBlockCounts[dateKey] || 0;
+                        const isFuture = date > today;
+                        const isPast = dateKey < todayKey;
 
                         return (
                             <div
                                 key={dateKey}
-                                className={`flex-1 border-r border-white/10 last:border-r-0 ${isToday ? 'bg-purple-500/5' : ''
+                                className={`flex-1 border-r border-white/10 last:border-r-0 cursor-pointer transition-colors ${isToday ? 'bg-purple-500/5' :
+                                        isSelected ? 'bg-blue-500/5' :
+                                            isPast ? 'bg-white/[0.02]' : ''
                                     }`}
+                                onClick={() => handleDayClick(date)}
                             >
                                 {/* Day Header */}
-                                <div className={`h-12 flex flex-col items-center justify-center border-b border-white/10 ${isToday ? 'bg-purple-500/10' : ''
+                                <div className={`h-16 flex flex-col items-center justify-center border-b border-white/10 ${isToday ? 'bg-purple-500/10' :
+                                        isSelected ? 'bg-blue-500/10' : ''
                                     }`}>
                                     <span className="text-xs text-white/60">{DAYS[idx]}</span>
-                                    <span className={`text-sm font-medium ${isToday ? 'text-purple-400' : 'text-white'
+                                    <span className={`text-sm font-medium ${isToday ? 'text-purple-400' :
+                                            isSelected ? 'text-blue-400' :
+                                                'text-white'
                                         }`}>
                                         {date.getDate()}
                                     </span>
+                                    {blockCount > 0 ? (
+                                        <span className="text-[9px] text-white/40">{blockCount} blocos</span>
+                                    ) : isFuture ? (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handlePlanDay(date); }}
+                                            className="text-[9px] text-purple-400/60 hover:text-purple-400 transition-colors flex items-center gap-0.5"
+                                        >
+                                            <Plus className="w-2.5 h-2.5" />
+                                            planejar
+                                        </button>
+                                    ) : null}
                                 </div>
 
                                 {/* Blocks Area */}
@@ -205,7 +309,7 @@ export default function WeekView({ weekBlocks = {} }: WeekViewProps) {
 
                                     {/* Blocks */}
                                     {blocks.map(block => {
-                                        const cat = CATEGORY_CONFIG[block.category] || CATEGORY_CONFIG.outro;
+                                        const cat = CATEGORY_CONFIG[block.category] || DEFAULT_CATEGORY;
                                         const Icon = cat.icon;
                                         const style = getBlockStyle(block);
 
@@ -240,6 +344,19 @@ export default function WeekView({ weekBlocks = {} }: WeekViewProps) {
                                             </motion.div>
                                         );
                                     })}
+
+                                    {/* Empty state for unplanned future days */}
+                                    {blocks.length === 0 && isFuture && (
+                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handlePlanDay(date); }}
+                                                className="flex flex-col items-center gap-1 px-3 py-2 bg-purple-500/10 hover:bg-purple-500/20 rounded-lg border border-purple-500/20 transition-colors"
+                                            >
+                                                <Wand2 className="w-4 h-4 text-purple-400" />
+                                                <span className="text-[10px] text-purple-300">Planejar</span>
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         );
