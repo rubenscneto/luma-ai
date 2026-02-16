@@ -119,14 +119,43 @@ export default function MeuPlanejadorPage() {
 
     const totalSteps = STEPS.length;
 
+    // Load existing profile if available (Edit Mode)
+    useEffect(() => {
+        if (profile && !loading && currentStep === 1 && formData.description === "") {
+            setFormData({
+                occupations: profile.occupations || (profile.occupation ? [profile.occupation] : []),
+                description: profile.description || "",
+                studyFocus: profile.studyFocus || "",
+                peakProductivity: profile.peakProductivity,
+                energyLevel: profile.energyLevel,
+                style: profile.style,
+            });
+            setUserSettings({
+                wake_up_time: profile.userSettings?.wake_up_time || "07:00",
+                bed_time: profile.userSettings?.bed_time || "23:00"
+            });
+            setObjectives(profile.objectives || []);
+            setHobbies(profile.hobbies || []);
+            setFixedTasks(profile.fixedTasks || []);
+
+            // If we have data, user might want to jump to review or just edit.
+            // For now, let's just pre-fill.
+            toast.info("Dados do perfil carregados para edição.");
+        }
+    }, [profile]);
+
     const handleNext = async () => {
         if (currentStep < totalSteps) {
             setCurrentStep(c => c + 1);
+            // Auto-scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         } else {
             // Final submit — save profile & generate A/B plans
             setLoading(true);
+            const toastId = toast.loading("Salvando suas preferências...");
+
             try {
-                const profile = {
+                const profilePayload = {
                     ...formData,
                     fixedTasks,
                     objectives,
@@ -134,28 +163,44 @@ export default function MeuPlanejadorPage() {
                     userSettings: { ...userSettings, user_id: user?.id || '' },
                     style: formData.style as any,
                 };
-                setProfile(profile);
+                setProfile(profilePayload);
 
-                // Save onboarding data via our NEW API
+                // 1. Save onboarding data via our NEW API (with Verification)
                 if (user?.id) {
-                    await fetch('/api/ai/onboarding/save-profile', {
+                    const saveRes = await fetch('/api/ai/onboarding/save-profile', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ user_id: user.id, ...profile }),
+                        body: JSON.stringify({ user_id: user.id, ...profilePayload }),
                     });
+
+                    if (!saveRes.ok) throw new Error("Falha ao conectar com servidor");
+
+                    const saveData = await saveRes.json();
+                    if (!saveData.success) throw new Error(saveData.error);
+
+                    // READBACK VERIFICATION
+                    if (saveData.fixedBlocksCount !== fixedTasks.length) {
+                        console.warn(`Mismatch: Sent ${fixedTasks.length}, Saved ${saveData.fixedBlocksCount}`);
+                        toast.warning("Atenção: Nem todos os blocos fixos foram confirmados.", { id: toastId });
+                    } else {
+                        toast.success("Perfil salvo com segurança!", { id: toastId });
+                    }
                 }
+
+                // 2. Generate plans (A/B)
+                toast.loading("Criando estratégias para sua semana...", { id: toastId });
 
                 // Generate two plans from the routine API based on the *custom description* too
                 const [resA, resB] = await Promise.all([
                     fetch("/api/rotina", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ ...profile, planStyle: 'focused' }),
+                        body: JSON.stringify({ ...profilePayload, planStyle: 'focused' }),
                     }),
                     fetch("/api/rotina", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ ...profile, planStyle: 'balanced' }),
+                        body: JSON.stringify({ ...profilePayload, planStyle: 'balanced' }),
                     }),
                 ]);
 
@@ -202,14 +247,15 @@ export default function MeuPlanejadorPage() {
                 };
 
                 setAbPlans({
-                    planA: buildPlan(dataA, '🎯 Plano Focado', 'Blocos longos de concentração com menos interrupções'),
-                    planB: buildPlan(dataB, '⚖️ Plano Equilibrado', 'Mix de foco, pausas e tempo livre ao longo do dia'),
+                    planA: buildPlan(dataA, '🎯 Plano Focado', 'Blocos longos (90m+) de concentração. Ideal para tarefas complexas e estudo profundo.'),
+                    planB: buildPlan(dataB, '⚖️ Plano Equilibrado', 'Intervalos regulares (50m/10m). Ótimo para manter energia constante.'),
                 });
                 setShowABPreview(true);
-                toast.success("2 planos gerados! Escolha o que mais combina com você.");
+                toast.dismiss(toastId);
+                toast.success("Planos gerados! Escolha o seu.");
             } catch (error) {
                 console.error("Failed to generate plans", error);
-                toast.error("Erro ao gerar planos. Tente novamente.");
+                toast.error("Erro ao processar. Tente novamente.", { id: toastId });
             } finally {
                 setLoading(false);
             }

@@ -73,6 +73,8 @@ export async function generateRoutine(profile: any): Promise<any> {
     4. Se houver "Foco de Estudos", agende blocos específicos para isso.
     5. Agende blocos de foco nos horários de pico de produtividade.
     6. Inclua pausas e refeições.
+    7. NÃO gere mais de 15 blocos principais no dia. Agrupe tarefas pequenas.
+    8. Mínimo de 15 minutos por bloco (exceto pausas rápidas).
 
   Retorne APENAS um array JSON válido de objetos com este formato:
   { "id": "string", "title": "string", "startTime": "HH:mm", "duration": number, "type": "work"|"study"|"leisure"|"health"|"fixed" }
@@ -85,7 +87,49 @@ export async function generateRoutine(profile: any): Promise<any> {
         const endIndex = responseText.lastIndexOf(']') + 1;
         if (startIndex === -1 || endIndex === 0) throw new Error("No JSON array found");
         const jsonStr = responseText.substring(startIndex, endIndex);
-        return JSON.parse(jsonStr);
+
+        let routine = JSON.parse(jsonStr);
+
+        // --- GUARDRAILS & SANITIZATION ---
+        const MAX_BLOCKS = 24;
+        const MIN_DURATION = 10; // minutes
+        const seenSignatures = new Set<string>();
+        const sanitizedRoutine: any[] = [];
+
+        for (const block of routine) {
+            // 1. Basic Validation
+            if (!block.title || !block.startTime || !block.duration) continue;
+
+            // 2. Min Duration Enforcement (merge or skip if too small, unless fixed)
+            if (block.type !== 'fixed' && block.duration < MIN_DURATION) {
+                // Try to merge with previous if same type, otherwise skip or bump to min
+                const prev = sanitizedRoutine[sanitizedRoutine.length - 1];
+                if (prev && prev.type === block.type) {
+                    prev.duration += block.duration;
+                    continue;
+                }
+                block.duration = MIN_DURATION; // Bump to min
+            }
+
+            // 3. Deduplication
+            // Signature: title-type-startTime
+            const sig = `${block.title.toLowerCase().trim()}-${block.type}-${block.startTime}`;
+            if (seenSignatures.has(sig)) continue;
+
+            seenSignatures.add(sig);
+            sanitizedRoutine.push(block);
+        }
+
+        // 4. Max Blocks Constraint
+        if (sanitizedRoutine.length > MAX_BLOCKS) {
+            console.warn(`Routine generated ${sanitizedRoutine.length} blocks, truncating to ${MAX_BLOCKS} and merging tails.`);
+            // Keep first 20, merge rest into a "Review & Plan" block or similar? 
+            // Better to just truncate for safety than explode DB.
+            sanitizedRoutine.length = MAX_BLOCKS;
+        }
+
+        return sanitizedRoutine;
+
     } catch (error) {
         console.warn("Gemini API Error (Falling back to Mock):", error);
         // Robust Mock Generation based on profile
@@ -93,20 +137,13 @@ export async function generateRoutine(profile: any): Promise<any> {
         const [wakeHour, wakeMin] = wakeTime.split(':').map(Number);
         const baseHour = wakeHour;
 
-        // Simple mock generator avoiding overlap would be complex, just returning a cleaner list without [object Object]
-        // and respecting start time.
-
         const mockRoutine = [
             { id: "1", title: "Acordar e Hidratação", startTime: `${baseHour.toString().padStart(2, '0')}:${wakeMin.toString().padStart(2, '0')}`, duration: 30, type: "health" },
             { id: "2", title: "Planejamento do Dia", startTime: `${(baseHour).toString().padStart(2, '0')}:${(wakeMin + 30).toString().padStart(2, '0')}`, duration: 15, type: "fixed" },
-            { id: "3", title: `Foco: ${profile.occupation} (Sessão 1)`, startTime: `${(baseHour + 1).toString().padStart(2, '0')}:00`, duration: 90, type: "work" },
+            { id: "3", title: `Foco: ${profile.occupations?.[0] || profile.occupation || 'Trabalho'} (Sessão 1)`, startTime: `${(baseHour + 1).toString().padStart(2, '0')}:00`, duration: 90, type: "work" },
             { id: "4", title: "Almoço", startTime: "12:00", duration: 60, type: "health" },
-            { id: "5", title: `Foco: ${profile.occupation} (Sessão 2)`, startTime: "14:00", duration: 90, type: "work" },
+            { id: "5", title: `Foco: ${profile.occupations?.[0] || profile.occupation || 'Trabalho'} (Sessão 2)`, startTime: "14:00", duration: 90, type: "work" },
         ];
-
-        // If user has fixed tasks, we should try to append them or at least mention them? 
-        // For a mock, let's keep it simple but VALID.
-        // The previous error was injecting the object directly.
 
         return mockRoutine;
     }

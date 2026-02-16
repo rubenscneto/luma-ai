@@ -48,6 +48,8 @@ interface DailyPlanContextType {
     selectedDate: string;
     setSelectedDate: (date: string) => void;
     loadPlanForDate: (date: string) => Promise<void>;
+    weekBlocks: Record<string, DailyBlock[]>;
+    fetchWeekBlocks: (startDate: string) => Promise<void>;
 
     // Recurrence Actions
     detectRecurrences: () => Promise<void>;
@@ -87,6 +89,7 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
     const [todayPlan, setTodayPlan] = useState<DailyPlan | null>(null);
     const [todayBlocks, setTodayBlocks] = useState<DailyBlockWithStatus[]>([]);
     const [fixedBlocks, setFixedBlocks] = useState<FixedBlock[]>([]);
+    const [weekBlocks, setWeekBlocks] = useState<Record<string, DailyBlock[]>>({});
     const [isLoading, setIsLoading] = useState(false);
 
     // A/B Plan state
@@ -212,6 +215,88 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
             setIsLoading(false);
         }
     }, [user, selectedDate, today]);
+
+    const fetchWeekBlocks = useCallback(async (startDate: string) => {
+        if (!user) return;
+
+        // Don't set global isLoading to avoid blocking the whole UI, use local state in component or just let it load
+        // But we can set a flag if needed. For now, let's just fetch.
+        try {
+            // Calculate 7 days range
+            const start = new Date(startDate);
+            const dates = Array.from({ length: 7 }, (_, i) => {
+                const d = new Date(start);
+                d.setDate(start.getDate() + i);
+                return d.toISOString().split('T')[0];
+            });
+
+            // 1. Fetch Plans for these dates
+            const { data: plans } = await supabase
+                .from('daily_plan')
+                .select('id, plan_date')
+                .eq('user_id', user.id)
+                .in('plan_date', dates);
+
+            const planMap = new Map((plans || []).map(p => [p.plan_date, p.id]));
+            const planIds = (plans || []).map(p => p.id);
+
+            // 2. Fetch Blocks for these plans
+            let dbBlocks: DailyBlock[] = [];
+            if (planIds.length > 0) {
+                const { data: blocks } = await supabase
+                    .from('daily_blocks')
+                    .select('*')
+                    .in('plan_id', planIds)
+                    .order('start_datetime', { ascending: true });
+                dbBlocks = blocks || [];
+            }
+
+            // 3. Fetch Fixed Blocks (all active)
+            const { data: fixed } = await supabase
+                .from('fixed_blocks')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('is_active', true);
+
+            const activeFixed = fixed || [];
+            const newWeekBlocks: Record<string, DailyBlock[]> = {};
+
+            // 4. Assemble Week Data
+            dates.forEach(dateStr => {
+                const planId = planMap.get(dateStr);
+                const dayOfWeek = new Date(dateStr + 'T12:00:00').getDay();
+
+                if (planId) {
+                    // Use DB blocks
+                    newWeekBlocks[dateStr] = dbBlocks.filter(b => b.plan_id === planId);
+                } else {
+                    // Construct fallback from fixed blocks
+                    const daysFixed = activeFixed.filter(f => f.day_of_week === dayOfWeek);
+                    newWeekBlocks[dateStr] = daysFixed.map(f => ({
+                        id: `fixed-preview-${f.id}-${dateStr}`,
+                        user_id: user.id,
+                        plan_id: 'preview',
+                        title: f.title,
+                        category: f.category,
+                        // Naive time construction, assuming input is HH:MM
+                        start_datetime: `${dateStr}T${f.start_time}`,
+                        end_datetime: `${dateStr}T${f.end_time}`,
+                        source: 'fixed',
+                        is_done: false,
+                        is_skipped: false,
+                        is_fixed: true,
+                        order_index: 0,
+                        created_at: new Date().toISOString(),
+                    } as DailyBlock));
+                }
+            });
+
+            setWeekBlocks(newWeekBlocks);
+        } catch (error) {
+            console.error('Error fetching week blocks:', error);
+            toast.error('Erro ao carregar visualização semanal.');
+        }
+    }, [user]);
 
     // Alias for backwards compatibility
     const loadTodayPlan = useCallback(() => loadPlanForDate(today), [loadPlanForDate, today]);
@@ -683,6 +768,8 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
             selectedDate,
             setSelectedDate,
             loadPlanForDate,
+            weekBlocks,
+            fetchWeekBlocks,
         }}>
             {children}
         </DailyPlanContext.Provider>

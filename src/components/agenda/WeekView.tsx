@@ -8,6 +8,7 @@ import {
     Moon, Heart, Users, Sparkles, CheckCircle2, Plus
 } from 'lucide-react';
 import { useDailyPlan } from '@/context/dailyPlanContext';
+import { useAuth } from '@/context/authContext';
 import { DailyBlock } from '@/types';
 import { toast } from 'sonner';
 
@@ -51,13 +52,18 @@ function formatDateKey(date: Date): string {
     return date.toISOString().split('T')[0];
 }
 
-interface WeekViewProps {
-    weekBlocks?: Record<string, DailyBlock[]>;
-    onDayClick?: (date: string) => void;
-}
+// function formatDateKey(date: Date): string {
+//     return date.toISOString().split('T')[0];
+// }
 
-export default function WeekView({ weekBlocks = {}, onDayClick }: WeekViewProps) {
-    const { todayBlocks, generatePlan } = useDailyPlan();
+export default function WeekView() {
+    const {
+        todayBlocks,
+        generatePlan,
+        weekBlocks,
+        fetchWeekBlocks
+    } = useDailyPlan();
+    const { user } = useAuth();
     const [currentWeekStart, setCurrentWeekStart] = useState(() => {
         const today = new Date();
         today.setDate(today.getDate() - today.getDay());
@@ -84,35 +90,51 @@ export default function WeekView({ weekBlocks = {}, onDayClick }: WeekViewProps)
         setCurrentWeekStart(today);
     };
 
+    // Fetch week blocks when currentWeekStart changes
+    React.useEffect(() => {
+        const startDateKey = formatDateKey(currentWeekStart);
+        fetchWeekBlocks(startDateKey);
+    }, [currentWeekStart, fetchWeekBlocks]);
+
     const handleDayClick = useCallback((date: Date) => {
         const key = formatDateKey(date);
         setSelectedDayKey(prev => prev === key ? null : key);
-        if (onDayClick) onDayClick(key);
-    }, [onDayClick]);
+        // if (onDayClick) onDayClick(key); // Removed prop
+    }, []);
 
     const handlePlanWeek = async () => {
+        if (!user) {
+            toast.error('Usuário não autenticado.');
+            return;
+        }
         setIsWeekLoading(true);
         try {
             const startDate = formatDateKey(weekDates[0]);
+
+            const payload = {
+                user_id: user.id,
+                start_date: startDate,
+                timezone: 'America/Sao_Paulo',
+            };
+
             const response = await fetch('/api/ai/agenda/plan-week', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    user_id: '', // Will be set by the server from auth
-                    start_date: startDate,
-                    timezone: 'America/Sao_Paulo',
-                }),
+                body: JSON.stringify(payload),
             });
 
             if (response.ok) {
                 const data = await response.json();
                 toast.success(`Semana planejada! ${data.totalBlocks} blocos criados.`);
+                // Refresh view
+                await fetchWeekBlocks(formatDateKey(currentWeekStart));
             } else {
                 const errorData = await response.json().catch(() => ({}));
+                console.error('Plan week error data:', errorData);
                 toast.error(errorData.error || 'Erro ao planejar semana.');
             }
         } catch (error) {
-            console.error('Plan week error:', error);
+            console.error('Plan week error exception:', error);
             toast.error('Erro de conexão ao planejar semana.');
         } finally {
             setIsWeekLoading(false);
@@ -124,6 +146,7 @@ export default function WeekView({ weekBlocks = {}, onDayClick }: WeekViewProps)
         try {
             await generatePlan(dateStr, 'first_time');
             toast.success(`Dia ${date.getDate()} planejado com sucesso!`);
+            fetchWeekBlocks(formatDateKey(currentWeekStart));
         } catch (error) {
             toast.error('Erro ao planejar dia.');
         }
@@ -254,19 +277,19 @@ export default function WeekView({ weekBlocks = {}, onDayClick }: WeekViewProps)
                             <div
                                 key={dateKey}
                                 className={`flex-1 border-r border-white/10 last:border-r-0 cursor-pointer transition-colors ${isToday ? 'bg-purple-500/5' :
-                                        isSelected ? 'bg-blue-500/5' :
-                                            isPast ? 'bg-white/[0.02]' : ''
+                                    isSelected ? 'bg-blue-500/5' :
+                                        isPast ? 'bg-white/[0.02]' : ''
                                     }`}
                                 onClick={() => handleDayClick(date)}
                             >
                                 {/* Day Header */}
                                 <div className={`h-16 flex flex-col items-center justify-center border-b border-white/10 ${isToday ? 'bg-purple-500/10' :
-                                        isSelected ? 'bg-blue-500/10' : ''
+                                    isSelected ? 'bg-blue-500/10' : ''
                                     }`}>
                                     <span className="text-xs text-white/60">{DAYS[idx]}</span>
                                     <span className={`text-sm font-medium ${isToday ? 'text-purple-400' :
-                                            isSelected ? 'text-blue-400' :
-                                                'text-white'
+                                        isSelected ? 'text-blue-400' :
+                                            'text-white'
                                         }`}>
                                         {date.getDate()}
                                     </span>

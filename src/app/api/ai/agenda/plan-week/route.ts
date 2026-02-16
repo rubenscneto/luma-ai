@@ -97,12 +97,17 @@ export async function POST(request: NextRequest) {
         // Load existing blocks for the week to avoid duplicates
         const weekStart = datesToPlan[0];
         const weekEnd = datesToPlan[datesToPlan.length - 1];
-        const { data: existingBlocks } = await supabase
+        const { data: existingBlocks, error: blocksError } = await supabase
             .from('daily_blocks')
-            .select('*, daily_plan!inner(plan_date)')
+            .select('*')
             .eq('user_id', input.user_id)
             .gte('start_datetime', `${weekStart}T00:00:00`)
             .lte('start_datetime', `${weekEnd}T23:59:59`);
+
+        if (blocksError) {
+            console.error('Error fetching existing blocks:', blocksError);
+            throw new Error(`Database error (fetching blocks): ${blocksError.message}`);
+        }
 
         // Build context for AI
         const fixedBlocksByDay: Record<number, any[]> = {};
@@ -225,6 +230,14 @@ Responda EXCLUSIVAMENTE em JSON válido:
 
             if (!plan) continue;
 
+            // Delete existing AI/manual blocks for this day to prevent duplication/explosion
+            // We keep 'fixed' blocks which are managed separately
+            await supabase
+                .from('daily_blocks')
+                .delete()
+                .eq('plan_id', plan.id)
+                .neq('category', 'fixed');
+
             // Convert AI blocks + fixed blocks to solver format
             const fixedSolverBlocks: SolverBlock[] = dayFixed.map(fb => ({
                 id: `fixed-${fb.id}`,
@@ -261,6 +274,13 @@ Responda EXCLUSIVAMENTE em JSON válido:
             // Save resolved AI blocks (skip fixed blocks, they're already saved)
             const aiResolved = solverResult.resolved.filter(b => b.source !== 'fixed');
 
+            // --- FINAL GUARDRAIL ---
+            const MAX_BLOCKS_PER_DAY = 24;
+            if (aiResolved.length > MAX_BLOCKS_PER_DAY) {
+                solverWarnings.push(`${day.date}: Truncated excess blocks (${aiResolved.length} > ${MAX_BLOCKS_PER_DAY})`);
+                aiResolved.length = MAX_BLOCKS_PER_DAY;
+            }
+
             for (const block of aiResolved) {
                 const timeFields = solverBlockToTimeFields(block, day.date, input.timezone);
 
@@ -292,9 +312,13 @@ Responda EXCLUSIVAMENTE em JSON válido:
         });
 
     } catch (error) {
-        console.error('Plan week error:', error);
+        console.error('Plan week error FULL details:', error);
         return NextResponse.json(
-            { error: error instanceof Error ? error.message : 'Erro ao planejar semana.' },
+            {
+                error: error instanceof Error ? error.message : 'Erro crítico ao planejar semana.',
+                stack: error instanceof Error ? error.stack : undefined,
+                details: String(error)
+            },
             { status: 500 }
         );
     }
