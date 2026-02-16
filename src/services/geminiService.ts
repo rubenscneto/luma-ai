@@ -54,12 +54,13 @@ export async function generateRoutine(profile: any): Promise<any> {
 
     const prompt = `Crie uma rotina diária detalhada em formato JSON baseado no seguinte perfil e restrições:
     PERFIL DO USUÁRIO:
-    - Ocupação: ${profile.occupation}
+    - Ocupações: ${Array.isArray(profile.occupations) ? profile.occupations.join(', ') : profile.occupation}
+    - Descrição da Rotina (Contexto Pessoal): "${profile.description || "Não informada"}"
+    - Foco de Estudos: "${profile.studyFocus || "Não informado"}"
     - Pico de Produtividade: ${profile.peakProductivity}
     - Energia: ${profile.energyLevel}
     - Estilo: ${profile.style}
     
-    RESTRIÇÕES DE HORÁRIO (RIGOROSO):
     RESTRIÇÕES DE HORÁRIO (RIGOROSO):
     - Acorda: ${profile.userSettings?.wake_up_time || "07:00"}
     - Dorme: ${profile.userSettings?.bed_time || "22:00"}
@@ -68,8 +69,10 @@ export async function generateRoutine(profile: any): Promise<any> {
     INSTRUÇÕES:
     1. A rotina DEVE começar no horário de acordar e terminar no horário de dormir.
     2. Respeite OBRIGATORIAMENTE os horários das Tarefas Fixas (Ex: se tem Trabalho das 09h às 18h, não agende estudos nesse período).
-    3. Almeje alocar blocos de foco nos horários de pico de produtividade.
-    4. Inclua pausas e refeições.
+    3. Use a "Descrição da Rotina" para entender o contexto do usuário (ex: filhos, home office, etc) e adaptar os blocos.
+    4. Se houver "Foco de Estudos", agende blocos específicos para isso.
+    5. Agende blocos de foco nos horários de pico de produtividade.
+    6. Inclua pausas e refeições.
 
   Retorne APENAS um array JSON válido de objetos com este formato:
   { "id": "string", "title": "string", "startTime": "HH:mm", "duration": number, "type": "work"|"study"|"leisure"|"health"|"fixed" }

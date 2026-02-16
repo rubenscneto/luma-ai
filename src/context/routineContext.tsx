@@ -76,10 +76,12 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
                     if (profileRes.data) {
                         const p = profileRes.data;
                         const loadedProfile: RoutineProfile = {
-                            occupation: p.occupation || '',
+                            occupations: p.occupations || (p.occupation ? [p.occupation] : []),
                             peakProductivity: p.peak_productivity || '',
                             energyLevel: p.energy_level || '',
                             style: p.style || 'balanced',
+                            description: p.description || '',
+                            studyFocus: p.study_focus || '',
                             userSettings: {
                                 user_id: user.id,
                                 wake_up_time: p.wake_up_time || '07:00',
@@ -146,10 +148,13 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
                 const { error } = await supabase
                     .from('profiles')
                     .update({
-                        occupation: newProfile.occupation,
+                        occupations: newProfile.occupations,
+                        occupation: newProfile.occupations?.[0] || '', // Fallback for legacy
                         peak_productivity: newProfile.peakProductivity,
                         energy_level: newProfile.energyLevel,
                         style: newProfile.style,
+                        description: newProfile.description,
+                        study_focus: newProfile.studyFocus,
                         wake_up_time: newProfile.userSettings?.wake_up_time,
                         bed_time: newProfile.userSettings?.bed_time
                     })

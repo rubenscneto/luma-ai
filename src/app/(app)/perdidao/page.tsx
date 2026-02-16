@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, ArrowLeft, Loader2, Sparkles, Target, Clock, Zap, Calendar, Brain, Heart, Palette, CheckCircle } from "lucide-react";
+import { ArrowRight, ArrowLeft, Loader2, Sparkles, Target, Clock, Zap, Calendar, Brain, Heart, Palette, CheckCircle, FileText, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 
 import { SleepCycleStep } from "@/components/perdidao/SleepCycleStep";
@@ -34,14 +34,16 @@ interface ABPlan {
 }
 
 const STEPS = [
-    { id: 1, title: "Quem é você?", description: "Nos conte sobre sua ocupação.", icon: Brain },
-    { id: 2, title: "Pico de Energia", description: "Quando você é mais produtivo?", icon: Zap },
-    { id: 3, title: "Nível de Energia", description: "Como sua energia varia durante o dia?", icon: Target },
-    { id: 4, title: "Ciclo de Sono", description: "Configure seu horário de dormir e acordar.", icon: Clock },
-    { id: 5, title: "Compromissos Fixos", description: "Trabalho, aulas, reuniões recorrentes.", icon: Calendar },
-    { id: 6, title: "Seus Objetivos", description: "O que você quer conquistar?", icon: Target },
-    { id: 7, title: "Hobbies & Lazer", description: "O que te faz feliz no tempo livre?", icon: Heart },
-    { id: 8, title: "Estilo de Rotina", description: "Como é a rotina ideal para você?", icon: Palette },
+    { id: 1, title: "Quem é você?", description: "Selecione todas que se aplicam.", icon: Brain },
+    { id: 2, title: "Sua Rotina em Palavras", description: "Descreva como é seu dia ideal ou atual com suas palavras.", icon: FileText },
+    { id: 3, title: "Foco nos Estudos", description: "O que você está estudando ou quer aprender?", icon: BookOpen },
+    { id: 4, title: "Pico de Energia", description: "Quando você é mais produtivo?", icon: Zap },
+    { id: 5, title: "Nível de Energia", description: "Como sua energia varia durante o dia?", icon: Target },
+    { id: 6, title: "Ciclo de Sono", description: "Configure seu horário de dormir e acordar.", icon: Clock },
+    { id: 7, title: "Compromissos Fixos", description: "Trabalho, aulas, reuniões recorrentes.", icon: Calendar },
+    { id: 8, title: "Seus Objetivos", description: "O que você quer conquistar?", icon: Target },
+    { id: 9, title: "Hobbies & Lazer", description: "O que te faz feliz no tempo livre?", icon: Heart },
+    { id: 10, title: "Estilo de Rotina", description: "Como é a rotina ideal para você?", icon: Palette },
 ];
 
 const OCCUPATION_SUGGESTIONS = [
@@ -95,11 +97,15 @@ export default function MeuPlanejadorPage() {
     const [loading, setLoading] = useState(false);
 
     const [formData, setFormData] = useState({
-        occupation: "",
+        occupations: [] as string[],
+        description: "",
+        studyFocus: "",
         peakProductivity: "",
         energyLevel: "",
         style: "",
     });
+    const [occupationInput, setOccupationInput] = useState(""); // For new occupation input
+
     const [objectives, setObjectives] = useState<string[]>([]);
     const [hobbies, setHobbies] = useState<string[]>([]);
     const [userSettings, setUserSettings] = useState({ wake_up_time: "07:00", bed_time: "23:00" });
@@ -117,7 +123,7 @@ export default function MeuPlanejadorPage() {
         if (currentStep < totalSteps) {
             setCurrentStep(c => c + 1);
         } else {
-            // Final submit — generate A/B plans
+            // Final submit — save profile & generate A/B plans
             setLoading(true);
             try {
                 const profile = {
@@ -130,16 +136,16 @@ export default function MeuPlanejadorPage() {
                 };
                 setProfile(profile);
 
-                // Save onboarding data (optional)
+                // Save onboarding data via our NEW API
                 if (user?.id) {
-                    fetch('/api/ai/onboarding/save-profile', {
+                    await fetch('/api/ai/onboarding/save-profile', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ user_id: user.id, ...profile }),
-                    }).catch(() => { });
+                    });
                 }
 
-                // Generate two plans from the routine API
+                // Generate two plans from the routine API based on the *custom description* too
                 const [resA, resB] = await Promise.all([
                     fetch("/api/rotina", {
                         method: "POST",
@@ -233,9 +239,19 @@ export default function MeuPlanejadorPage() {
         if (currentStep > 1) setCurrentStep(c => c - 1);
     };
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const toggleOccupation = (occ: string) => {
+        setFormData(prev => {
+            if (prev.occupations.includes(occ)) {
+                return { ...prev, occupations: prev.occupations.filter(o => o !== occ) };
+            } else {
+                return { ...prev, occupations: [...prev.occupations, occ] };
+            }
+        });
     };
 
     const StepIcon = STEPS[currentStep - 1].icon;
@@ -246,19 +262,23 @@ export default function MeuPlanejadorPage() {
                 return (
                     <div className="space-y-4">
                         <Input
-                            name="occupation"
-                            placeholder="Ex: Desenvolvedor Senior, Estudante de Medicina..."
-                            value={formData.occupation}
-                            onChange={handleChange}
-                            autoFocus
+                            placeholder="Outra ocupação? Digite e pressione Enter..."
+                            value={occupationInput}
+                            onChange={(e) => setOccupationInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && occupationInput.trim()) {
+                                    toggleOccupation(occupationInput.trim());
+                                    setOccupationInput('');
+                                }
+                            }}
                             className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                         />
                         <div className="flex flex-wrap gap-2">
                             {OCCUPATION_SUGGESTIONS.map(occ => (
                                 <button
                                     key={occ}
-                                    onClick={() => setFormData(prev => ({ ...prev, occupation: occ }))}
-                                    className={`px-3 py-1.5 text-sm rounded-full border transition-all ${formData.occupation === occ
+                                    onClick={() => toggleOccupation(occ)}
+                                    className={`px-3 py-1.5 text-sm rounded-full border transition-all ${formData.occupations.includes(occ)
                                         ? 'bg-purple-500/20 border-purple-500/50 text-purple-300'
                                         : 'border-white/10 text-white/50 hover:text-white hover:border-white/20'
                                         }`}
@@ -266,10 +286,42 @@ export default function MeuPlanejadorPage() {
                                     {occ}
                                 </button>
                             ))}
+                            {formData.occupations.filter(o => !OCCUPATION_SUGGESTIONS.includes(o)).map(occ => (
+                                <button
+                                    key={occ}
+                                    onClick={() => toggleOccupation(occ)}
+                                    className="px-3 py-1.5 text-sm rounded-full border bg-purple-500/20 border-purple-500/50 text-purple-300"
+                                >
+                                    {occ} ✕
+                                </button>
+                            ))}
                         </div>
                     </div>
                 );
-            case 2:
+            case 2: // Description (NEW)
+                return (
+                    <textarea
+                        name="description"
+                        placeholder="Ex: Trabalho das 8h às 17h, mas tenho flexibilidade. Gosto de estudar à noite. Tenho filhos pequenos e preciso de pausas frequentes..."
+                        value={formData.description}
+                        onChange={handleChange}
+                        className="w-full h-32 p-3 rounded-md bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-purple-500 resize-none"
+                    />
+                );
+            case 3: // Study Focus (NEW)
+                return (
+                    <div className="space-y-4">
+                        <p className="text-sm text-white/60">Se você está estudando algo específico (faculdade, curso, idioma), conte-nos aqui para personalizarmos seus blocos de estudo.</p>
+                        <Input
+                            name="studyFocus"
+                            placeholder="Ex: Programação Fullstack, Inglês Avançado, Direito Constitucional..."
+                            value={formData.studyFocus}
+                            onChange={handleChange}
+                            className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                        />
+                    </div>
+                );
+            case 4:
                 return (
                     <div className="grid grid-cols-3 gap-4">
                         {ENERGY_PRESETS.map(opt => (
@@ -288,7 +340,7 @@ export default function MeuPlanejadorPage() {
                         ))}
                     </div>
                 );
-            case 3:
+            case 5:
                 return (
                     <Input
                         name="energyLevel"
@@ -298,7 +350,7 @@ export default function MeuPlanejadorPage() {
                         className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                     />
                 );
-            case 4:
+            case 6:
                 return (
                     <SleepCycleStep
                         value={{ user_id: '', ...userSettings }}
@@ -308,14 +360,14 @@ export default function MeuPlanejadorPage() {
                         })}
                     />
                 );
-            case 5:
+            case 7:
                 return (
                     <FixedTaskInput
                         tasks={fixedTasks}
                         onChange={setFixedTasks}
                     />
                 );
-            case 6:
+            case 8:
                 return (
                     <div className="grid grid-cols-2 gap-3">
                         {OBJECTIVE_OPTIONS.map(opt => (
@@ -339,7 +391,7 @@ export default function MeuPlanejadorPage() {
                         ))}
                     </div>
                 );
-            case 7:
+            case 9:
                 return (
                     <div className="grid grid-cols-3 gap-3">
                         {HOBBY_OPTIONS.map(opt => (
@@ -363,7 +415,7 @@ export default function MeuPlanejadorPage() {
                         ))}
                     </div>
                 );
-            case 8:
+            case 10:
                 return (
                     <div className="grid grid-cols-3 gap-4">
                         {STYLE_OPTIONS.map(opt => (

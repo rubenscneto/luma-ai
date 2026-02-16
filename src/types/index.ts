@@ -28,9 +28,11 @@ export interface RoutineBlock {
 }
 
 export interface RoutineProfile {
-    occupation: string;
+    occupations: string[]; // Replaces single occupation
     peakProductivity: string;
     energyLevel: string;
+    description: string; // New field
+    studyFocus?: string; // New field
     fixedTasks: FixedTask[];
     userSettings: UserSettings;
     style: 'focused' | 'balanced' | 'relaxed';
@@ -120,8 +122,11 @@ export interface FixedTask {
 export interface RoutineProfileDB {
     user_id: string;
     occupation: string;
+    occupations?: string[]; // New field
     peak_productivity: string;
     energy_level: string;
+    description?: string; // New field
+    study_focus?: string; // New field
     goal: string;
     summary?: string;
     wake_up_time: string;
