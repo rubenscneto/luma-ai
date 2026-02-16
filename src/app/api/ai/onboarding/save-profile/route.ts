@@ -99,20 +99,15 @@ export async function POST(request: NextRequest) {
                     throw new Error('Failed to save fixed blocks');
                 }
             }
-        }
 
+            return NextResponse.json({
+                success: true,
+                savedProfile: profileData,
+                fixedBlocksCount: fixedTasks?.length || 0
+            });
+
+        } catch (error) {
+            console.error('Save profile error:', error);
+            return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        }
     }
-            }
-        }
-
-return NextResponse.json({
-    success: true,
-    savedProfile: profileData,
-    fixedBlocksCount: fixedTasks?.length || 0
-});
-
-    } catch (error) {
-    console.error('Save profile error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-}
-}
