@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRoutine } from "@/context/routineContext";
 import { useAuth } from "@/context/authContext";
 import { Card } from "@/components/ui/card";
@@ -92,7 +92,7 @@ const STYLE_OPTIONS = [
 export default function MeuPlanejadorPage() {
     const router = useRouter();
     const { user } = useAuth();
-    const { setRoutine, setProfile } = useRoutine();
+    const { setRoutine, setProfile, profile } = useRoutine();
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
 

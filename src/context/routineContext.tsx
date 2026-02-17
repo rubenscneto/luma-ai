@@ -77,11 +77,14 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
                         const p = profileRes.data;
                         const loadedProfile: RoutineProfile = {
                             occupations: p.occupations || (p.occupation ? [p.occupation] : []),
+                            occupation: p.occupation || '',
                             peakProductivity: p.peak_productivity || '',
                             energyLevel: p.energy_level || '',
                             style: p.style || 'balanced',
                             description: p.description || '',
                             studyFocus: p.study_focus || '',
+                            objectives: p.objectives || [],
+                            hobbies: p.hobbies || [],
                             userSettings: {
                                 user_id: user.id,
                                 wake_up_time: p.wake_up_time || '07:00',
@@ -150,6 +153,8 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
                     .update({
                         occupations: newProfile.occupations,
                         occupation: newProfile.occupations?.[0] || '', // Fallback for legacy
+                        objectives: newProfile.objectives,
+                        hobbies: newProfile.hobbies,
                         peak_productivity: newProfile.peakProductivity,
                         energy_level: newProfile.energyLevel,
                         style: newProfile.style,

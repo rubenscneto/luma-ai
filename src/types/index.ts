@@ -28,11 +28,14 @@ export interface RoutineBlock {
 }
 
 export interface RoutineProfile {
+    occupation?: string; // Legacy/Fallback
     occupations: string[]; // Replaces single occupation
     peakProductivity: string;
     energyLevel: string;
     description: string; // New field
     studyFocus?: string; // New field
+    objectives?: string[]; // New field
+    hobbies?: string[]; // New field
     fixedTasks: FixedTask[];
     userSettings: UserSettings;
     style: 'focused' | 'balanced' | 'relaxed';
