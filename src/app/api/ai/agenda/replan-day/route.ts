@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
 import { AGENDA_REPLANNER_SYSTEM_PROMPT, buildReplanPrompt } from '@/ai/prompts/agendaPrompts';
+import { solveTimeline, dailyBlockToSolverBlock, solverBlockToTimeFields, SolverBlock } from '@/lib/timelineSolver';
+import { validateMealWindow, normalizeForComparison } from '@/lib/mealWindows';
 
 // Force dynamic to avoid static generation issues
 export const dynamic = 'force-dynamic';
@@ -176,54 +178,87 @@ export async function POST(request: NextRequest) {
                 };
             }
 
-            // 8. Apply adjustments
+            // 8. Apply AI adjustments to in-memory blocks
+            const adjustedBlockMap = new Map(allBlocks!.map(b => [b.id, { ...b }]));
             for (const adj of aiResponse.adjustments) {
-                if (adj.action === 'move' && adj.new_start && adj.new_end) {
-                    await supabase
-                        .from('daily_blocks')
-                        .update({
-                            start_datetime: `${dateStr}T${adj.new_start}:00`,
-                            end_datetime: `${dateStr}T${adj.new_end}:00`,
-                            updated_at: new Date().toISOString(),
-                        })
-                        .eq('id', adj.block_id);
-                } else if (adj.action === 'mark_optional') {
-                    // Update meta to mark as optional
-                    const { data: block } = await supabase
-                        .from('daily_blocks')
-                        .select('meta')
-                        .eq('id', adj.block_id)
-                        .single();
+                const block = adjustedBlockMap.get(adj.block_id);
+                if (!block) continue;
 
-                    await supabase
-                        .from('daily_blocks')
-                        .update({
-                            meta: { ...(block?.meta || {}), optional: true, suggested_reason: adj.reason },
-                            updated_at: new Date().toISOString(),
-                        })
-                        .eq('id', adj.block_id);
+                if (adj.action === 'move' && adj.new_start && adj.new_end) {
+                    block.start_datetime = `${dateStr}T${adj.new_start}:00`;
+                    block.end_datetime = `${dateStr}T${adj.new_end}:00`;
+                } else if (adj.action === 'mark_optional') {
+                    block.meta = { ...(block.meta || {}), optional: true, suggested_reason: adj.reason };
                 }
             }
 
-            // 9. Recalculate order_index
-            const { data: reorderedBlocks } = await supabase
-                .from('daily_blocks')
+            // 9. Load fixed blocks for this day
+            const dayOfWeek = new Date(dateStr + 'T12:00:00').getDay();
+            const { data: fixedBlocks } = await supabase
+                .from('fixed_blocks')
                 .select('*')
-                .eq('plan_id', plan.id)
-                .order('start_datetime', { ascending: true });
+                .eq('user_id', input.user_id)
+                .eq('is_active', true)
+                .eq('day_of_week', dayOfWeek);
 
-            if (reorderedBlocks) {
-                for (let i = 0; i < reorderedBlocks.length; i++) {
-                    if (reorderedBlocks[i].order_index !== i) {
-                        await supabase
-                            .from('daily_blocks')
-                            .update({ order_index: i })
-                            .eq('id', reorderedBlocks[i].id);
+            // 10. Convert to solver format and run solver
+            const pendingAdjusted = [...adjustedBlockMap.values()].filter(
+                b => !b.is_done && !b.is_skipped
+            );
+
+            const fixedSolverBlocks: SolverBlock[] = (fixedBlocks || []).map(fb => ({
+                id: `fixed-${fb.id}`,
+                title: fb.title,
+                category: fb.category || 'fixed',
+                startMin: timeToMinutes(fb.start_time),
+                endMin: timeToMinutes(fb.end_time),
+                source: 'fixed' as const,
+                priority: 100,
+            }));
+
+            const pendingSolverBlocks: SolverBlock[] = pendingAdjusted.map(b => {
+                const start = new Date(b.start_datetime);
+                const end = new Date(b.end_datetime);
+                let startMin = start.getHours() * 60 + start.getMinutes();
+                const endMin = end.getHours() * 60 + end.getMinutes();
+
+                // Meal window validation
+                if (b.category === 'meal') {
+                    const mealCheck = validateMealWindow(b.title, startMin, b.meta);
+                    if (mealCheck.window && !mealCheck.valid) {
+                        startMin = mealCheck.nearestSlot;
                     }
                 }
+
+                return {
+                    id: b.id,
+                    title: b.title,
+                    category: b.category,
+                    startMin,
+                    endMin: startMin + (endMin - (start.getHours() * 60 + start.getMinutes())),
+                    source: (b.source === 'derived' ? 'ai' : (b.source || 'ai')) as 'ai' | 'fixed' | 'manual',
+                    priority: b.source === 'fixed' ? 100 : (b.category === 'meal' ? 70 : 60),
+                    meta: b.meta,
+                };
+            });
+
+            const solverResult = solveTimeline([...fixedSolverBlocks, ...pendingSolverBlocks]);
+
+            // 11. Save solver-resolved times back to DB
+            const resolvedNonFixed = solverResult.resolved.filter(b => b.source !== 'fixed');
+            for (const block of resolvedNonFixed) {
+                const timeFields = solverBlockToTimeFields(block, dateStr, 'America/Sao_Paulo');
+                await supabase
+                    .from('daily_blocks')
+                    .update({
+                        start_datetime: timeFields.start_datetime,
+                        end_datetime: timeFields.end_datetime,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', block.id);
             }
 
-            // 10. Return final state
+            // 12. Re-read final state and return full block list
             const { data: finalBlocks } = await supabase
                 .from('daily_blocks')
                 .select('*')
@@ -234,6 +269,7 @@ export async function POST(request: NextRequest) {
                 success: true,
                 message: aiResponse.message_to_user,
                 adjustments_made: aiResponse.adjustments.length,
+                solver_warnings: solverResult.warnings,
                 could_not_fit: aiResponse.could_not_fit,
                 blocks: finalBlocks,
                 stats: { completed: completedToday, skipped: skippedToday },
@@ -261,4 +297,9 @@ export async function POST(request: NextRequest) {
             { status: 500 }
         );
     }
+}
+
+function timeToMinutes(time: string): number {
+    const [h, m] = time.split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
 }

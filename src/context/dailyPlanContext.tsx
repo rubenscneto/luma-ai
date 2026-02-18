@@ -14,6 +14,7 @@ import {
     SolverConflict,
 } from '@/lib/timelineSolver';
 import { processDerivedBlocks } from '@/lib/derivedBlocks';
+import { normalizeForComparison } from '@/lib/mealWindows';
 
 interface DailyPlanContextType {
     // State
@@ -261,33 +262,46 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
             const activeFixed = fixed || [];
             const newWeekBlocks: Record<string, DailyBlock[]> = {};
 
-            // 4. Assemble Week Data
+            // 4. Assemble Week Data — ALWAYS include fixed blocks
             dates.forEach(dateStr => {
                 const planId = planMap.get(dateStr);
                 const dayOfWeek = new Date(dateStr + 'T12:00:00').getDay();
+                const daysFixed = activeFixed.filter(f => f.day_of_week === dayOfWeek);
+
+                // Convert fixed blocks to DailyBlock format
+                const fixedAsDailyBlocks: DailyBlock[] = daysFixed.map(f => ({
+                    id: `fixed-${f.id}-${dateStr}`,
+                    user_id: user.id,
+                    plan_id: planId || 'preview',
+                    title: f.title,
+                    category: f.category,
+                    start_datetime: `${dateStr}T${f.start_time}`,
+                    end_datetime: `${dateStr}T${f.end_time}`,
+                    source: 'fixed' as const,
+                    is_done: false,
+                    is_skipped: false,
+                    is_fixed: true,
+                    order_index: 0,
+                    created_at: new Date().toISOString(),
+                } as DailyBlock));
 
                 if (planId) {
-                    // Use DB blocks
-                    newWeekBlocks[dateStr] = dbBlocks.filter(b => b.plan_id === planId);
+                    const planBlocks = dbBlocks.filter(b => b.plan_id === planId);
+                    // Dedup: skip virtual fixed if DB already has a block with same normalized title+start+end
+                    const dbKeys = new Set(planBlocks.map(b => {
+                        const s = new Date(b.start_datetime).toTimeString().slice(0, 5);
+                        const e = new Date(b.end_datetime).toTimeString().slice(0, 5);
+                        return `${normalizeForComparison(b.title)}|${s}|${e}`;
+                    }));
+                    const missingFixed = fixedAsDailyBlocks.filter(f => {
+                        const s = new Date(f.start_datetime).toTimeString().slice(0, 5);
+                        const e = new Date(f.end_datetime).toTimeString().slice(0, 5);
+                        return !dbKeys.has(`${normalizeForComparison(f.title)}|${s}|${e}`);
+                    });
+                    newWeekBlocks[dateStr] = [...planBlocks, ...missingFixed]
+                        .sort((a, b) => new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime());
                 } else {
-                    // Construct fallback from fixed blocks
-                    const daysFixed = activeFixed.filter(f => f.day_of_week === dayOfWeek);
-                    newWeekBlocks[dateStr] = daysFixed.map(f => ({
-                        id: `fixed-preview-${f.id}-${dateStr}`,
-                        user_id: user.id,
-                        plan_id: 'preview',
-                        title: f.title,
-                        category: f.category,
-                        // Naive time construction, assuming input is HH:MM
-                        start_datetime: `${dateStr}T${f.start_time}`,
-                        end_datetime: `${dateStr}T${f.end_time}`,
-                        source: 'fixed',
-                        is_done: false,
-                        is_skipped: false,
-                        is_fixed: true,
-                        order_index: 0,
-                        created_at: new Date().toISOString(),
-                    } as DailyBlock));
+                    newWeekBlocks[dateStr] = fixedAsDailyBlocks;
                 }
             });
 
@@ -358,11 +372,19 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
     const markBlockDone = async (blockId: string) => {
         if (!user) return;
 
+        // Block done/skip on virtual fixed blocks (id starts with 'fixed-')
+        if (blockId.startsWith('fixed-')) {
+            toast.info('Blocos fixos não podem ser marcados como concluídos.');
+            return;
+        }
+
         const { error } = await supabase
             .from('daily_blocks')
-            .update({ is_done: true, done_at: new Date().toISOString() })
+            .update({ is_done: true, done_at: new Date().toISOString(), updated_at: new Date().toISOString() })
             .eq('id', blockId)
-            .eq('user_id', user.id);
+            .eq('user_id', user.id)
+            .select()
+            .single();
 
         if (!error) {
             setTodayBlocks(prev => prev.map(b =>
@@ -374,18 +396,27 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
     const skipBlock = async (blockId: string, reason?: string) => {
         if (!user) return;
 
+        // Block done/skip on virtual fixed blocks
+        if (blockId.startsWith('fixed-')) {
+            toast.info('Blocos fixos não podem ser pulados.');
+            return;
+        }
+
+        // Wait for DB confirm (.select().single()) before proceeding
         const { error } = await supabase
             .from('daily_blocks')
-            .update({ is_skipped: true, skip_reason: reason })
+            .update({ is_skipped: true, skip_reason: reason, updated_at: new Date().toISOString() })
             .eq('id', blockId)
-            .eq('user_id', user.id);
+            .eq('user_id', user.id)
+            .select()
+            .single();
 
         if (!error) {
             setTodayBlocks(prev => prev.map(b =>
                 b.id === blockId ? { ...b, is_skipped: true, status: 'skipped' } : b
             ));
 
-            // Trigger replan with skip signal
+            // Trigger replan — will merge blocks preserving this skip
             await triggerReplan('skip', blockId, reason);
         }
     };
@@ -555,7 +586,27 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
             });
 
             if (response.ok) {
-                await loadTodayPlan();
+                const data = await response.json();
+                if (data.blocks && Array.isArray(data.blocks)) {
+                    // Merge: preserve local done/skipped state (avoids race condition)
+                    setTodayBlocks(prev => {
+                        const localOverrides = new Map(
+                            prev.filter(b => b.is_done || b.is_skipped)
+                                .map(b => [b.id, { is_done: b.is_done, is_skipped: b.is_skipped }])
+                        );
+                        const now = new Date();
+                        return data.blocks.map((b: DailyBlock) => {
+                            const override = localOverrides.get(b.id);
+                            const merged = override
+                                ? { ...b, is_done: override.is_done || b.is_done, is_skipped: override.is_skipped || b.is_skipped }
+                                : b;
+                            return enrichBlockWithStatus(merged, now);
+                        });
+                    });
+                } else {
+                    // Fallback: full reload if response doesn't include blocks
+                    await loadTodayPlan();
+                }
             }
         } catch (error) {
             console.error('Replan error:', error);

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { AGENDA_PLANNER_SYSTEM_PROMPT, buildPlanDayPrompt } from '@/ai/prompts/agendaPrompts';
 import { solveTimeline, dailyBlockToSolverBlock, solverBlockToTimeFields, SolverBlock } from '@/lib/timelineSolver';
 import { processDerivedBlocks } from '@/lib/derivedBlocks';
+import { validateMealWindow, generateIdempotencyKey, normalizeForComparison } from '@/lib/mealWindows';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +13,8 @@ const planWeekInputSchema = z.object({
     user_id: z.string().uuid(),
     start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // Monday of the week
     timezone: z.string().default('America/Sao_Paulo'),
-    days_to_plan: z.array(z.number().min(0).max(6)).optional(), // specific days to plan (0=Sun..6=Sat)
+    days_to_plan: z.array(z.number().min(0).max(6)).optional(),
+    debug: z.boolean().optional().default(false),
 });
 
 const aiBlockSchema = z.object({
@@ -200,45 +202,50 @@ Responda EXCLUSIVAMENTE em JSON válido:
         const weekPlan = validated.data;
         let totalBlocksCreated = 0;
         const solverWarnings: string[] = [];
+        const debugInfo: any[] = [];
 
         // Process each day
         for (const day of weekPlan.days) {
             const dayOfWeek = getDayOfWeek(day.date);
             const dayFixed = fixedBlocksByDay[dayOfWeek] || [];
 
-            // Get or create plan for this date
-            let { data: plan } = await supabase
+            // Get or create plan for this date using UPSERT to handle race conditions
+            const { data: plan, error: planError } = await supabase
                 .from('daily_plan')
-                .select('*')
-                .eq('user_id', input.user_id)
-                .eq('plan_date', day.date)
+                .upsert({
+                    user_id: input.user_id,
+                    plan_date: day.date,
+                    timezone: input.timezone,
+                    status: 'active',
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id, plan_date' })
+                .select()
                 .single();
 
-            if (!plan) {
-                const { data: newPlan } = await supabase
-                    .from('daily_plan')
-                    .insert({
-                        user_id: input.user_id,
-                        plan_date: day.date,
-                        timezone: input.timezone,
-                        status: 'active',
-                    })
-                    .select()
-                    .single();
-                plan = newPlan;
+            if (planError || !plan) {
+                console.error(`Failed to upsert plan for ${day.date}:`, planError);
+                solverWarnings.push(`${day.date}: Falha ao criar/atualizar plano diário.`);
+                continue;
             }
 
-            if (!plan) continue;
+            // -- DEBUG COUNTERS --
+            let debugAiRaw = day.blocks.length;
+            let debugAfterFilter = 0;
+            let debugAfterSolver = 0;
+            let debugInserted = 0;
+            let debugMealWindowRejects = 0;
 
-            // Delete existing AI/manual blocks for this day to prevent duplication/explosion
-            // We keep 'fixed' blocks which are managed separately
-            await supabase
+            // Fetch existing blocks for this plan (for UPSERT logic)
+            const { data: existingPlanBlocks } = await supabase
                 .from('daily_blocks')
-                .delete()
-                .eq('plan_id', plan.id)
-                .neq('category', 'fixed');
+                .select('id, idempotency_key, is_done, is_skipped, title, category, source')
+                .eq('plan_id', plan.id);
 
-            // Convert AI blocks + fixed blocks to solver format
+            const existingByKey = new Map(
+                (existingPlanBlocks || []).filter(b => b.idempotency_key).map(b => [b.idempotency_key, b])
+            );
+
+            // Convert Fixed blocks to solver format
             const fixedSolverBlocks: SolverBlock[] = dayFixed.map(fb => ({
                 id: `fixed-${fb.id}`,
                 title: fb.title,
@@ -249,56 +256,185 @@ Responda EXCLUSIVAMENTE em JSON válido:
                 priority: 100,
             }));
 
-            const aiSolverBlocks: SolverBlock[] = day.blocks.map((b, idx) => ({
-                id: `ai-${day.date}-${idx}`,
-                title: b.title,
-                category: b.category,
-                startMin: timeToMinutes(b.start_time),
-                endMin: timeToMinutes(b.end_time),
-                source: 'ai' as const,
-                priority: b.category === 'meal' ? 70 : 60,
-                canShorten: true,
-                minDuration: b.category === 'meal' ? 15 : 20,
-            }));
+            // Filter and Convert AI blocks
+            const aiSolverBlocks: SolverBlock[] = [];
+            for (const [idx, b] of day.blocks.entries()) {
+                let startMin = timeToMinutes(b.start_time);
+                const endMin = timeToMinutes(b.end_time);
 
-            // Add derived blocks (meal pauses)
+                // 1. Meal window enforcement
+                if (b.category === 'meal') {
+                    const mealCheck = validateMealWindow(b.title, startMin);
+                    if (mealCheck.window && !mealCheck.valid) {
+                        solverWarnings.push(`${day.date}: Refeição "${b.title}" movida de ${b.start_time} para ${minutesToTimeStr(mealCheck.nearestSlot)} (janela: ${mealCheck.window.label}).`);
+                        startMin = mealCheck.nearestSlot;
+                        debugMealWindowRejects++;
+                    }
+                }
+
+                // 2. Check for overlapping Fixed Block
+                const adjustedEnd = startMin + (endMin - timeToMinutes(b.start_time));
+                const overlapsFixed = fixedSolverBlocks.some(fb =>
+                    (fb.startMin < adjustedEnd && fb.endMin > startMin)
+                );
+                if (overlapsFixed) {
+                    solverWarnings.push(`${day.date}: Ignorado bloco IA "${b.title}" (${b.start_time}) — colide com fixo.`);
+                    continue;
+                }
+
+                // 3. Semantic dedup vs fixed (normalized title + time proximity for meals)
+                const normalizedAiTitle = normalizeForComparison(b.title);
+                const isSemanticDupe = fixedSolverBlocks.some(fb => {
+                    const normalizedFixedTitle = normalizeForComparison(fb.title);
+                    return normalizedFixedTitle === normalizedAiTitle ||
+                        (fb.category === 'meal' && b.category === 'meal' && Math.abs(fb.startMin - startMin) < 60);
+                });
+                if (isSemanticDupe) {
+                    solverWarnings.push(`${day.date}: Ignorado "${b.title}" (duplicata semântica de fixo).`);
+                    continue;
+                }
+
+                aiSolverBlocks.push({
+                    id: `ai-${day.date}-${idx}`,
+                    title: b.title,
+                    category: b.category,
+                    startMin: startMin,
+                    endMin: startMin + (endMin - timeToMinutes(b.start_time)),
+                    source: 'ai' as const,
+                    priority: b.category === 'meal' ? 70 : 60,
+                    canShorten: true,
+                    minDuration: b.category === 'meal' ? 15 : 20,
+                    meta: { energyLevel: b.energyLevel, suggestedReason: b.suggested_reason }
+                });
+            }
+            debugAfterFilter = aiSolverBlocks.length;
+
+            // JOIN, derive, solve
             const allBlocks = processDerivedBlocks([...fixedSolverBlocks, ...aiSolverBlocks]);
-
-            // Solve timeline
             const solverResult = solveTimeline(allBlocks);
-
             if (solverResult.warnings.length > 0) {
-                solverWarnings.push(`${day.date}: ${solverResult.warnings.join('; ')}`);
+                solverResult.warnings.forEach(w => solverWarnings.push(`${day.date}: ${w}`));
             }
 
-            // Save resolved AI blocks (skip fixed blocks, they're already saved)
             const aiResolved = solverResult.resolved.filter(b => b.source !== 'fixed');
+            debugAfterSolver = aiResolved.length;
 
-            // --- FINAL GUARDRAIL ---
-            const MAX_BLOCKS_PER_DAY = 24;
+            // Block limit guardrail
+            const MAX_BLOCKS_PER_DAY = 18;
             if (aiResolved.length > MAX_BLOCKS_PER_DAY) {
-                solverWarnings.push(`${day.date}: Truncated excess blocks (${aiResolved.length} > ${MAX_BLOCKS_PER_DAY})`);
+                solverWarnings.push(`${day.date}: Truncado (${aiResolved.length} > ${MAX_BLOCKS_PER_DAY}).`);
                 aiResolved.length = MAX_BLOCKS_PER_DAY;
             }
 
-            for (const block of aiResolved) {
+            // --- SMART UPSERT: preserve done/skipped status ---
+            const newKeys = new Set<string>();
+            const toInsert: any[] = [];
+            const toUpdate: { id: string; data: any }[] = [];
+
+            for (const [i, block] of aiResolved.entries()) {
+                const idemKey = generateIdempotencyKey(block.source, block.category, block.title);
+                // Append counter for duplicates within same day (e.g., two "Sono" blocks)
+                let uniqueKey = idemKey;
+                let counter = 1;
+                while (newKeys.has(uniqueKey)) {
+                    counter++;
+                    uniqueKey = `${idemKey}::${counter}`;
+                }
+                newKeys.add(uniqueKey);
+
                 const timeFields = solverBlockToTimeFields(block, day.date, input.timezone);
+                const existing = existingByKey.get(uniqueKey);
 
-                await supabase.from('daily_blocks').insert({
-                    plan_id: plan.id,
-                    user_id: input.user_id,
-                    title: block.title,
-                    category: block.category,
-                    start_datetime: timeFields.start_datetime,
-                    end_datetime: timeFields.end_datetime,
-                    source: block.parentEventId ? 'ai' : 'ai',
-                    is_done: false,
-                    is_skipped: false,
-                    order_index: totalBlocksCreated * 10,
-                    meta: block.meta || {},
+                if (existing && (existing.is_done || existing.is_skipped)) {
+                    // PRESERVE: block already done/skipped — only update times
+                    toUpdate.push({
+                        id: existing.id,
+                        data: {
+                            start_datetime: timeFields.start_datetime,
+                            end_datetime: timeFields.end_datetime,
+                            order_index: i * 10,
+                            updated_at: new Date().toISOString(),
+                        }
+                    });
+                } else if (existing) {
+                    // EXISTS but not done — full update
+                    toUpdate.push({
+                        id: existing.id,
+                        data: {
+                            title: block.title,
+                            category: block.category,
+                            start_datetime: timeFields.start_datetime,
+                            end_datetime: timeFields.end_datetime,
+                            source: block.source,
+                            order_index: i * 10,
+                            meta: block.meta || {},
+                            updated_at: new Date().toISOString(),
+                        }
+                    });
+                } else {
+                    // NEW block
+                    toInsert.push({
+                        plan_id: plan.id,
+                        user_id: input.user_id,
+                        title: block.title,
+                        category: block.category,
+                        start_datetime: timeFields.start_datetime,
+                        end_datetime: timeFields.end_datetime,
+                        source: block.source,
+                        is_done: false,
+                        is_skipped: false,
+                        order_index: i * 10,
+                        meta: block.meta || {},
+                        idempotency_key: uniqueKey,
+                    });
+                }
+            }
+
+            // DELETE stale blocks (not in new keyset AND not done/skipped)
+            const staleBlocks = (existingPlanBlocks || []).filter(b =>
+                b.idempotency_key &&
+                !newKeys.has(b.idempotency_key) &&
+                !b.is_done && !b.is_skipped &&
+                b.source !== 'fixed'
+            );
+            if (staleBlocks.length > 0) {
+                await supabase.from('daily_blocks').delete().in('id', staleBlocks.map(b => b.id));
+            }
+
+            // Execute updates
+            for (const upd of toUpdate) {
+                await supabase.from('daily_blocks').update(upd.data).eq('id', upd.id);
+            }
+
+            // Execute inserts
+            if (toInsert.length > 0) {
+                const { error: insertError } = await supabase.from('daily_blocks').insert(toInsert);
+                if (insertError) {
+                    console.error(`Error inserting blocks for ${day.date}:`, insertError);
+                    solverWarnings.push(`${day.date}: Erro ao salvar blocos.`);
+                }
+            }
+
+            debugInserted = toInsert.length;
+            totalBlocksCreated += toInsert.length + toUpdate.length;
+
+            // Accumulate debug info
+            if (input.debug) {
+                debugInfo.push({
+                    date: day.date,
+                    aiRawCount: debugAiRaw,
+                    afterFilterCount: debugAfterFilter,
+                    afterSolverCount: debugAfterSolver,
+                    insertedCount: debugInserted,
+                    updatedCount: toUpdate.length,
+                    deletedStaleCount: staleBlocks.length,
+                    preservedDoneSkipped: toUpdate.filter((_, i) => {
+                        const ex = existingByKey.get([...newKeys][i]);
+                        return ex && (ex.is_done || ex.is_skipped);
+                    }).length,
+                    mealWindowRejects: debugMealWindowRejects,
+                    fixedCount: dayFixed.length,
                 });
-
-                totalBlocksCreated++;
             }
         }
 
@@ -309,6 +445,7 @@ Responda EXCLUSIVAMENTE em JSON válido:
             daysPlanned: weekPlan.days.length,
             totalBlocks: totalBlocksCreated,
             warnings: solverWarnings,
+            ...(input.debug ? { debug: debugInfo } : {}),
         });
 
     } catch (error) {
@@ -327,4 +464,10 @@ Responda EXCLUSIVAMENTE em JSON válido:
 function timeToMinutes(time: string): number {
     const [h, m] = time.split(':').map(Number);
     return (h || 0) * 60 + (m || 0);
+}
+
+function minutesToTimeStr(min: number): string {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }

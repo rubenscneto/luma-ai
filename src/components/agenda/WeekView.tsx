@@ -61,7 +61,8 @@ export default function WeekView() {
         todayBlocks,
         generatePlan,
         weekBlocks,
-        fetchWeekBlocks
+        fetchWeekBlocks,
+        loadTodayPlan,
     } = useDailyPlan();
     const { user } = useAuth();
     const [currentWeekStart, setCurrentWeekStart] = useState(() => {
@@ -126,8 +127,9 @@ export default function WeekView() {
             if (response.ok) {
                 const data = await response.json();
                 toast.success(`Semana planejada! ${data.totalBlocks} blocos criados.`);
-                // Refresh view
+                // Refresh week view AND today's blocks
                 await fetchWeekBlocks(formatDateKey(currentWeekStart));
+                await loadTodayPlan();
             } else {
                 const errorData = await response.json().catch(() => ({}));
                 console.error('Plan week error data:', errorData);
