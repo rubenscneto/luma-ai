@@ -521,28 +521,37 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
             // Convert solver result back to datetime
             const timeFields = solverBlockToTimeFields(resolvedNew, today);
 
-            // Save to Supabase with solved times
-            const { data: insertedBlock, error: insertError } = await supabase
-                .from('daily_blocks')
-                .insert({
-                    plan_id: planId,
-                    user_id: user.id,
-                    source: 'manual',
-                    is_done: false,
-                    is_skipped: false,
-                    order_index: todayBlocks.length * 10,
-                    ...block,
-                    start_datetime: timeFields.start_datetime,
-                    end_datetime: timeFields.end_datetime,
-                })
-                .select()
-                .single();
+            // Save via server API (key generated server-side by persistSingleBlock)
+            const startDt = new Date(timeFields.start_datetime);
+            const endDt = new Date(timeFields.end_datetime);
+            const startTime = `${String(startDt.getHours()).padStart(2, '0')}:${String(startDt.getMinutes()).padStart(2, '0')}`;
+            const endTime = `${String(endDt.getHours()).padStart(2, '0')}:${String(endDt.getMinutes()).padStart(2, '0')}`;
 
-            if (insertError) {
-                console.error('Insert block error:', insertError);
+            const response = await fetch('/api/agenda/blocks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: user.id,
+                    date: today,
+                    title: block.title,
+                    category: block.category,
+                    start_time: startTime,
+                    end_time: endTime,
+                    source: (block.source as string) || 'manual',
+                    meta: block.meta || {},
+                    timezone: 'America/Sao_Paulo',
+                }),
+            });
+
+            const apiResult = await response.json();
+
+            if (!response.ok || !apiResult.success) {
+                console.error('Insert block error:', apiResult);
                 toast.error('Erro ao salvar bloco.');
                 return;
             }
+
+            const insertedBlock = apiResult.block;
 
             // Update any existing blocks that were moved by the solver
             const movedConflicts = result.conflicts.filter(

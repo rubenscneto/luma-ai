@@ -7,6 +7,7 @@
 
 export interface MealWindow {
     label: string;
+    canonicalType: 'breakfast' | 'lunch' | 'snack' | 'dinner';
     keywords: string[];
     minMinutes: number; // 05:00 = 300
     maxMinutes: number; // 10:00 = 600
@@ -15,24 +16,28 @@ export interface MealWindow {
 export const DEFAULT_MEAL_WINDOWS: MealWindow[] = [
     {
         label: 'café',
+        canonicalType: 'breakfast',
         keywords: ['café', 'cafe', 'breakfast', 'café da manhã', 'desjejum', 'morning meal'],
         minMinutes: 300,  // 05:00
         maxMinutes: 600,  // 10:00
     },
     {
         label: 'almoço',
+        canonicalType: 'lunch',
         keywords: ['almoço', 'almoco', 'lunch', 'refeição principal'],
         minMinutes: 660,  // 11:00
         maxMinutes: 840,  // 14:00
     },
     {
         label: 'lanche',
+        canonicalType: 'snack',
         keywords: ['lanche', 'snack', 'lanche da tarde', 'merenda', 'coffee break'],
         minMinutes: 840,  // 14:00
         maxMinutes: 1080, // 18:00
     },
     {
         label: 'jantar',
+        canonicalType: 'dinner',
         keywords: ['jantar', 'janta', 'dinner', 'refeição noturna', 'supper', 'ceia'],
         minMinutes: 1080, // 18:00
         maxMinutes: 1290, // 21:30

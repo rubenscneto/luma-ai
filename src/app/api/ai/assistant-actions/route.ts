@@ -164,22 +164,19 @@ ${message}
                         }
 
                         if (planId) {
-                            const { data, error } = await supabase
-                                .from('daily_blocks')
-                                .insert({
-                                    plan_id: planId,
-                                    user_id,
+                            const { persistSingleBlock } = await import('@/lib/persistDailyBlocks');
+                            const result = await persistSingleBlock(
+                                supabase, planId, user_id, today,
+                                {
                                     title: action.title,
                                     category: action.category,
                                     start_datetime: action.start_datetime,
                                     end_datetime: action.end_datetime,
                                     source: 'manual',
                                     meta: action.meta || {},
-                                })
-                                .select()
-                                .single();
-
-                            executedActions.push({ type: action.type, success: !error, data });
+                                }
+                            );
+                            executedActions.push({ type: action.type, success: true, data: result.block });
                         }
                         break;
                     }

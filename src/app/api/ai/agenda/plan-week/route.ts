@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { AGENDA_PLANNER_SYSTEM_PROMPT, buildPlanDayPrompt } from '@/ai/prompts/agendaPrompts';
 import { solveTimeline, dailyBlockToSolverBlock, solverBlockToTimeFields, SolverBlock } from '@/lib/timelineSolver';
 import { processDerivedBlocks } from '@/lib/derivedBlocks';
-import { validateMealWindow, generateIdempotencyKey, normalizeForComparison } from '@/lib/mealWindows';
+import { validateMealWindow, normalizeForComparison } from '@/lib/mealWindows';
 
 export const dynamic = 'force-dynamic';
 
@@ -231,19 +231,7 @@ Responda EXCLUSIVAMENTE em JSON válido:
             // -- DEBUG COUNTERS --
             let debugAiRaw = day.blocks.length;
             let debugAfterFilter = 0;
-            let debugAfterSolver = 0;
-            let debugInserted = 0;
             let debugMealWindowRejects = 0;
-
-            // Fetch existing blocks for this plan (for UPSERT logic)
-            const { data: existingPlanBlocks } = await supabase
-                .from('daily_blocks')
-                .select('id, idempotency_key, is_done, is_skipped, title, category, source')
-                .eq('plan_id', plan.id);
-
-            const existingByKey = new Map(
-                (existingPlanBlocks || []).filter(b => b.idempotency_key).map(b => [b.idempotency_key, b])
-            );
 
             // Convert Fixed blocks to solver format
             const fixedSolverBlocks: SolverBlock[] = dayFixed.map(fb => ({
@@ -317,7 +305,6 @@ Responda EXCLUSIVAMENTE em JSON válido:
             }
 
             const aiResolved = solverResult.resolved.filter(b => b.source !== 'fixed');
-            debugAfterSolver = aiResolved.length;
 
             // Block limit guardrail
             const MAX_BLOCKS_PER_DAY = 18;
@@ -326,97 +313,32 @@ Responda EXCLUSIVAMENTE em JSON válido:
                 aiResolved.length = MAX_BLOCKS_PER_DAY;
             }
 
-            // --- SMART UPSERT: preserve done/skipped status ---
-            const newKeys = new Set<string>();
-            const toInsert: any[] = [];
-            const toUpdate: { id: string; data: any }[] = [];
-
-            for (const [i, block] of aiResolved.entries()) {
-                const idemKey = generateIdempotencyKey(block.source, block.category, block.title);
-                // Append counter for duplicates within same day (e.g., two "Sono" blocks)
-                let uniqueKey = idemKey;
-                let counter = 1;
-                while (newKeys.has(uniqueKey)) {
-                    counter++;
-                    uniqueKey = `${idemKey}::${counter}`;
-                }
-                newKeys.add(uniqueKey);
-
+            // Convert solver results to BlockInput for persistDailyBlocks
+            const { persistDailyBlocks } = await import('@/lib/persistDailyBlocks');
+            const blockInputs = aiResolved.map((block, i) => {
                 const timeFields = solverBlockToTimeFields(block, day.date, input.timezone);
-                const existing = existingByKey.get(uniqueKey);
+                return {
+                    title: block.title,
+                    category: block.category,
+                    start_datetime: timeFields.start_datetime,
+                    end_datetime: timeFields.end_datetime,
+                    source: ((block.source as string) === 'derived' ? 'ai' : block.source) as 'ai' | 'fixed' | 'manual',
+                    order_index: i * 10,
+                    meta: block.meta || {},
+                };
+            });
 
-                if (existing && (existing.is_done || existing.is_skipped)) {
-                    // PRESERVE: block already done/skipped — only update times
-                    toUpdate.push({
-                        id: existing.id,
-                        data: {
-                            start_datetime: timeFields.start_datetime,
-                            end_datetime: timeFields.end_datetime,
-                            order_index: i * 10,
-                            updated_at: new Date().toISOString(),
-                        }
-                    });
-                } else if (existing) {
-                    // EXISTS but not done — full update
-                    toUpdate.push({
-                        id: existing.id,
-                        data: {
-                            title: block.title,
-                            category: block.category,
-                            start_datetime: timeFields.start_datetime,
-                            end_datetime: timeFields.end_datetime,
-                            source: block.source,
-                            order_index: i * 10,
-                            meta: block.meta || {},
-                            updated_at: new Date().toISOString(),
-                        }
-                    });
-                } else {
-                    // NEW block
-                    toInsert.push({
-                        plan_id: plan.id,
-                        user_id: input.user_id,
-                        title: block.title,
-                        category: block.category,
-                        start_datetime: timeFields.start_datetime,
-                        end_datetime: timeFields.end_datetime,
-                        source: block.source,
-                        is_done: false,
-                        is_skipped: false,
-                        order_index: i * 10,
-                        meta: block.meta || {},
-                        idempotency_key: uniqueKey,
-                    });
+            // Use centralized persist — canonical keys, no counter, preserves done/skipped
+            const persistResult = await persistDailyBlocks(
+                supabase, plan.id, input.user_id, day.date, blockInputs,
+                {
+                    deleteStale: true,
+                    deleteNullKeys: true,
+                    staleSources: ['ai'],
                 }
-            }
-
-            // DELETE stale blocks (not in new keyset AND not done/skipped)
-            const staleBlocks = (existingPlanBlocks || []).filter(b =>
-                b.idempotency_key &&
-                !newKeys.has(b.idempotency_key) &&
-                !b.is_done && !b.is_skipped &&
-                b.source !== 'fixed'
             );
-            if (staleBlocks.length > 0) {
-                await supabase.from('daily_blocks').delete().in('id', staleBlocks.map(b => b.id));
-            }
 
-            // Execute updates
-            for (const upd of toUpdate) {
-                await supabase.from('daily_blocks').update(upd.data).eq('id', upd.id);
-            }
-
-            // Execute inserts
-            if (toInsert.length > 0) {
-                const { error: insertError } = await supabase.from('daily_blocks').insert(toInsert);
-                if (insertError) {
-                    console.error(`Error inserting blocks for ${day.date}:`, insertError);
-                    solverWarnings.push(`${day.date}: Erro ao salvar blocos.`);
-                }
-            }
-
-            debugInserted = toInsert.length;
-            totalBlocksCreated += toInsert.length + toUpdate.length;
+            totalBlocksCreated += persistResult.inserted + persistResult.updated;
 
             // Accumulate debug info
             if (input.debug) {
@@ -424,14 +346,11 @@ Responda EXCLUSIVAMENTE em JSON válido:
                     date: day.date,
                     aiRawCount: debugAiRaw,
                     afterFilterCount: debugAfterFilter,
-                    afterSolverCount: debugAfterSolver,
-                    insertedCount: debugInserted,
-                    updatedCount: toUpdate.length,
-                    deletedStaleCount: staleBlocks.length,
-                    preservedDoneSkipped: toUpdate.filter((_, i) => {
-                        const ex = existingByKey.get([...newKeys][i]);
-                        return ex && (ex.is_done || ex.is_skipped);
-                    }).length,
+                    afterSolverCount: aiResolved.length,
+                    insertedCount: persistResult.inserted,
+                    updatedCount: persistResult.updated,
+                    deletedStaleCount: persistResult.deleted,
+                    preservedDoneSkipped: persistResult.preserved_done_skipped,
                     mealWindowRejects: debugMealWindowRejects,
                     fixedCount: dayFixed.length,
                 });

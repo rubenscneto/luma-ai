@@ -3,6 +3,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
 import { DAILY_PLAN_SYSTEM_PROMPT, DAILY_PLAN_USER_PROMPT } from '@/ai/prompts/dailyPlanPrompt';
 import { DailyPlanAIResponseSchema } from '@/ai/schemas/aiSchemas';
+import { persistDailyBlocks, BlockInput } from '@/lib/persistDailyBlocks';
+import { timeToTimestamptz } from '@/lib/mealWindows';
 
 const apiKey = process.env.GEMINI_API_KEY || '';
 const genAI = new GoogleGenerativeAI(apiKey);
@@ -106,11 +108,6 @@ export async function POST(req: NextRequest) {
 
         if (existingPlan) {
             planId = existingPlan.id;
-            // Delete existing blocks (regenerating)
-            await supabase
-                .from('daily_blocks')
-                .delete()
-                .eq('plan_id', planId);
         } else {
             const { data: newPlan, error } = await supabase
                 .from('daily_plan')
@@ -129,43 +126,34 @@ export async function POST(req: NextRequest) {
             planId = newPlan.id;
         }
 
-        // Insert fixed blocks first
-        const fixedBlockRows = (fixedBlocks || []).map((fb: any, index: number) => ({
-            plan_id: planId,
-            user_id,
+        // Build blocks array for persistDailyBlocks
+        const fixedBlockInputs: BlockInput[] = (fixedBlocks || []).map((fb: any, index: number) => ({
             title: fb.title,
             category: fb.category,
-            start_datetime: `${date}T${fb.start_time}:00${timezone === 'America/Sao_Paulo' ? '-03:00' : ''}`,
-            end_datetime: `${date}T${fb.end_time}:00${timezone === 'America/Sao_Paulo' ? '-03:00' : ''}`,
-            source: 'fixed',
+            start_datetime: timeToTimestamptz(date, fb.start_time, timezone),
+            end_datetime: timeToTimestamptz(date, fb.end_time, timezone),
+            source: 'fixed' as const,
             order_index: index * 10,
-            meta: { fixed_block_id: fb.id }
+            meta: { fixed_block_id: fb.id },
         }));
 
-        // Insert AI-generated blocks
-        const aiBlockRows = aiResponse.blocks.map((block: any, index: number) => ({
-            plan_id: planId,
-            user_id,
+        const aiBlockInputs: BlockInput[] = aiResponse.blocks.map((block: any, index: number) => ({
             title: block.title,
             category: block.category,
             start_datetime: block.start,
             end_datetime: block.end,
-            source: 'ai',
-            order_index: (fixedBlockRows.length + index) * 10,
-            meta: block.meta || {}
+            source: 'ai' as const,
+            order_index: (fixedBlockInputs.length + index) * 10,
+            meta: block.meta || {},
         }));
 
-        const allBlocks = [...fixedBlockRows, ...aiBlockRows];
+        const allBlockInputs = [...fixedBlockInputs, ...aiBlockInputs];
 
-        if (allBlocks.length > 0) {
-            const { error: insertError } = await supabase
-                .from('daily_blocks')
-                .insert(allBlocks);
-
-            if (insertError) {
-                console.error('Insert blocks error:', insertError);
-            }
-        }
+        // Use centralized persist (handles dedup, stale cleanup, NULL key cleanup)
+        const persistResult = await persistDailyBlocks(
+            supabase, planId, user_id, date, allBlockInputs,
+            { deleteStale: true, deleteNullKeys: true }
+        );
 
         // Update plan status
         await supabase
@@ -176,7 +164,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
             success: true,
             plan_id: planId,
-            blocks_created: allBlocks.length,
+            blocks_created: persistResult.inserted + persistResult.updated,
             summary: aiResponse.summary,
             insight: aiResponse.insight
         });

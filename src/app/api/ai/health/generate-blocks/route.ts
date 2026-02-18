@@ -163,29 +163,28 @@ Considere que hoje é ${new Date(dateStr + 'T12:00:00').toLocaleDateString('pt-B
 
         const validated = aiResponseSchema.parse(parsed);
 
-        // If plan_id provided, insert blocks into database
+        // If plan_id provided, persist blocks using centralized helper
         if (input.plan_id) {
-            const blocksToInsert = validated.health_blocks.map((block, index) => ({
-                plan_id: input.plan_id,
-                user_id: input.user_id,
+            const { persistDailyBlocks } = await import('@/lib/persistDailyBlocks');
+            const blockInputs = validated.health_blocks.map((block, index) => ({
                 title: block.title,
                 category: block.category,
                 start_datetime: `${dateStr}T${block.start_time}:00`,
                 end_datetime: `${dateStr}T${block.end_time}:00`,
-                source: 'ai_health',
-                order_index: 100 + index, // Higher order to place after other blocks
+                source: 'ai_health' as const,
+                order_index: 100 + index,
                 is_done: false,
                 is_skipped: false,
                 meta: block.meta || {},
             }));
 
-            const { error: insertError } = await supabase
-                .from('daily_blocks')
-                .insert(blocksToInsert);
+            const result = await persistDailyBlocks(
+                supabase, input.plan_id, input.user_id, dateStr, blockInputs,
+                { deleteStale: false, deleteNullKeys: true, staleSources: ['ai_health'] }
+            );
 
-            if (insertError) {
-                console.error('Insert health blocks error:', insertError);
-                // Continue anyway, just report we couldn't save
+            if (result.inserted === 0 && result.updated === 0) {
+                console.error('persistDailyBlocks returned 0 inserts/updates for health blocks');
             }
         }
 

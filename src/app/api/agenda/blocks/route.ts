@@ -107,13 +107,15 @@ export async function GET(request: NextRequest) {
     }
 }
 
-// POST - Create a new block
+// POST - Create a new block (with idempotency key via centralized helper)
 export async function POST(request: NextRequest) {
     try {
         const supabase = getSupabase();
 
         const body = await request.json();
         const input = createBlockSchema.parse(body);
+        const { persistSingleBlock } = await import('@/lib/persistDailyBlocks');
+        const { timeToTimestamptz } = await import('@/lib/mealWindows');
 
         // Get or create daily plan
         const { data: existingPlan } = await supabase
@@ -144,38 +146,26 @@ export async function POST(request: NextRequest) {
             planId = newPlan.id;
         }
 
-        // Get max order_index
-        const { data: existingBlocks } = await supabase
-            .from('daily_blocks')
-            .select('order_index')
-            .eq('plan_id', planId)
-            .order('order_index', { ascending: false })
-            .limit(1);
+        const timezone = (body.timezone as string) || 'America/Sao_Paulo';
+        const startDt = timeToTimestamptz(input.date, input.start_time, timezone);
+        const endDt = timeToTimestamptz(input.date, input.end_time, timezone);
 
-        const orderIndex = (existingBlocks?.[0]?.order_index ?? -1) + 1;
-
-        // Create block
-        const { data: block, error } = await supabase
-            .from('daily_blocks')
-            .insert({
-                plan_id: planId,
-                user_id: input.user_id,
+        const result = await persistSingleBlock(
+            supabase, planId, input.user_id, input.date,
+            {
                 title: input.title,
                 category: input.category,
-                start_datetime: `${input.date}T${input.start_time}:00`,
-                end_datetime: `${input.date}T${input.end_time}:00`,
+                start_datetime: startDt,
+                end_datetime: endDt,
                 source: input.source,
-                order_index: orderIndex,
                 meta: input.meta || {},
-            })
-            .select()
-            .single();
-
-        if (error) throw error;
+            }
+        );
 
         return NextResponse.json({
             success: true,
-            block,
+            block: result.block,
+            is_new: result.isNew,
         });
     } catch (error) {
         console.error('Create block error:', error);

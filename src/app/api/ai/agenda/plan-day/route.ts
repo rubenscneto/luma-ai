@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
 import { AGENDA_PLANNER_SYSTEM_PROMPT, buildPlanDayPrompt, buildABPlanPrompt } from '@/ai/prompts/agendaPrompts';
+import { persistDailyBlocks, BlockInput } from '@/lib/persistDailyBlocks';
+import { timeToTimestamptz } from '@/lib/mealWindows';
 
 // Force dynamic to avoid static generation issues
 export const dynamic = 'force-dynamic';
@@ -45,8 +47,7 @@ function getDayOfWeek(dateStr: string): number {
 }
 
 function timeToDatetime(dateStr: string, timeStr: string, timezone: string): string {
-    // Create datetime in the specified timezone
-    return `${dateStr}T${timeStr}:00`;
+    return timeToTimestamptz(dateStr, timeStr, timezone);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -133,7 +134,7 @@ async function getOrCreatePlan(supabase: any, userId: string, dateStr: string, t
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function insertFixedBlocks(supabase: any, planId: string, userId: string, dateStr: string, timezone: string, fixedBlocks: any[], existingBlocks: any[]) {
+function buildFixedBlockInputs(dateStr: string, timezone: string, fixedBlocks: any[], existingBlocks: any[]): BlockInput[] {
     const fixedBlockIds = (existingBlocks || [])
         .filter((b: any) => b.source === 'fixed')
         .map((b: any) => b.meta?.fixed_block_id);
@@ -142,25 +143,19 @@ async function insertFixedBlocks(supabase: any, planId: string, userId: string, 
         fb => !fixedBlockIds.includes(fb.id)
     );
 
-    if (newFixedBlocks.length > 0) {
-        const fixedBlocksToInsert = newFixedBlocks.map((fb, idx) => ({
-            plan_id: planId,
-            user_id: userId,
-            title: fb.title,
-            category: fb.category,
-            start_datetime: timeToDatetime(dateStr, fb.start_time, timezone),
-            end_datetime: timeToDatetime(dateStr, fb.end_time, timezone),
-            source: 'fixed' as const,
-            order_index: idx,
-            meta: {
-                fixed_block_id: fb.id,
-                location: fb.location,
-                notes: fb.notes,
-            },
-        }));
-
-        await supabase.from('daily_blocks').insert(fixedBlocksToInsert);
-    }
+    return newFixedBlocks.map((fb, idx) => ({
+        title: fb.title,
+        category: fb.category,
+        start_datetime: timeToDatetime(dateStr, fb.start_time, timezone),
+        end_datetime: timeToDatetime(dateStr, fb.end_time, timezone),
+        source: 'fixed' as const,
+        order_index: idx,
+        meta: {
+            fixed_block_id: fb.id,
+            location: fb.location,
+            notes: fb.notes,
+        },
+    }));
 }
 
 async function generateAIBlocks(genAI: GoogleGenerativeAI, systemPrompt: string, userPrompt: string, temperature: number) {
@@ -220,30 +215,11 @@ export async function POST(request: NextRequest) {
                 .select('*')
                 .eq('plan_id', planId);
 
-            // Insert fixed blocks if not already there
-            await insertFixedBlocks(supabase, planId, input.user_id, dateStr, input.timezone, context.fixedBlocks, existingBlocks || []);
+            // Build fixed + confirmed blocks
+            const fixedInputs = buildFixedBlockInputs(dateStr, input.timezone, context.fixedBlocks, existingBlocks || []);
 
-            // Delete any existing AI blocks
-            await supabase
-                .from('daily_blocks')
-                .delete()
-                .eq('plan_id', planId)
-                .eq('source', 'ai');
-
-            // Get current max order_index
-            const { data: currentBlocks } = await supabase
-                .from('daily_blocks')
-                .select('order_index')
-                .eq('plan_id', planId)
-                .order('order_index', { ascending: false })
-                .limit(1);
-
-            let orderIndex = (currentBlocks?.[0]?.order_index ?? -1) + 1;
-
-            // Insert the selected plan's blocks
-            const blocksToInsert = input.plan_blocks.map(block => ({
-                plan_id: planId,
-                user_id: input.user_id,
+            let orderIndex = fixedInputs.length;
+            const confirmedInputs: BlockInput[] = input.plan_blocks.map(block => ({
                 title: block.title,
                 category: block.category,
                 start_datetime: timeToDatetime(dateStr, block.start_time, input.timezone),
@@ -256,7 +232,12 @@ export async function POST(request: NextRequest) {
                 },
             }));
 
-            await supabase.from('daily_blocks').insert(blocksToInsert);
+            // Persist all blocks with stale cleanup (replaces old AI blocks)
+            const persistResult = await persistDailyBlocks(
+                supabase, planId, input.user_id, dateStr,
+                [...fixedInputs, ...confirmedInputs],
+                { deleteStale: true, deleteNullKeys: true, staleSources: ['ai'] }
+            );
 
             // Activate plan
             await supabase
@@ -264,11 +245,7 @@ export async function POST(request: NextRequest) {
                 .update({ status: 'active', updated_at: new Date().toISOString() })
                 .eq('id', planId);
 
-            const { data: finalBlocks } = await supabase
-                .from('daily_blocks')
-                .select('*')
-                .eq('plan_id', planId)
-                .order('start_datetime', { ascending: true });
+            const finalBlocks = persistResult.blocks;
 
             return NextResponse.json({
                 success: true,
@@ -277,10 +254,10 @@ export async function POST(request: NextRequest) {
                 blocks: finalBlocks,
                 selected_plan: input.selected_plan,
                 blocks_count: {
-                    total: finalBlocks?.length || 0,
-                    fixed: finalBlocks?.filter((b: any) => b.source === 'fixed').length || 0,
-                    ai: finalBlocks?.filter((b: any) => b.source === 'ai').length || 0,
-                    manual: finalBlocks?.filter((b: any) => b.source === 'manual').length || 0,
+                    total: finalBlocks.length,
+                    fixed: finalBlocks.filter((b: any) => b.source === 'fixed').length,
+                    ai: finalBlocks.filter((b: any) => b.source === 'ai').length,
+                    manual: finalBlocks.filter((b: any) => b.source === 'manual').length,
                 },
             });
         }
@@ -367,8 +344,8 @@ export async function POST(request: NextRequest) {
             .eq('plan_id', planId)
             .order('start_datetime', { ascending: true });
 
-        // Insert fixed blocks
-        await insertFixedBlocks(supabase, planId, input.user_id, dateStr, input.timezone, context.fixedBlocks, existingBlocks || []);
+        // Build fixed block inputs
+        const fixedInputs = buildFixedBlockInputs(dateStr, input.timezone, context.fixedBlocks, existingBlocks || []);
 
         const allExistingForContext = (existingBlocks || []).map((eb: any) => ({
             title: eb.title,
@@ -376,16 +353,6 @@ export async function POST(request: NextRequest) {
             end: new Date(eb.end_datetime).toTimeString().slice(0, 5),
             source: eb.source,
         }));
-
-        // If mode is regenerate, delete AI blocks that are not done
-        if (input.mode === 'regenerate') {
-            await supabase
-                .from('daily_blocks')
-                .delete()
-                .eq('plan_id', planId)
-                .eq('source', 'ai')
-                .eq('is_done', false);
-        }
 
         // Generate AI suggestions
         const prompt = buildPlanDayPrompt({
@@ -400,20 +367,10 @@ export async function POST(request: NextRequest) {
 
         const aiBlocks = await generateAIBlocks(genAI, AGENDA_PLANNER_SYSTEM_PROMPT, prompt, 0.7);
 
-        // Insert AI-generated blocks
+        // Build AI block inputs
         if (aiBlocks.blocks.length > 0) {
-            const { data: currentBlocks } = await supabase
-                .from('daily_blocks')
-                .select('order_index')
-                .eq('plan_id', planId)
-                .order('order_index', { ascending: false })
-                .limit(1);
-
-            let orderIndex = (currentBlocks?.[0]?.order_index ?? -1) + 1;
-
-            const aiBlocksToInsert = aiBlocks.blocks.map(block => ({
-                plan_id: planId,
-                user_id: input.user_id,
+            let orderIndex = fixedInputs.length;
+            const aiInputs: BlockInput[] = aiBlocks.blocks.map(block => ({
                 title: block.title,
                 category: block.category,
                 start_datetime: timeToDatetime(dateStr, block.start_time, input.timezone),
@@ -426,14 +383,45 @@ export async function POST(request: NextRequest) {
                 },
             }));
 
-            await supabase.from('daily_blocks').insert(aiBlocksToInsert);
+            // Persist all (fixed + AI) with stale cleanup for AI blocks only
+            const persistResult = await persistDailyBlocks(
+                supabase, planId, input.user_id, dateStr,
+                [...fixedInputs, ...aiInputs],
+                {
+                    deleteStale: input.mode === 'regenerate',
+                    deleteNullKeys: true,
+                    staleSources: ['ai'],
+                }
+            );
+
+            // Update plan status to active
+            await supabase
+                .from('daily_plan')
+                .update({ status: 'active', updated_at: new Date().toISOString() })
+                .eq('id', planId);
+
+            return NextResponse.json({
+                success: true,
+                plan_id: planId,
+                date: dateStr,
+                blocks: persistResult.blocks,
+                ai_summary: aiBlocks.summary,
+                blocks_count: {
+                    total: persistResult.blocks.length,
+                    fixed: persistResult.blocks.filter((b: any) => b.source === 'fixed').length,
+                    ai: persistResult.blocks.filter((b: any) => b.source === 'ai').length,
+                    manual: persistResult.blocks.filter((b: any) => b.source === 'manual').length,
+                },
+            });
         }
 
-        // Update plan status to active
-        await supabase
-            .from('daily_plan')
-            .update({ status: 'active', updated_at: new Date().toISOString() })
-            .eq('id', planId);
+        // No AI blocks generated — just persist fixed blocks
+        if (fixedInputs.length > 0) {
+            await persistDailyBlocks(
+                supabase, planId, input.user_id, dateStr, fixedInputs,
+                { deleteStale: false, deleteNullKeys: true }
+            );
+        }
 
         // Fetch final state
         const { data: finalBlocks } = await supabase
@@ -446,7 +434,7 @@ export async function POST(request: NextRequest) {
             success: true,
             plan_id: planId,
             date: dateStr,
-            blocks: finalBlocks,
+            blocks: finalBlocks || [],
             ai_summary: aiBlocks.summary,
             blocks_count: {
                 total: finalBlocks?.length || 0,
