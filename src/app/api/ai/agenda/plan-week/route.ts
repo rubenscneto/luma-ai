@@ -354,19 +354,21 @@ Responda EXCLUSIVAMENTE em JSON válido:
             // Actually persistDailyBlocks expects ALL blocks for the day to handle 'deleteStale' correctly.
             // So we must include Fixed blocks too.
 
-            const finalBlocksInput: BlockInput[] = solverResult.resolved.map((sb, idx) => {
-                const timeFields = solverBlockToTimeFields(sb, day.date, input.timezone);
-                return {
-                    title: sb.title,
-                    category: sb.category as any,
-                    start_datetime: timeFields.start_datetime,
-                    end_datetime: timeFields.end_datetime,
-                    source: sb.source,
-                    order_index: idx,
-                    is_fixed: sb.source === 'fixed',
-                    meta: sb.meta
-                };
-            });
+            const finalBlocksInput: BlockInput[] = solverResult.resolved
+                .filter(sb => sb.source !== 'fixed') // User requested: don't persist fixed blocks blocks to daily_blocks
+                .map((sb, idx) => {
+                    const timeFields = solverBlockToTimeFields(sb, day.date, input.timezone);
+                    return {
+                        title: sb.title,
+                        category: sb.category as any,
+                        start_datetime: timeFields.start_datetime,
+                        end_datetime: timeFields.end_datetime,
+                        source: sb.source,
+                        order_index: idx,
+                        is_fixed: sb.source === 'fixed',
+                        meta: sb.meta
+                    };
+                });
 
             // PERSIST TO DB
             const persistResult = await persistDailyBlocks(
