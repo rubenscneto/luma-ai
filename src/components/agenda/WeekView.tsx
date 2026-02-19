@@ -116,6 +116,7 @@ export default function WeekView() {
                 user_id: user.id,
                 start_date: startDate,
                 timezone: 'America/Sao_Paulo',
+                debug: true, // TEMP: diagnostic — see ai_raw_count / after_filter / after_solver
             };
 
             const response = await fetch('/api/ai/agenda/plan-week', {
@@ -126,13 +127,15 @@ export default function WeekView() {
 
             if (response.ok) {
                 const data = await response.json();
+                // DEBUG: log full response for diagnosis
+                console.log('[plan-week] response:', JSON.stringify(data, null, 2));
                 toast.success(`Semana planejada! ${data.totalBlocks} blocos criados.`);
                 // Refresh week view AND today's blocks
                 await fetchWeekBlocks(formatDateKey(currentWeekStart));
                 await loadTodayPlan();
             } else {
                 const errorData = await response.json().catch(() => ({}));
-                console.error('Plan week error data:', errorData);
+                console.error('Plan week error data:', JSON.stringify(errorData, null, 2));
                 toast.error(errorData.error || 'Erro ao planejar semana.');
             }
         } catch (error) {

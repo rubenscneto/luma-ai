@@ -136,8 +136,8 @@ export function BlockCard({ block, compact = false }: BlockCardProps) {
                     </div>
                 )}
 
-                {/* Actions toggle */}
-                {!block.is_done && !block.is_skipped && (
+                {/* Actions toggle — DISABLED for virtual fixed blocks (not yet materialized in DB) */}
+                {!block.is_done && !block.is_skipped && !(block as any).is_fixed && block.source !== 'fixed' && (
                     <button
                         onClick={() => setShowActions(!showActions)}
                         className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"

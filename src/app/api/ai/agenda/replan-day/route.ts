@@ -245,6 +245,9 @@ export async function POST(request: NextRequest) {
             const solverResult = solveTimeline([...fixedSolverBlocks, ...pendingSolverBlocks]);
 
             // 11. Save solver-resolved times back to DB
+            // SAFETY: replan ONLY updates times on existing blocks. NEVER delete/insert.
+            //         Only non-fixed blocks are updated (see filter below).
+            //         See SKILL.md §0.4 — replan keeps .update() only.
             const resolvedNonFixed = solverResult.resolved.filter(b => b.source !== 'fixed');
             for (const block of resolvedNonFixed) {
                 const timeFields = solverBlockToTimeFields(block, dateStr, 'America/Sao_Paulo');

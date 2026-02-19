@@ -357,6 +357,11 @@ Responda EXCLUSIVAMENTE em JSON válido:
             }
         }
 
+        // Server-side debug log (visible in Vercel logs)
+        if (input.debug && debugInfo.length > 0) {
+            console.log('[plan-week] DEBUG:', JSON.stringify(debugInfo, null, 2));
+        }
+
         return NextResponse.json({
             status: 'success',
             weekSummary: weekPlan.weekSummary,
