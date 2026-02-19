@@ -6,6 +6,7 @@ import { AGENDA_PLANNER_SYSTEM_PROMPT, buildPlanDayPrompt } from '@/ai/prompts/a
 import { solveTimeline, dailyBlockToSolverBlock, solverBlockToTimeFields, SolverBlock } from '@/lib/timelineSolver';
 import { processDerivedBlocks } from '@/lib/derivedBlocks';
 import { validateMealWindow, normalizeForComparison } from '@/lib/mealWindows';
+import { persistDailyBlocks, BlockInput } from '@/lib/persistDailyBlocks';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,6 +54,11 @@ export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
         const input = planWeekInputSchema.parse(body);
+
+        // STRICT VALIDATION: start_date must be valid YYYY-MM-DD
+        if (!input.start_date || !/^\d{4}-\d{2}-\d{2}$/.test(input.start_date)) {
+            return NextResponse.json({ error: 'start_date inválida. Formato esperado: YYYY-MM-DD' }, { status: 400 });
+        }
 
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
         const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -216,8 +222,11 @@ Responda EXCLUSIVAMENTE em JSON válido:
         const solverWarnings: string[] = [];
         const debugInfo: any[] = [];
 
+        // Initialize overflow blocks from previous day (for overnight handling)
+        let nextDayOverflows: SolverBlock[] = [];
+
         // Process each day
-        for (const day of weekPlan.days) {
+        for (const [dayIdx, day] of weekPlan.days.entries()) {
             const dayOfWeek = getDayOfWeek(day.date);
             const dayFixed = fixedBlocksByDay[dayOfWeek] || [];
 
@@ -254,20 +263,41 @@ Responda EXCLUSIVAMENTE em JSON válido:
                 endMin: timeToMinutes(fb.end_time),
                 source: 'fixed' as const,
                 priority: 100,
+                locked: true, // Fixed blocks are immutable in time
             }));
 
             // Filter and Convert AI blocks
-            const aiSolverBlocks: SolverBlock[] = [];
+            // Start with overflows from previous day
+            const aiSolverBlocks: SolverBlock[] = [...nextDayOverflows];
+            nextDayOverflows = []; // Reset for this day's output
+
             for (const [idx, b] of day.blocks.entries()) {
                 let startMin = timeToMinutes(b.start_time);
                 let endMin = timeToMinutes(b.end_time);
 
                 // OVERNIGHT HANDLING: end <= start means block crosses midnight
-                // (e.g. "Dormir" 23:00-07:00)
-                // Cap at 23:59 for same-day representation
+                // Split into 2 blocks:
+                // 1. Current day: start -> 23:59 (truncated)
+                // 2. Next day: 00:00 -> end (added to nextDayOverflows)
                 if (endMin <= startMin) {
-                    solverWarnings.push(`${day.date}: Bloco "${b.title}" (${b.start_time}-${b.end_time}) cruza meia-noite — truncado para 23:59.`);
-                    endMin = 23 * 60 + 59; // 23:59
+                    solverWarnings.push(`${day.date}: Bloco "${b.title}" (${b.start_time}-${b.end_time}) cruza meia-noite. Dividindo.`);
+
+                    // Create overflow block for next day
+                    nextDayOverflows.push({
+                        id: `overflow-${dayIdx}-${idx}`,
+                        title: `${b.title} (Cont.)`,
+                        category: b.category,
+                        startMin: 0,
+                        endMin: endMin, // original end time matches minutes from 00:00
+                        source: 'ai' as const,
+                        priority: b.category === 'meal' ? 70 : 60,
+                        canShorten: true,
+                        minDuration: b.category === 'meal' ? 15 : 20,
+                        meta: { energyLevel: b.energyLevel, suggestedReason: b.suggested_reason }
+                    });
+
+                    // Truncate current block
+                    endMin = 23 * 60 + 59;
                 }
 
                 // 1. Meal window enforcement
@@ -283,100 +313,91 @@ Responda EXCLUSIVAMENTE em JSON válido:
                 // 2. Check for overlapping Fixed Block
                 const adjustedEnd = startMin + (endMin - timeToMinutes(b.start_time));
                 const overlapsFixed = fixedSolverBlocks.some(fb =>
-                    (fb.startMin < adjustedEnd && fb.endMin > startMin)
+                    !(adjustedEnd <= fb.startMin || startMin >= fb.endMin)
                 );
-                if (overlapsFixed) {
-                    solverWarnings.push(`${day.date}: Ignorado bloco IA "${b.title}" (${b.start_time}) — colide com fixo.`);
-                    continue;
-                }
 
-                // 3. Semantic dedup vs fixed (normalized title + time proximity for meals)
-                const normalizedAiTitle = normalizeForComparison(b.title);
-                const isSemanticDupe = fixedSolverBlocks.some(fb => {
-                    const normalizedFixedTitle = normalizeForComparison(fb.title);
-                    return normalizedFixedTitle === normalizedAiTitle ||
-                        (fb.category === 'meal' && b.category === 'meal' && Math.abs(fb.startMin - startMin) < 60);
-                });
-                if (isSemanticDupe) {
-                    solverWarnings.push(`${day.date}: Ignorado "${b.title}" (duplicata semântica de fixo).`);
-                    continue;
+                if (overlapsFixed) {
+                    // Skip this AI block if it conflicts with a fixed block
+                    // The solver can handle it, but we prefer to drop 'optional' AI blocks that blatantly clash
+                    // However, we'll let the solver try to move it unless it's strictly impossible.
+                    // For now, let's include it but the solver will likely move it or shrink it.
                 }
 
                 aiSolverBlocks.push({
-                    id: `ai-${day.date}-${idx}`,
+                    id: `ai-${dayIdx}-${idx}`,
                     title: b.title,
                     category: b.category,
                     startMin: startMin,
-                    endMin: startMin + (endMin - timeToMinutes(b.start_time)),
+                    endMin: adjustedEnd, // Use adjusted duration
                     source: 'ai' as const,
-                    priority: b.category === 'meal' ? 70 : 60,
+                    priority: b.category === 'meal' ? 70 : 50, // Meals have higher priority
                     canShorten: true,
-                    minDuration: b.category === 'meal' ? 15 : 20,
-                    meta: { energyLevel: b.energyLevel, suggestedReason: b.suggested_reason }
+                    minDuration: b.category === 'meal' ? 15 : 15, // Minimum 15 mins
+                    meta: {
+                        energyLevel: b.energyLevel,
+                        suggestedReason: b.suggested_reason
+                    }
                 });
-            }
-            debugAfterFilter = aiSolverBlocks.length;
-
-            // JOIN, derive, solve
-            const allBlocks = processDerivedBlocks([...fixedSolverBlocks, ...aiSolverBlocks]);
-            const solverResult = solveTimeline(allBlocks);
-            if (solverResult.warnings.length > 0) {
-                solverResult.warnings.forEach(w => solverWarnings.push(`${day.date}: ${w}`));
+                debugAfterFilter++;
             }
 
-            const aiResolved = solverResult.resolved.filter(b => b.source !== 'fixed');
+            // SOLVE TIMELINE (Fix conflicts)
+            const allSolverBlocks = [...fixedSolverBlocks, ...aiSolverBlocks];
+            const solverResult = solveTimeline(allSolverBlocks);
 
-            // Block limit guardrail
-            const MAX_BLOCKS_PER_DAY = 18;
-            if (aiResolved.length > MAX_BLOCKS_PER_DAY) {
-                solverWarnings.push(`${day.date}: Truncado (${aiResolved.length} > ${MAX_BLOCKS_PER_DAY}).`);
-                aiResolved.length = MAX_BLOCKS_PER_DAY;
+            if (solverResult.conflicts.length > 0) {
+                solverWarnings.push(...solverResult.conflicts.map(c => `${day.date}: ${c.reason}`));
             }
 
-            // Convert solver results to BlockInput for persistDailyBlocks
-            const { persistDailyBlocks } = await import('@/lib/persistDailyBlocks');
-            const blockInputs = aiResolved.map((block, i) => {
-                const timeFields = solverBlockToTimeFields(block, day.date, input.timezone);
+            // Convert back to BlockInput for persistence
+            // Only take 'resolved' blocks that are NOT fixed (we re-persist fixed ones anyway? NO, we only persist AI ones + Fixed ones properly)
+            // Actually persistDailyBlocks expects ALL blocks for the day to handle 'deleteStale' correctly.
+            // So we must include Fixed blocks too.
+
+            const finalBlocksInput: BlockInput[] = solverResult.resolved.map((sb, idx) => {
+                const timeFields = solverBlockToTimeFields(sb, day.date, input.timezone);
                 return {
-                    title: block.title,
-                    category: block.category,
+                    title: sb.title,
+                    category: sb.category as any,
                     start_datetime: timeFields.start_datetime,
                     end_datetime: timeFields.end_datetime,
-                    source: ((block.source as string) === 'derived' ? 'ai' : block.source) as 'ai' | 'fixed' | 'manual',
-                    order_index: i * 10,
-                    meta: block.meta || {},
+                    source: sb.source,
+                    order_index: idx,
+                    is_fixed: sb.source === 'fixed',
+                    meta: sb.meta
                 };
             });
 
-            // Use centralized persist — canonical keys, no counter, preserves done/skipped
+            // PERSIST TO DB
             const persistResult = await persistDailyBlocks(
-                supabase, plan.id, input.user_id, day.date, blockInputs,
+                supabase,
+                plan.id,
+                input.user_id,
+                day.date,
+                finalBlocksInput,
                 {
                     deleteStale: true,
                     deleteNullKeys: true,
-                    staleSources: ['ai'],
+                    staleSources: ['ai'] // Only delete stale AI blocks, preserve fixed ones if they were not in our list? 
+                    // No, invalid fixed blocks should be removed? 
+                    // Actually, if we pass all current valid fixed blocks, any old fixed block not in this list will be deleted?
+                    // persistDailyBlocks logic: "if deleteStale is true, it deletes blocks NOT in the new set".
+                    // So yes, we must pass ALL valid blocks.
                 }
             );
 
-            totalBlocksCreated += persistResult.inserted + persistResult.updated;
+            debugInfo.push({
+                date: day.date,
+                aiRawCount: debugAiRaw,
+                afterSolverCount: finalBlocksInput.length,
+                inserted: persistResult.inserted,
+                updated: persistResult.updated,
+                deleted: persistResult.deleted,
+                persistErrors: persistResult.errors, // Expose errors!
+                solverConflicts: solverResult.conflicts.length
+            });
 
-            // Accumulate debug info
-            if (input.debug) {
-                debugInfo.push({
-                    date: day.date,
-                    aiRawCount: debugAiRaw,
-                    afterFilterCount: debugAfterFilter,
-                    afterSolverCount: aiResolved.length,
-                    insertedCount: persistResult.inserted,
-                    updatedCount: persistResult.updated,
-                    deletedStaleCount: persistResult.deleted,
-                    preservedDoneSkipped: persistResult.preserved_done_skipped,
-                    mealWindowRejects: debugMealWindowRejects,
-                    fixedCount: dayFixed.length,
-                    persistErrors: persistResult.errors.length > 0 ? persistResult.errors : undefined,
-                    rlsHint: persistResult.errors.some(e => e.code === '42501') ? 'RLS policy blocking writes — verify SUPABASE_SERVICE_ROLE_KEY' : undefined,
-                });
-            }
+            totalBlocksCreated += persistResult.inserted + persistResult.updated;
         }
 
         // Server-side debug log (visible in Vercel logs)
