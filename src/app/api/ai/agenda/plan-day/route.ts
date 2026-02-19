@@ -318,7 +318,8 @@ export async function POST(request: NextRequest) {
                 ...b,
                 category: b.category as any, // Cast string to enum
                 start_time: b.start_time,
-                end_time: b.end_time
+                end_time: b.end_time,
+                energyLevel: b.energyLevel as 'low' | 'medium' | 'high' | undefined
             }));
 
             const confirmedInputs = processAndSolveBlocks(rawPlanBlocks, dateStr, input.timezone, fixedInputs);
