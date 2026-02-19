@@ -23,7 +23,7 @@ export interface BlockInput {
     skip_reason?: string;
     done_at?: string;
     meta?: Record<string, unknown>;
-    description?: string;
+    // description?: string; // Removed until schema migration
 }
 
 export interface PersistError {
@@ -186,6 +186,7 @@ export async function persistDailyBlocks(
                 order_index: block.order_index,
                 meta: { ...(existing.meta || {}), ...(block.meta || {}) },
                 updated_at: new Date().toISOString(),
+                // Explicitly excluding description until schema migration
             };
 
             if (preserveStatus) {
@@ -216,25 +217,28 @@ export async function persistDailyBlocks(
             }
         } else {
             // INSERT
+            // STRICT WHITELIST to prevent PGRST204 (column not found)
+            const insertPayload = {
+                plan_id: planId,
+                user_id: userId,
+                title: block.title,
+                // description: block.description || null, // Removed until schema migration
+                category: block.category,
+                start_datetime: block.start_datetime,
+                end_datetime: block.end_datetime,
+                source: block.source,
+                order_index: block.order_index,
+                is_done: block.is_done ?? false,
+                is_skipped: block.is_skipped ?? false,
+                skip_reason: block.skip_reason || null,
+                done_at: block.done_at || null,
+                meta: block.meta || {},
+                idempotency_key: block.idempotency_key,
+            };
+
             const { error } = await supabase
                 .from('daily_blocks')
-                .insert({
-                    plan_id: planId,
-                    user_id: userId,
-                    title: block.title,
-                    description: block.description || null,
-                    category: block.category,
-                    start_datetime: block.start_datetime,
-                    end_datetime: block.end_datetime,
-                    source: block.source,
-                    order_index: block.order_index,
-                    is_done: block.is_done ?? false,
-                    is_skipped: block.is_skipped ?? false,
-                    skip_reason: block.skip_reason || null,
-                    done_at: block.done_at || null,
-                    meta: block.meta || {},
-                    idempotency_key: block.idempotency_key,
-                });
+                .insert(insertPayload);
 
             if (error) {
                 errors.push({ operation: 'insert', key: block.idempotency_key, code: error.code, message: error.message, hint: error.hint || (error.code === '42501' ? 'RLS policy denied INSERT — use service role key' : undefined) });
