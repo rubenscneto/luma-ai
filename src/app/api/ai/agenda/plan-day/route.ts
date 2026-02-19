@@ -4,6 +4,9 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
 import { AGENDA_PLANNER_SYSTEM_PROMPT, buildPlanDayPrompt, buildABPlanPrompt } from '@/ai/prompts/agendaPrompts';
 import { persistDailyBlocks, BlockInput } from '@/lib/persistDailyBlocks';
+import { solveTimeline, dailyBlockToSolverBlock, solverBlockToTimeFields, SolverBlock } from '@/lib/timelineSolver';
+import { splitOvernightBlocks } from '@/lib/overnightSplit';
+import { validateMealWindow } from '@/lib/mealWindows';
 import { timeToTimestamptz } from '@/lib/mealWindows';
 
 // Force dynamic to avoid static generation issues
@@ -175,11 +178,101 @@ async function generateAIBlocks(genAI: GoogleGenerativeAI, systemPrompt: string,
 
     const responseText = result.response.text();
     try {
-        return aiResponseSchema.parse(JSON.parse(responseText));
+        const cleanJson = responseText.replace(/```json\n?|```/g, '').trim();
+        return aiResponseSchema.parse(JSON.parse(cleanJson));
     } catch (parseError) {
         console.error('AI response parse error:', parseError);
         return { blocks: [], summary: 'Não foi possível gerar sugestões.', insight: undefined };
     }
+}
+
+// Helper: Process AI blocks -> Split Overnight -> Solve Conflicts -> Return BlockInput[]
+function processAndSolveBlocks(
+    aiBlocks: z.infer<typeof aiBlockSchema>[],
+    dateStr: string,
+    timezone: string,
+    fixedInputs: BlockInput[]
+): BlockInput[] {
+    // 1. Convert to BlockInput (raw)
+    const rawInputs: BlockInput[] = aiBlocks.map((b, idx) => ({
+        title: b.title,
+        category: b.category,
+        start_datetime: timeToDatetime(dateStr, b.start_time, timezone),
+        end_datetime: timeToDatetime(dateStr, b.end_time, timezone),
+        source: 'ai',
+        meta: {
+            suggested_reason: b.suggested_reason,
+            energyLevel: b.energyLevel
+        }
+    }));
+
+    // 2. Split Overnight (keep only today's portion for plan-day)
+    const { today: todayInputs } = splitOvernightBlocks(rawInputs, dateStr);
+
+    // 3. Prepare Solver
+    const fixedSolverBlocks: SolverBlock[] = fixedInputs.map(fb => ({
+        id: `fixed-${fb.order_index}`,
+        title: fb.title,
+        category: fb.category || 'fixed',
+        startMin: extractTimeMinutes(fb.start_datetime),
+        endMin: extractTimeMinutes(fb.end_datetime),
+        source: 'fixed',
+        priority: 100,
+        locked: true
+    }));
+
+    const aiSolverBlocks: SolverBlock[] = todayInputs.map((b, idx) => {
+        let startMin = extractTimeMinutes(b.start_datetime);
+        let endMin = extractTimeMinutes(b.end_datetime);
+
+        // Validate meal window
+        if (b.category === 'meal') {
+            const mealCheck = validateMealWindow(b.title, startMin);
+            if (mealCheck.window && !mealCheck.valid) {
+                startMin = mealCheck.nearestSlot;
+                const duration = endMin - extractTimeMinutes(b.start_datetime);
+                endMin = startMin + duration;
+            }
+        }
+
+        return {
+            id: `ai-${idx}`,
+            title: b.title,
+            category: b.category,
+            startMin,
+            endMin,
+            source: 'ai',
+            priority: b.category === 'meal' ? 70 : 50,
+            canShorten: true,
+            minDuration: 15,
+            meta: b.meta
+        };
+    });
+
+    // 4. Solve
+    const result = solveTimeline([...fixedSolverBlocks, ...aiSolverBlocks]);
+
+    // 5. Convert back to BlockInput (excluding fixed)
+    return result.resolved
+        .filter(sb => sb.source !== 'fixed')
+        .map((sb, idx) => {
+            const timeFields = solverBlockToTimeFields(sb, dateStr, timezone);
+            return {
+                title: sb.title,
+                category: sb.category as any,
+                start_datetime: timeFields.start_datetime,
+                end_datetime: timeFields.end_datetime,
+                source: 'ai',
+                order_index: fixedInputs.length + idx, // Append after fixed
+                meta: sb.meta
+            };
+        });
+}
+
+function extractTimeMinutes(dt: string): number {
+    const match = dt.match(/T(\d{2}):(\d{2})/);
+    if (match) return parseInt(match[1]) * 60 + parseInt(match[2]);
+    return 0;
 }
 
 export async function POST(request: NextRequest) {
@@ -218,19 +311,22 @@ export async function POST(request: NextRequest) {
             // Build fixed + confirmed blocks
             const fixedInputs = buildFixedBlockInputs(dateStr, input.timezone, context.fixedBlocks, existingBlocks || []);
 
+            // Process and Solve (Split overnight, resolve conflicts)
             let orderIndex = fixedInputs.length;
-            const confirmedInputs: BlockInput[] = input.plan_blocks.map(block => ({
-                title: block.title,
-                category: block.category,
-                start_datetime: timeToDatetime(dateStr, block.start_time, input.timezone),
-                end_datetime: timeToDatetime(dateStr, block.end_time, input.timezone),
-                source: 'ai' as const,
-                order_index: orderIndex++,
-                meta: {
-                    suggested_reason: block.suggested_reason,
-                    created_via: `confirm_plan_${input.selected_plan}`,
-                },
+            // Map input blocks to schema format for helper
+            const rawPlanBlocks = input.plan_blocks.map(b => ({
+                ...b,
+                category: b.category as any, // Cast string to enum
+                start_time: b.start_time,
+                end_time: b.end_time
             }));
+
+            const confirmedInputs = processAndSolveBlocks(rawPlanBlocks, dateStr, input.timezone, fixedInputs);
+
+            // Add confirming meta
+            confirmedInputs.forEach(b => {
+                b.meta = { ...b.meta, created_via: `confirm_plan_${input.selected_plan}` };
+            });
 
             // Persist all blocks with stale cleanup (replaces old AI blocks)
             const persistResult = await persistDailyBlocks(
@@ -311,19 +407,36 @@ export async function POST(request: NextRequest) {
                 ),
             ]);
 
+            // Build temp fixed inputs for solver
+            const fixedInputs = buildFixedBlockInputs(dateStr, input.timezone, context.fixedBlocks, existingBlocks || []);
+
+            // Solve both plans
+            const solvedA = processAndSolveBlocks(planAResult.blocks, dateStr, input.timezone, fixedInputs);
+            const solvedB = processAndSolveBlocks(planBResult.blocks, dateStr, input.timezone, fixedInputs);
+
+            // Convert back to simple response format
+            const toResponseFormat = (inputs: BlockInput[]) => inputs.map(b => ({
+                title: b.title,
+                category: b.category,
+                start_time: b.start_datetime.split('T')[1].slice(0, 5),
+                end_time: b.end_datetime.split('T')[1].slice(0, 5),
+                suggested_reason: b.meta?.suggested_reason,
+                energyLevel: b.meta?.energyLevel
+            }));
+
             return NextResponse.json({
                 success: true,
                 mode: 'generate_ab',
                 plan_id: planId,
                 date: dateStr,
                 planA: {
-                    blocks: planAResult.blocks,
+                    blocks: toResponseFormat(solvedA),
                     summary: planAResult.summary,
                     insight: planAResult.insight,
                     style: 'focused' as const,
                 },
                 planB: {
-                    blocks: planBResult.blocks,
+                    blocks: toResponseFormat(solvedB),
                     summary: planBResult.summary,
                     insight: planBResult.insight,
                     style: 'balanced' as const,
@@ -369,26 +482,20 @@ export async function POST(request: NextRequest) {
 
         // Build AI block inputs
         if (aiBlocks.blocks.length > 0) {
-            let orderIndex = fixedInputs.length;
-            const aiInputs: BlockInput[] = aiBlocks.blocks.map(block => ({
-                title: block.title,
-                category: block.category,
-                start_datetime: timeToDatetime(dateStr, block.start_time, input.timezone),
-                end_datetime: timeToDatetime(dateStr, block.end_time, input.timezone),
-                source: 'ai' as const,
-                order_index: orderIndex++,
-                meta: {
-                    suggested_reason: block.suggested_reason,
-                    created_via: 'plan_day',
-                },
-            }));
+            // Process and Solve
+            const aiInputs = processAndSolveBlocks(aiBlocks.blocks, dateStr, input.timezone, fixedInputs);
+
+            // Add meta
+            aiInputs.forEach(b => {
+                b.meta = { ...b.meta, created_via: 'plan_day' };
+            });
 
             // Persist all (fixed + AI) with stale cleanup for AI blocks only
             const persistResult = await persistDailyBlocks(
                 supabase, planId, input.user_id, dateStr,
                 [...fixedInputs, ...aiInputs],
                 {
-                    deleteStale: input.mode === 'regenerate',
+                    deleteStale: true, // Always clean up old AI blocks when replanning
                     deleteNullKeys: true,
                     staleSources: ['ai'],
                 }

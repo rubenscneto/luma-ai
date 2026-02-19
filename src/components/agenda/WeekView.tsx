@@ -104,6 +104,7 @@ export default function WeekView() {
     }, []);
 
     const handlePlanWeek = async () => {
+        if (isWeekLoading) return;
         if (!user) {
             toast.error('Usuário não autenticado.');
             return;

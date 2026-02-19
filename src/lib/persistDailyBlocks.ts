@@ -127,6 +127,29 @@ export async function persistDailyBlocks(
         staleSources,
     } = options;
 
+    // PROTECTION: Do not run stale delete if list is empty (unless intentional?)
+    // User requested explicit check to avoid data loss on empty AI response.
+    if (blocks.length === 0) {
+        console.warn(
+            '[persistDailyBlocks] ABORT — lista vazia para plan',
+            planId, dateStr,
+            '— stale delete NÃO executado para evitar perda de dados.'
+        );
+        const { data: currentBlocks } = await supabase
+            .from('daily_blocks')
+            .select('*')
+            .eq('plan_id', planId)
+            .order('start_datetime', { ascending: true });
+        return {
+            inserted: 0,
+            updated: 0,
+            deleted: 0,
+            preserved_done_skipped: 0,
+            blocks: currentBlocks || [],
+            errors: [],
+        };
+    }
+
     let inserted = 0;
     let updated = 0;
     let deleted = 0;

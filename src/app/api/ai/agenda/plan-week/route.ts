@@ -7,6 +7,7 @@ import { solveTimeline, dailyBlockToSolverBlock, solverBlockToTimeFields, Solver
 import { processDerivedBlocks } from '@/lib/derivedBlocks';
 import { validateMealWindow, normalizeForComparison } from '@/lib/mealWindows';
 import { persistDailyBlocks, BlockInput } from '@/lib/persistDailyBlocks';
+import { splitOvernightBlocks } from '@/lib/overnightSplit';
 
 export const dynamic = 'force-dynamic';
 
@@ -192,7 +193,10 @@ Responda EXCLUSIVAMENTE em JSON válido:
   "weekInsight": "Dica/insight motivacional"
 }`;
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const model = genAI.getGenerativeModel({
+            model: 'gemini-2.0-flash',
+            generationConfig: { responseMimeType: 'application/json' }
+        });
         const result = await model.generateContent({
             contents: [
                 { role: 'user', parts: [{ text: AGENDA_PLANNER_SYSTEM_PROMPT }] },
@@ -203,13 +207,28 @@ Responda EXCLUSIVAMENTE em JSON válido:
 
         const responseText = result.response.text();
 
-        // Extract JSON from response
-        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-            return NextResponse.json({ error: 'Resposta da IA não contém JSON válido.' }, { status: 400 });
+        // Enhanced Error Handling for JSON Parsing
+        let parsed: any;
+        try {
+            // Remove markdown code blocks if present (Gemini sometimes adds ```json ... ```)
+            const cleanJson = responseText.replace(/```json\n?|```/g, '').trim();
+            parsed = JSON.parse(cleanJson);
+        } catch (e) {
+            const aiTextSnippet = responseText.slice(0, 500); // Capture start of response for debug
+            console.error('AI JSON Parse Error:', e);
+            console.error('AI Raw Text:', responseText);
+            return NextResponse.json(
+                {
+                    error: 'AI_JSON_PARSE_FAILED',
+                    details: 'A IA não retornou um JSON válido.',
+                    parseError: String(e),
+                    aiTextSnippet,
+                    requestId: request.headers.get('x-request-id') || 'unknown'
+                },
+                { status: 500 }
+            );
         }
 
-        const parsed = JSON.parse(jsonMatch[0]);
         const validated = aiWeekResponseSchema.safeParse(parsed);
 
         if (!validated.success) {
@@ -222,8 +241,10 @@ Responda EXCLUSIVAMENTE em JSON válido:
         const solverWarnings: string[] = [];
         const debugInfo: any[] = [];
 
-        // Initialize overflow blocks from previous day (for overnight handling)
-        let nextDayOverflows: SolverBlock[] = [];
+        // Initialize overflow blocks from previous day (for overnight processing)
+        // We use BlockInput[] to carry over full block data including priority/meta if we want,
+        // but here we primarily need basic info.
+        let nextDayOverflows: BlockInput[] = [];
 
         // Process each day
         for (const [dayIdx, day] of weekPlan.days.entries()) {
@@ -266,61 +287,69 @@ Responda EXCLUSIVAMENTE em JSON válido:
                 locked: true, // Fixed blocks are immutable in time
             }));
 
-            // Filter and Convert AI blocks
-            // Start with overflows from previous day
-            const aiSolverBlocks: SolverBlock[] = [...nextDayOverflows];
-            nextDayOverflows = []; // Reset for this day's output
+            // 1. Prepare AI blocks + Overflows as BlockInputs
+            // We convert everything to BlockInput first to use the overnight utility
+            const rawDayInputs: BlockInput[] = [];
 
-            for (const [idx, b] of day.blocks.entries()) {
-                let startMin = timeToMinutes(b.start_time);
-                let endMin = timeToMinutes(b.end_time);
+            // Add overflows from previous day
+            rawDayInputs.push(...nextDayOverflows);
 
-                // OVERNIGHT HANDLING: end <= start means block crosses midnight
-                // Split into 2 blocks:
-                // 1. Current day: start -> 23:59 (truncated)
-                // 2. Next day: 00:00 -> end (added to nextDayOverflows)
-                if (endMin <= startMin) {
-                    solverWarnings.push(`${day.date}: Bloco "${b.title}" (${b.start_time}-${b.end_time}) cruza meia-noite. Dividindo.`);
+            // Add new AI blocks
+            day.blocks.forEach((b, idx) => {
+                rawDayInputs.push({
+                    title: b.title,
+                    category: b.category as any,
+                    start_datetime: `${day.date}T${b.start_time}:00`,
+                    end_datetime: `${day.date}T${b.end_time}:00`,
+                    source: 'ai',
+                    meta: {
+                        energyLevel: b.energyLevel,
+                        suggestedReason: b.suggested_reason,
+                        originalTime: `${b.start_time}-${b.end_time}`
+                    }
+                });
+            });
 
-                    // Create overflow block for next day
-                    nextDayOverflows.push({
-                        id: `overflow-${dayIdx}-${idx}`,
-                        title: `${b.title} (Cont.)`,
-                        category: b.category,
-                        startMin: 0,
-                        endMin: endMin, // original end time matches minutes from 00:00
-                        source: 'ai' as const,
-                        priority: b.category === 'meal' ? 70 : 60,
-                        canShorten: true,
-                        minDuration: b.category === 'meal' ? 15 : 20,
-                        meta: { energyLevel: b.energyLevel, suggestedReason: b.suggested_reason }
-                    });
+            // 2. Split Overnight Blocks
+            const { today: todayInputs, nextDay: newNextDayOverflows } = splitOvernightBlocks(rawDayInputs, day.date);
+            nextDayOverflows = newNextDayOverflows; // Update for next iteration
 
-                    // Truncate current block
-                    endMin = 23 * 60 + 59;
-                }
+            // 3. Convert to SolverBlocks and Apply Logic (Meal Windows, Conflicts)
+            const aiSolverBlocks: SolverBlock[] = [];
 
-                // 1. Meal window enforcement
+            for (const [idx, b] of todayInputs.entries()) {
+                let startMin = extractTimeMinutes(b.start_datetime);
+                let endMin = extractTimeMinutes(b.end_datetime);
+
+                // Re-calculate endMin if it wrapped to next day (should be 23:59 from split utility)
+                // The utility ensures end_datetime is set correctly for today.
+                // But we need to handle the case where 23:59:00 IS the end.
+                // extractTimeMinutes handles standard HH:MM.
+
+                // 1. Meal window enforcement (Only for meals)
                 if (b.category === 'meal') {
                     const mealCheck = validateMealWindow(b.title, startMin);
                     if (mealCheck.window && !mealCheck.valid) {
-                        solverWarnings.push(`${day.date}: Refeição "${b.title}" movida de ${b.start_time} para ${minutesToTimeStr(mealCheck.nearestSlot)} (janela: ${mealCheck.window.label}).`);
+                        solverWarnings.push(`${day.date}: Refeição "${b.title}" movida de ${minutesToTimeStr(startMin)} para ${minutesToTimeStr(mealCheck.nearestSlot)} (janela: ${mealCheck.window.label}).`);
                         startMin = mealCheck.nearestSlot;
+                        // Duration needs to be preserved?
+                        const duration = endMin - extractTimeMinutes(b.start_datetime);
+                        endMin = startMin + duration;
                         debugMealWindowRejects++;
                     }
                 }
 
                 // 2. Check for overlapping Fixed Block
-                const adjustedEnd = startMin + (endMin - timeToMinutes(b.start_time));
+                // Note: endMin could be < startMin if raw data was weird, but overnight splitter fixed that?
+                // Actually overnight splitter fixes crossing midnight.
+                // We trust startMin < endMin for "today" blocks now.
+
                 const overlapsFixed = fixedSolverBlocks.some(fb =>
-                    !(adjustedEnd <= fb.startMin || startMin >= fb.endMin)
+                    !(endMin <= fb.startMin || startMin >= fb.endMin)
                 );
 
                 if (overlapsFixed) {
-                    // Skip this AI block if it conflicts with a fixed block
-                    // The solver can handle it, but we prefer to drop 'optional' AI blocks that blatantly clash
-                    // However, we'll let the solver try to move it unless it's strictly impossible.
-                    // For now, let's include it but the solver will likely move it or shrink it.
+                    // Optional: Decide to drop or keep. Currently keeping for solver to fix.
                 }
 
                 aiSolverBlocks.push({
@@ -328,15 +357,12 @@ Responda EXCLUSIVAMENTE em JSON válido:
                     title: b.title,
                     category: b.category,
                     startMin: startMin,
-                    endMin: adjustedEnd, // Use adjusted duration
+                    endMin: endMin,
                     source: 'ai' as const,
-                    priority: b.category === 'meal' ? 70 : 50, // Meals have higher priority
+                    priority: b.category === 'meal' ? 70 : 50,
                     canShorten: true,
-                    minDuration: b.category === 'meal' ? 15 : 15, // Minimum 15 mins
-                    meta: {
-                        energyLevel: b.energyLevel,
-                        suggestedReason: b.suggested_reason
-                    }
+                    minDuration: b.category === 'meal' ? 15 : 15,
+                    meta: b.meta
                 });
                 debugAfterFilter++;
             }
@@ -350,12 +376,8 @@ Responda EXCLUSIVAMENTE em JSON válido:
             }
 
             // Convert back to BlockInput for persistence
-            // Only take 'resolved' blocks that are NOT fixed (we re-persist fixed ones anyway? NO, we only persist AI ones + Fixed ones properly)
-            // Actually persistDailyBlocks expects ALL blocks for the day to handle 'deleteStale' correctly.
-            // So we must include Fixed blocks too.
-
             const finalBlocksInput: BlockInput[] = solverResult.resolved
-                .filter(sb => sb.source !== 'fixed') // User requested: don't persist fixed blocks blocks to daily_blocks
+                .filter(sb => sb.source !== 'fixed')
                 .map((sb, idx) => {
                     const timeFields = solverBlockToTimeFields(sb, day.date, input.timezone);
                     return {
@@ -380,11 +402,7 @@ Responda EXCLUSIVAMENTE em JSON válido:
                 {
                     deleteStale: true,
                     deleteNullKeys: true,
-                    staleSources: ['ai'] // Only delete stale AI blocks, preserve fixed ones if they were not in our list? 
-                    // No, invalid fixed blocks should be removed? 
-                    // Actually, if we pass all current valid fixed blocks, any old fixed block not in this list will be deleted?
-                    // persistDailyBlocks logic: "if deleteStale is true, it deletes blocks NOT in the new set".
-                    // So yes, we must pass ALL valid blocks.
+                    staleSources: ['ai']
                 }
             );
 
@@ -395,7 +413,7 @@ Responda EXCLUSIVAMENTE em JSON válido:
                 inserted: persistResult.inserted,
                 updated: persistResult.updated,
                 deleted: persistResult.deleted,
-                persistErrors: persistResult.errors, // Expose errors!
+                persistErrors: persistResult.errors,
                 solverConflicts: solverResult.conflicts.length
             });
 
@@ -428,6 +446,19 @@ Responda EXCLUSIVAMENTE em JSON válido:
             { status: 500 }
         );
     }
+}
+
+// Helper to extract minutes from ISO datetime or HH:MM
+function extractTimeMinutes(dtOrTime: string): number {
+    if (dtOrTime.includes('T')) {
+        // ISO string
+        const match = dtOrTime.match(/T(\d{2}):(\d{2})/);
+        if (match) return parseInt(match[1]) * 60 + parseInt(match[2]);
+        return 0;
+    }
+    // HH:MM
+    const [h, m] = dtOrTime.split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
 }
 
 function timeToMinutes(time: string): number {

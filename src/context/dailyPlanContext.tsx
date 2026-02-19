@@ -171,15 +171,7 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
                     new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime()
                 );
 
-                try {
-                    const solverBlocks = allBlocks.map(b => dailyBlockToSolverBlock(b as any));
-                    const result = solveTimeline(solverBlocks);
-                    if (result.conflicts.length > 0) {
-                        console.warn('[TimelineSolver] Overlaps detected on load:', result.conflicts.map(c => c.reason));
-                    }
-                } catch (e) {
-                    console.warn('[TimelineSolver] Check failed:', e);
-                }
+
 
                 setTodayBlocks(allBlocks);
             } else {
