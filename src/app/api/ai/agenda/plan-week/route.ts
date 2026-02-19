@@ -55,11 +55,19 @@ export async function POST(request: NextRequest) {
         const input = planWeekInputSchema.parse(body);
 
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
         const geminiKey = process.env.GEMINI_API_KEY;
 
         if (!supabaseUrl || !supabaseKey || !geminiKey) {
-            return NextResponse.json({ error: 'Configuração do servidor incompleta.' }, { status: 500 });
+            const missing = [
+                !supabaseUrl && 'SUPABASE_URL',
+                !supabaseKey && 'SUPABASE_SERVICE_ROLE_KEY',
+                !geminiKey && 'GEMINI_API_KEY',
+            ].filter(Boolean).join(', ');
+            return NextResponse.json(
+                { error: `Configuração do servidor incompleta. Faltando: ${missing}`, rlsHint: !supabaseKey ? 'SUPABASE_SERVICE_ROLE_KEY is required for writes — anon key is blocked by RLS' : undefined },
+                { status: 500 }
+            );
         }
 
         const supabase = createClient(supabaseUrl, supabaseKey);
@@ -75,12 +83,16 @@ export async function POST(request: NextRequest) {
         });
 
         // Load user's fixed blocks for all relevant days
-        const { data: allFixedBlocks } = await supabase
+        const { data: allFixedBlocks, error: fixedError } = await supabase
             .from('fixed_blocks')
             .select('*')
             .eq('user_id', input.user_id)
             .eq('is_active', true)
             .in('day_of_week', daysOfWeek);
+
+        if (input.debug) {
+            console.log(`[plan-week] DEBUG: Fetched ${allFixedBlocks?.length || 0} fixed blocks. Error: ${fixedError?.message}`);
+        }
 
         // Load user profile
         const { data: profile } = await supabase
@@ -248,7 +260,15 @@ Responda EXCLUSIVAMENTE em JSON válido:
             const aiSolverBlocks: SolverBlock[] = [];
             for (const [idx, b] of day.blocks.entries()) {
                 let startMin = timeToMinutes(b.start_time);
-                const endMin = timeToMinutes(b.end_time);
+                let endMin = timeToMinutes(b.end_time);
+
+                // OVERNIGHT HANDLING: end <= start means block crosses midnight
+                // (e.g. "Dormir" 23:00-07:00)
+                // Cap at 23:59 for same-day representation
+                if (endMin <= startMin) {
+                    solverWarnings.push(`${day.date}: Bloco "${b.title}" (${b.start_time}-${b.end_time}) cruza meia-noite — truncado para 23:59.`);
+                    endMin = 23 * 60 + 59; // 23:59
+                }
 
                 // 1. Meal window enforcement
                 if (b.category === 'meal') {
@@ -353,6 +373,8 @@ Responda EXCLUSIVAMENTE em JSON válido:
                     preservedDoneSkipped: persistResult.preserved_done_skipped,
                     mealWindowRejects: debugMealWindowRejects,
                     fixedCount: dayFixed.length,
+                    persistErrors: persistResult.errors.length > 0 ? persistResult.errors : undefined,
+                    rlsHint: persistResult.errors.some(e => e.code === '42501') ? 'RLS policy blocking writes — verify SUPABASE_SERVICE_ROLE_KEY' : undefined,
                 });
             }
         }

@@ -27,12 +27,21 @@ export interface BlockInput {
     description?: string;
 }
 
+export interface PersistError {
+    operation: 'select' | 'insert' | 'update' | 'delete';
+    key?: string;
+    code?: string;
+    message: string;
+    hint?: string;
+}
+
 export interface PersistResult {
     inserted: number;
     updated: number;
     deleted: number;
     preserved_done_skipped: number;
     blocks: any[]; // final blocks in DB
+    errors: PersistError[];
 }
 
 export interface PersistOptions {
@@ -123,6 +132,7 @@ export async function persistDailyBlocks(
     let updated = 0;
     let deleted = 0;
     let preserved_done_skipped = 0;
+    const errors: PersistError[] = [];
 
     // 1. Generate keys for all incoming blocks
     const blocksWithKeys = blocks.map((block, idx) => ({
@@ -139,10 +149,15 @@ export async function persistDailyBlocks(
     const dedupedBlocks = Array.from(keyMap.values());
 
     // 2. Load existing blocks for this plan
-    const { data: existingBlocks } = await supabase
+    const { data: existingBlocks, error: selectError } = await supabase
         .from('daily_blocks')
         .select('*')
         .eq('plan_id', planId);
+
+    if (selectError) {
+        errors.push({ operation: 'select', code: selectError.code, message: selectError.message, hint: selectError.hint || 'RLS may be blocking SELECT — check service role key' });
+        console.error('[persistDailyBlocks] SELECT error:', selectError.message, selectError.code, selectError.hint);
+    }
 
     const existingByKey = new Map<string, any>();
     const existingNullKey: any[] = [];
@@ -189,12 +204,17 @@ export async function persistDailyBlocks(
                 if (block.is_skipped !== undefined) updateFields.is_skipped = block.is_skipped;
             }
 
-            await supabase
+            const { error: updateError } = await supabase
                 .from('daily_blocks')
                 .update(updateFields)
                 .eq('id', existing.id);
 
-            updated++;
+            if (updateError) {
+                errors.push({ operation: 'update', key: block.idempotency_key, code: updateError.code, message: updateError.message, hint: updateError.hint });
+                console.error('[persistDailyBlocks] UPDATE error:', updateError.message, block.idempotency_key);
+            } else {
+                updated++;
+            }
         } else {
             // INSERT
             const { error } = await supabase
@@ -218,8 +238,12 @@ export async function persistDailyBlocks(
                     idempotency_key: block.idempotency_key,
                 });
 
-            if (!error) inserted++;
-            else console.error('[persistDailyBlocks] Insert error:', error.message, block.idempotency_key);
+            if (error) {
+                errors.push({ operation: 'insert', key: block.idempotency_key, code: error.code, message: error.message, hint: error.hint || (error.code === '42501' ? 'RLS policy denied INSERT — use service role key' : undefined) });
+                console.error('[persistDailyBlocks] INSERT error:', error.code, error.message, block.idempotency_key);
+            } else {
+                inserted++;
+            }
         }
     }
 
@@ -274,6 +298,7 @@ export async function persistDailyBlocks(
         deleted,
         preserved_done_skipped,
         blocks: finalBlocks || [],
+        errors,
     };
 }
 
