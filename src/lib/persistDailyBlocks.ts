@@ -23,7 +23,6 @@ export interface BlockInput {
     skip_reason?: string;
     done_at?: string;
     meta?: Record<string, unknown>;
-    ai_suggested?: boolean;
     description?: string;
 }
 
@@ -233,7 +232,6 @@ export async function persistDailyBlocks(
                     is_skipped: block.is_skipped ?? false,
                     skip_reason: block.skip_reason || null,
                     done_at: block.done_at || null,
-                    ai_suggested: block.source === 'ai' || block.source === 'ai_health',
                     meta: block.meta || {},
                     idempotency_key: block.idempotency_key,
                 });
