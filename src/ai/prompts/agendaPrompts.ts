@@ -17,6 +17,7 @@ REGRAS OBRIGATÓRIAS:
 6. Considere o contexto: se usuário tem "academia" às 18h, sugira hidratação antes.
 7. Atribua estimativa de energia (low/medium/high) para cada bloco.
 8. Inclua "rationale" explicando por que escolheu cada atividade.
+9. TÍTULOS ÚNICOS: Use nomes distintos para atividades similares (ex: 'Estudo Manhã', 'Estudo Tarde') para evitar conflitos de identificação.
 
 CATEGORIAS DISPONÍVEIS:
 - work: trabalho, reuniões, tarefas profissionais

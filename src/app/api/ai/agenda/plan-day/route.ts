@@ -252,9 +252,21 @@ function processAndSolveBlocks(
     // 4. Solve
     const result = solveTimeline([...fixedSolverBlocks, ...aiSolverBlocks]);
 
-    // 5. Convert back to BlockInput (excluding fixed)
+    // 5. Convert back to BlockInput (excluding fixed and out-of-bounds)
+    const USEFUL_START = 5 * 60;   // 05:00
+    const USEFUL_END = 23 * 60;  // 23:00
+
     return result.resolved
-        .filter(sb => sb.source !== 'fixed')
+        .filter(sb => {
+            if (sb.source === 'fixed') return false;
+            if (sb.category === 'sleep') return true;
+
+            // Blocos fora da janela útil são descartados
+            if (sb.endMin <= USEFUL_START || sb.startMin >= USEFUL_END) {
+                return false;
+            }
+            return true;
+        })
         .map((sb, idx) => {
             const timeFields = solverBlockToTimeFields(sb, dateStr, timezone);
             return {
@@ -287,8 +299,12 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         const input = planDayInputSchema.parse(body);
 
-        const today = new Date();
-        const dateStr = input.date || today.toISOString().split('T')[0];
+        const now = new Date();
+        const dateStr = input.date || now.toISOString().split('T')[0];
+
+        if (!input.date) {
+            console.warn('[plan-day] date não fornecida — usando hoje como fallback:', dateStr);
+        }
         const dayOfWeek = getDayOfWeek(dateStr);
 
         // ========================================

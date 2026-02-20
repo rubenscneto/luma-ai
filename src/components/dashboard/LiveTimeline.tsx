@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
 export function LiveTimeline() {
-    const { currentBlock, nextBlock, todayBlocks, isLoading, generatePlan, todayPlan, replanDay } = useDailyPlan();
+    const { currentBlock, nextBlock, todayBlocks, isLoading, generatePlan, todayPlan, replanDay, selectedDate } = useDailyPlan();
     const [now, setNow] = useState(new Date());
     const [isReplanning, setIsReplanning] = useState(false);
 
@@ -80,7 +80,8 @@ export function LiveTimeline() {
                     <p className="text-white/60 mb-4">Nenhum plano para hoje</p>
                     <button
                         onClick={() => generatePlan()}
-                        className="px-4 py-2 rounded-lg bg-brand-primary hover:bg-brand-primary/90 text-white text-sm font-medium transition-colors"
+                        disabled={isLoading || !selectedDate}
+                        className="px-4 py-2 rounded-lg bg-brand-primary hover:bg-brand-primary/90 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         Gerar Plano
                     </button>

@@ -89,13 +89,19 @@ export function generateCanonicalKey(block: BlockInput, dateStr: string): string
         return `meal::${mealType}::${dateStr}`;
     }
 
-    // 3. Everything else — source::category::normalized_title::start_time
+    // 3. Everything else
     const normalized = normalizeForComparison(block.title)
         .replace(/\s+/g, '_')
         .replace(/[^a-z0-9_]/g, '')
         .substring(0, 60); // cap length
 
     const startTime = extractTimeFromDatetime(block.start_datetime);
+
+    // Para blocos 'ai': chave sem horário (estável mesmo após solver mover)
+    // Para blocos 'manual': mantém horário (usuário colocou intencionalmente)
+    if (block.source === 'ai') {
+        return `${block.source}::${block.category}::${normalized}`;
+    }
 
     return `${block.source}::${block.category}::${normalized}::${startTime}`;
 }

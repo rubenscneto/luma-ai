@@ -375,8 +375,27 @@ Responda EXCLUSIVAMENTE em JSON válido:
                 solverWarnings.push(...solverResult.conflicts.map(c => `${day.date}: ${c.reason}`));
             }
 
+            // Remover blocos que o solver empurrou para fora da janela útil
+            // (antes das 05:00 ou depois das 23:00 para blocos não-sono e não-fixos)
+            const USEFUL_START = 5 * 60;   // 05:00
+            const USEFUL_END = 23 * 60;  // 23:00
+
+            const filteredResolved = solverResult.resolved.filter(sb => {
+                if (sb.source === 'fixed') return true;
+                if (sb.category === 'sleep') return true;
+
+                // Blocos fora da janela útil são descartados (não persistidos)
+                if (sb.endMin <= USEFUL_START || sb.startMin >= USEFUL_END) {
+                    solverWarnings.push(
+                        `${day.date}: '${sb.title}' descartado — fora da janela útil (${minutesToTimeStr(sb.startMin)}-${minutesToTimeStr(sb.endMin)})`
+                    );
+                    return false;
+                }
+                return true;
+            });
+
             // Convert back to BlockInput for persistence
-            const finalBlocksInput: BlockInput[] = solverResult.resolved
+            const finalBlocksInput: BlockInput[] = filteredResolved
                 .filter(sb => sb.source !== 'fixed')
                 .map((sb, idx) => {
                     const timeFields = solverBlockToTimeFields(sb, day.date, input.timezone);

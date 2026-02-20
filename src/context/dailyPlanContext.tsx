@@ -324,7 +324,15 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
     }, [loadPlanForDate]);
 
     const generatePlan = async (date?: string, mode: 'first_time' | 'regenerate' | 'fill_gaps' = 'first_time') => {
-        console.log('generatePlan called', { date, mode, user: user?.id });
+        // GUARDA: não disparar se data não estiver definida
+        const effectiveDate = date || selectedDate || today;
+        console.log('generatePlan called', { date, effectiveDate, mode, user: user?.id });
+
+        if (!effectiveDate) {
+            console.warn('[generatePlan] Abortado: data não definida');
+            return;
+        }
+
         if (!user) {
             console.error('generatePlan aborted: No user');
             toast.error('Erro de autenticação. Tente recarregar a página.');
@@ -338,7 +346,7 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     user_id: user.id,
-                    date: date || today,
+                    date: effectiveDate,
                     mode,
                     timezone: 'America/Sao_Paulo',
                 }),

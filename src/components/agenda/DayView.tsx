@@ -301,6 +301,7 @@ function GenerateModePicker({
     onGenerateAB,
     isLoading,
     isABLoading,
+    selectedDate,
 }: {
     isOpen: boolean;
     onClose: () => void;
@@ -308,6 +309,7 @@ function GenerateModePicker({
     onGenerateAB: () => void;
     isLoading: boolean;
     isABLoading: boolean;
+    selectedDate: string;
 }) {
     if (!isOpen) return null;
 
@@ -332,8 +334,8 @@ function GenerateModePicker({
                 <div className="space-y-3">
                     <button
                         onClick={() => { onGenerate(); onClose(); }}
-                        disabled={isLoading || isABLoading}
-                        className="w-full flex items-center gap-3 p-4 rounded-xl bg-brand-primary/20 hover:bg-brand-primary/30 border border-brand-primary/30 transition-all disabled:opacity-50"
+                        disabled={isLoading || isABLoading || !selectedDate}
+                        className="w-full flex items-center gap-3 p-4 rounded-xl bg-brand-primary/20 hover:bg-brand-primary/30 border border-brand-primary/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <div className="w-10 h-10 rounded-lg bg-brand-primary/30 flex items-center justify-center shrink-0">
                             <Sparkles className="w-5 h-5 text-brand-primary" />
@@ -347,8 +349,8 @@ function GenerateModePicker({
 
                     <button
                         onClick={() => { onGenerateAB(); onClose(); }}
-                        disabled={isLoading || isABLoading}
-                        className="w-full flex items-center gap-3 p-4 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 transition-all disabled:opacity-50"
+                        disabled={isLoading || isABLoading || !selectedDate}
+                        className="w-full flex items-center gap-3 p-4 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <div className="w-10 h-10 rounded-lg bg-purple-500/30 flex items-center justify-center shrink-0">
                             <GitCompareArrows className="w-5 h-5 text-purple-400" />
@@ -371,7 +373,7 @@ export function DayView() {
     const {
         todayBlocks, todayPlan, isLoading, generatePlan,
         generateHealthBlocks, addBlock, replanDay,
-        generateABPlan, abPlans, isABLoading,
+        generateABPlan, abPlans, isABLoading, selectedDate
     } = useDailyPlan();
 
     const [showAddModal, setShowAddModal] = useState(false);
@@ -465,7 +467,7 @@ export function DayView() {
 
                     <button
                         onClick={() => setShowGenerateModal(true)}
-                        disabled={isLoading || isABLoading}
+                        disabled={isLoading || isABLoading || !selectedDate}
                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-primary hover:bg-brand-primary/90 text-white transition-colors disabled:opacity-50"
                     >
                         {isLoading || isABLoading ? (
@@ -510,16 +512,16 @@ export function DayView() {
                     <div className="flex gap-3">
                         <button
                             onClick={() => generatePlan()}
-                            disabled={isLoading}
-                            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-primary hover:bg-brand-primary/90 text-white font-medium transition-colors"
+                            disabled={isLoading || !selectedDate}
+                            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-primary hover:bg-brand-primary/90 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <Sparkles className="w-5 h-5" />
                             Plano Único
                         </button>
                         <button
                             onClick={() => generateABPlan()}
-                            disabled={isABLoading}
-                            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-600/90 text-white font-medium transition-colors"
+                            disabled={isABLoading || !selectedDate}
+                            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-600/90 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <GitCompareArrows className="w-5 h-5" />
                             Comparar A/B
@@ -566,9 +568,9 @@ export function DayView() {
                                     <div
                                         key={block.id}
                                         className={`absolute w-1.5 h-1.5 rounded-full -translate-x-0.5 ${block.is_done ? 'bg-green-400' :
-                                                block.is_skipped ? 'bg-red-400/50' :
-                                                    block.status === 'current' ? 'bg-brand-primary' :
-                                                        'bg-white/30'
+                                            block.is_skipped ? 'bg-red-400/50' :
+                                                block.status === 'current' ? 'bg-brand-primary' :
+                                                    'bg-white/30'
                                             }`}
                                         style={{ left: `${left}%` }}
                                     />
@@ -649,6 +651,7 @@ export function DayView() {
                     onGenerateAB={() => generateABPlan()}
                     isLoading={isLoading}
                     isABLoading={isABLoading}
+                    selectedDate={selectedDate}
                 />
             </AnimatePresence>
 
