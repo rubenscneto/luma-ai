@@ -6,21 +6,21 @@ export const dynamic = 'force-dynamic';
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '');
 
 export async function POST(request: NextRequest) {
-    try {
-        const { book_title, book_author, book_type, session_notes, pages_range, chapter_name } = await request.json();
+  try {
+    const { book_title, book_author, book_type, session_notes, pages_range, chapter_name } = await request.json();
 
-        if (!book_title) {
-            return NextResponse.json({ error: 'book_title required' }, { status: 400 });
-        }
+    if (!book_title) {
+      return NextResponse.json({ error: 'book_title required' }, { status: 400 });
+    }
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-        const contextParts = [];
-        if (chapter_name) contextParts.push(`Capítulo: "${chapter_name}"`);
-        if (pages_range) contextParts.push(`Páginas ${pages_range}`);
-        if (session_notes) contextParts.push(`Anotações da sessão: "${session_notes}"`);
+    const contextParts = [];
+    if (chapter_name) contextParts.push(`Capítulo: "${chapter_name}"`);
+    if (pages_range) contextParts.push(`Páginas ${pages_range}`);
+    if (session_notes) contextParts.push(`Anotações da sessão: "${session_notes}"`);
 
-        const prompt = `Gere um quiz de compreensão de leitura para o livro "${book_title}" de ${book_author || 'autor desconhecido'}.
+    const prompt = `Gere um quiz de compreensão de leitura para o livro "${book_title}" de ${book_author || 'autor desconhecido'}.
 Tipo do livro: ${book_type || 'geral'}
 ${contextParts.length > 0 ? `Contexto: ${contextParts.join('. ')}` : ''}
 
@@ -48,24 +48,24 @@ Regras:
 - Para ficção, foque em temas, personagens e enredo
 - Retorne APENAS JSON válido, sem markdown`;
 
-        const result = await model.generateContent(prompt);
-        const text = result.response.text();
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
 
-        let parsed;
-        try {
-            const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-            parsed = JSON.parse(cleanText);
-        } catch {
-            parsed = {
-                quiz_title: `Quiz: ${book_title}`,
-                questions: [],
-                discussion_prompts: ['Reflita sobre os principais temas abordados no livro.'],
-            };
-        }
-
-        return NextResponse.json(parsed);
-    } catch (error) {
-        console.error('Book quiz generation error:', error);
-        return NextResponse.json({ error: 'Erro ao gerar quiz.' }, { status: 500 });
+    let parsed;
+    try {
+      const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      parsed = JSON.parse(cleanText);
+    } catch {
+      parsed = {
+        quiz_title: `Quiz: ${book_title}`,
+        questions: [],
+        discussion_prompts: ['Reflita sobre os principais temas abordados no livro.'],
+      };
     }
+
+    return NextResponse.json(parsed);
+  } catch (error) {
+    console.error('Book quiz generation error:', error);
+    return NextResponse.json({ error: 'Erro ao gerar quiz.' }, { status: 500 });
+  }
 }

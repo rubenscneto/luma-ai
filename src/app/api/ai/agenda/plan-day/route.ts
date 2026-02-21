@@ -162,7 +162,7 @@ function buildFixedBlockInputs(dateStr: string, timezone: string, fixedBlocks: a
 }
 
 async function generateAIBlocks(genAI: GoogleGenerativeAI, systemPrompt: string, userPrompt: string, temperature: number) {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const result = await model.generateContent({
         contents: [

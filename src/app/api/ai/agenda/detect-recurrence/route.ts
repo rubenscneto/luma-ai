@@ -88,7 +88,7 @@ TAREFA:
 Analise o histórico acima e identifique padrões recorrentes que o usuário repete frequentemente mas que NÃO são blocos fixos.
 Retorne apenas padrões com pelo menos 2 ocorrências e confiança mínima de 50%.`;
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const result = await model.generateContent({
             contents: [
                 { role: 'user', parts: [{ text: RECURRENCE_DETECTION_PROMPT }] },
