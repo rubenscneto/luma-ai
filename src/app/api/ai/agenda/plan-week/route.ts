@@ -456,6 +456,18 @@ Responda EXCLUSIVAMENTE em JSON válido:
 
     } catch (error) {
         console.error('Plan week error FULL details:', error);
+
+        // Return 400 for validation errors (Zod)
+        if (error instanceof z.ZodError) {
+            return NextResponse.json(
+                {
+                    error: 'Dados de entrada inválidos.',
+                    details: error.issues
+                },
+                { status: 400 }
+            );
+        }
+
         return NextResponse.json(
             {
                 error: error instanceof Error ? error.message : 'Erro crítico ao planejar semana.',
