@@ -17,7 +17,7 @@ Este documento é a **referência técnica definitiva** do LumaAI. Deve ser atua
 | **Frontend** | Next.js 14+ (App Router) + TypeScript (Strict) |
 | **Estilização** | TailwindCSS + Framer Motion |
 | **Backend/DB** | Supabase (PostgreSQL + Auth + RLS) |
-| **IA** | Google Gemini API (`getGeminiModel` centralized) |
+| **IA** | Gemini 2.5 Flash (Padrão) / Gemini 3 Flash (via Flag G3) |
 | **Deploy** | Vercel |
 | **PWA** | `@ducanh2912/next-pwa` |
 
@@ -128,7 +128,7 @@ src/
 | `locked_at` | timestamptz | NO | `now()` | Início do bloqueio |
 | `expires_at` | timestamptz | NO | — | Expiração (TTL) |
 
-### 2.5 Tabela `daily_scores` (Performance e Consistência — Engine V2)
+### 2.5 Tabela `daily_scores` (Performance e Inteligência — Engine V2)
 
 | Coluna | Tipo | Nullable | Default | Notas |
 |---|---|---|---|---|

@@ -45,8 +45,8 @@ const PRIORITY_WEIGHTS: Record<string, number> = {
     study: 1.1,
     leisure: 1.0,
     admin: 0.9,
-    commute: 0.8,
-    sleep: 0.8,
+    commute: 0.5,
+    sleep: 0.5,
     meal: 1.3,
     fixed: 1.0,
 };
@@ -73,14 +73,23 @@ function calculateAdherence(blocks: any[]): number {
 
     let totalDriftMins = 0;
     aiBlocks.forEach(b => {
-        const original = new Date(b.meta.original_start).getTime();
+        let original = new Date(b.meta.original_start).getTime();
         const current = new Date(b.start_datetime).getTime();
+
+        // Mitigation for overnight split segments (D+1 part)
+        // If it starts at 00:00 and is a continuation, drift should be 0 unless moved
+        if (b.meta?.overnight_continuation) {
+            const startOfDay = new Date(b.start_datetime);
+            startOfDay.setHours(0, 0, 0, 0);
+            original = startOfDay.getTime();
+        }
+
         const drift = Math.abs(current - original) / (1000 * 60);
         totalDriftMins += drift;
     });
 
     const avgDrift = totalDriftMins / aiBlocks.length;
-    // Penalty: 100 - (avgDrift / 2) -> 60 min avg drift = 70 score
+    // Penalty: 100 - (avgDrift / 0.6) -> 60 min avg drift = 0 score
     return Math.max(0, Math.round(100 - (avgDrift / 0.6)));
 }
 
