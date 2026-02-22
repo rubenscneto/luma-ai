@@ -1,7 +1,7 @@
 # LumaAI — Documentação Técnica & Diário de Bordo 🛠️
 
-**Versão Atual**: 2.0.0
-**Última Atualização**: 2026-02-18
+- **Version**: 2.4.0
+- **Last Updated**: 2026-02-21
 **Data de Início**: Dezembro 2025
 
 Este documento é a **referência técnica definitiva** do LumaAI. Deve ser atualizado a cada implementação, remoção ou refatoração.
@@ -17,7 +17,7 @@ Este documento é a **referência técnica definitiva** do LumaAI. Deve ser atua
 | **Frontend** | Next.js 14+ (App Router) + TypeScript (Strict) |
 | **Estilização** | TailwindCSS + Framer Motion |
 | **Backend/DB** | Supabase (PostgreSQL + Auth + RLS) |
-| **IA** | Google Gemini API (`gemini-2.0-flash`) |
+| **IA** | Google Gemini API (`getGeminiModel` centralized) |
 | **Deploy** | Vercel |
 | **PWA** | `@ducanh2912/next-pwa` |
 
@@ -119,13 +119,22 @@ src/
 
 **Índices:** `idx_fixed_blocks_user_id`, `idx_fixed_blocks_day (user_id, day_of_week)`
 
-### 2.4 Outras Tabelas
+### 2.4 Tabela `processing_locks` (Controle de Concorrência)
+
+| Coluna | Tipo | Nullable | Default | Notas |
+|---|---|---|---|---|
+| `lock_key` | text | NO | — | PK (ex: `plan-week:userId`) |
+| `user_id` | uuid | YES | — | Referência ao usuário |
+| `locked_at` | timestamptz | NO | `now()` | Início do bloqueio |
+| `expires_at` | timestamptz | NO | — | Expiração (TTL) |
+
+### 2.5 Outras Tabelas
 
 | Tabela | Propósito |
 |---|---|
 | `profiles` | Nome, ocupação, avatar (synced from Auth) |
 | `health_profile` | Meta de saúde, treino, sono, dieta |
-| `routine_profile` | Descrição da rotina, hobbies, objetivos (**⚠️ NÃO lido pelo planner**) |
+| `routine_profile` | Descrição da rotina, hobbies, objetivos (**✅ LIDO pelo planner desde v2.1.0**) |
 | `subjects` | Matérias de estudo |
 | `study_materials` | Links e textos de estudo |
 | `flashcards` | Flashcards com SRS (Spaced Repetition) |
@@ -146,11 +155,11 @@ Usuário clica "Planejar Semana"
     ↓
 WeekView.tsx → POST /api/ai/agenda/plan-week
     ↓
-Carrega: profiles, health_profile, fixed_blocks, existing daily_blocks
+Monta prompt (weekPrompt) com fixos, perfil, health_profile e **routine_profile**
     ↓
-Monta prompt (weekPrompt) com fixos, perfil, contexto
+Acquires lock in `processing_locks` (prevents race conditions)
     ↓
-Gemini 2.0 Flash gera JSON (aiWeekResponseSchema)
+Gemini 2.0/1.5 Flash gera JSON (aiWeekResponseSchema)
     ↓
 Validação Zod (aiWeekResponseSchema)
     ↓
@@ -162,8 +171,9 @@ Para cada dia:
   5. Converte para SolverBlock
   6. Adiciona blocos derivados (pausas pós-refeição)
   7. Roda timelineSolver.solveTimeline()
-  8. Aplica MAX_BLOCKS_PER_DAY=18
-  9. INSERT daily_blocks
+  8. Pre-processa refeições para gerar `meal_sequence` (dedup sequencial)
+  9. Aplica MAX_BLOCKS_PER_DAY=18
+  10. UPSERT daily_blocks via `persistDailyBlocks` (preserva status is_done/skipped)
     ↓
 Response: { status, weekSummary, totalBlocks, warnings }
     ↓
@@ -305,14 +315,14 @@ Gera automaticamente "Pausa pós-refeição" (30min) ancorada a blocos meal.
 
 | # | Problema | Causa-raiz | Arquivo |
 |---|---|---|---|
-| 1 | **Fixos não aparecem na Week View** para dias planejados | `fetchWeekBlocks` só mostra fixos como fallback (dias sem plano) | `dailyPlanContext.tsx:269-271` |
-| 2 | **Concluir/Pular "volta"** | `skipBlock` chama `triggerReplan` → `loadTodayPlan` refaz tudo, desfazendo optimistic update | `dailyPlanContext.tsx:388-390` |
-| 3 | **Replanejar não roda solver** | `replan-day` pede à IA ajustes textuais, sem solver | `replan-day/route.ts` |
-| 4 | **Jantar 16h** (horários sem sentido) | Sem meal windows no backend; prompt é sugestão, não enforcement | `agendaPrompts.ts:186` |
-| 5 | **Sem UNIQUE em `daily_blocks`** | Race conditions podem criar duplicatas | Schema DB |
-| 6 | **Rotina genérica** | `routine_profile` não é lido pelo planner | `plan-week/route.ts:83-95` |
-| 7 | **Auto-heal só loga** | Solver roda on-load mas resultado não é salvo | `dailyPlanContext.tsx:173-181` |
-| 8 | **Sem sinônimos na dedup** | "jantar" vs "dinner" vs "refeição" não detectado | `plan-week/route.ts:263-270` |
+| 1 | **Fixos não aparecem na Week View** | ✅ Resolvido: Fixos carregados via Context | WeekView.tsx |
+| 2 | **Concluir/Pular "volta"** | ✅ Resolvido: Optimistic state preservado | dailyPlanContext.tsx |
+| 3 | **Replanejar não roda solver** | ✅ Resolvido: Replanner chama `solveTimeline` | replan-day/route.ts |
+| 4 | **Jantar 16h** | ✅ Resolvido: Guardrails nas janelas de refeição | agendaPrompts.ts |
+| 5 | **Sem UNIQUE em `daily_blocks`** | ✅ Resolvido: `processing_locks` via Supabase | plan-week route |
+| 6 | **Rotina genérica** | ✅ Resolvido: `routine_profile` injetado (Plan/Replan) | AI routes |
+| 7 | **Auto-heal só loga** | ✅ Resolvido: `persistDailyBlocks` salva ajustes | custom hook |
+| 8 | **Sem sinônimos na dedup** | ✅ Resolvido: `meal_sequence` lida com colisões | persistDailyBlocks.ts |
 
 ---
 
@@ -340,6 +350,31 @@ Gera automaticamente "Pausa pós-refeição" (30min) ancorada a blocos meal.
 ---
 
 ## 📅 Diário de Bordo (Changelog)
+
+### [21/02/2026] - Workout Progression & Export (v2.4.0)
+- **Feature**: Workout Progression System (PR tracking, volume charts, AI suggestions).
+- **Feature**: Google Calendar Export (.ics endpoint and UI button).
+- **Fix**: Resolvido erro de importação do ícone `Target` no `WorkoutSession.tsx`.
+
+### [21/02/2026] - Performance & Transparência (v2.3.0)
+- **UI**: Adicionados banners de "Insight do Dia" e "Ajustes Automáticos" na `DayView.tsx`.
+- **UI**: Exibição de `suggested_reason` nos `BlockCard.tsx`.
+- **Backend**: Batch Upsert em `persistDailyBlocks.ts` (redução drástica de IO).
+- **Fix**: Resolvida ausência de `addRecurrenceAsFixed` no context.
+
+### [21/02/2026] - Refinamento & Transparência (v2.2.0)
+- **API**: Adicionados campos de `warnings` e `suggested_reason` em todas as rotas de agenda.
+- **IA**: Injeção de `routine_profile` estendida para `plan-day` e `replan-day`.
+- **Fix**: Resolvido erro de compilação TypeScript em `plan-day/route.ts`.
+- **Docs**: Todas as 8 causas-raiz identificadas na auditoria foram resolvidas.
+
+### [21/02/2026] - Estabilização da Agenda (Fase 0, 1 & 1.25)
+- **Refactor**: Centralização do modelo Gemini em `lib/ai/gemini.ts` com suporte a Feature Flags.
+- **Database**: Criação da tabela `processing_locks` para controle de concorrência.
+- **API**: Implementação de locking distribuído no endpoint `plan-week`.
+- **API**: Suporte a múltiplas refeições do mesmo tipo via `meal_sequence` em `persistDailyBlocks.ts`.
+- **IA**: Injeção de dados de `routine_profile` (objetivos, produtividade) nos prompts de planejamento para maior personalização.
+- **Docs**: Atualização técnica completa e fornecimento de script SQL de migração.
 
 ### [18/02/2026] - Diagnóstico Completo & Documentação
 - **Diagnóstico**: Auditoria completa da pipeline de geração de rotina

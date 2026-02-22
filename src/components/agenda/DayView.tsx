@@ -2,10 +2,13 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Sparkles, Loader2, Calendar, RefreshCw, Heart, GitCompareArrows, X, Target, Zap, Clock, Lightbulb } from 'lucide-react';
+import { Plus, Sparkles, Loader2, Calendar, RefreshCw, Heart, GitCompareArrows, X, Target, Zap, Clock, Lightbulb, Download } from 'lucide-react';
 import { useDailyPlan } from '@/context/dailyPlanContext';
+import { useAuth } from '@/context/authContext';
 import { BlockCard } from './BlockCard';
 import { AIGeneratedPlan, AIBlock } from '@/types';
+
+import { ConsistencyScore } from './ConsistencyScore';
 
 interface AddBlockModalProps {
     isOpen: boolean;
@@ -373,8 +376,10 @@ export function DayView() {
     const {
         todayBlocks, todayPlan, isLoading, generatePlan,
         generateHealthBlocks, addBlock, replanDay,
-        generateABPlan, abPlans, isABLoading, selectedDate
+        generateABPlan, abPlans, isABLoading, selectedDate,
+        lastSolverWarnings, lastAISummary, consistencyScore
     } = useDailyPlan();
+    const { user } = useAuth();
 
     const [showAddModal, setShowAddModal] = useState(false);
     const [showGenerateModal, setShowGenerateModal] = useState(false);
@@ -412,22 +417,31 @@ export function DayView() {
         }
     };
 
+    const handleExportICS = () => {
+        if (!selectedDate || !user) return;
+        window.open(`/api/agenda/export?date=${selectedDate}&user_id=${user.id}`, '_blank');
+    };
+
     // Current time position for timeline (6:00 to 22:00 range)
     const currentHour = now.getHours() + now.getMinutes() / 60;
     const timelineProgress = Math.max(0, Math.min(100, ((currentHour - 6) / 16) * 100));
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold text-white capitalize">{formattedDate}</h2>
-                    <p className="text-white/60 text-sm mt-1">
-                        {todayBlocks.length} blocos • {pastBlocks.length} concluídos
-                        {delayedBlocks.length > 0 && (
-                            <span className="text-amber-400"> • {delayedBlocks.length} atrasado(s)</span>
-                        )}
-                    </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-6">
+                    <div>
+                        <h2 className="text-2xl font-bold text-white capitalize">{formattedDate}</h2>
+                        <p className="text-white/60 text-sm mt-1">
+                            {todayBlocks.length} blocos • {pastBlocks.length} concluídos
+                            {delayedBlocks.length > 0 && (
+                                <span className="text-amber-400"> • {delayedBlocks.length} atrasado(s)</span>
+                            )}
+                        </p>
+                    </div>
+                    {todayPlan && (
+                        <ConsistencyScore score={consistencyScore} size={50} />
+                    )}
                 </div>
 
                 <div className="flex gap-2">
@@ -457,6 +471,18 @@ export function DayView() {
                         </button>
                     )}
 
+                    {todayPlan && (
+                        <button
+                            onClick={handleExportICS}
+                            disabled={isLoading}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 transition-colors disabled:opacity-50"
+                            title="Exportar para Calendário (.ics)"
+                        >
+                            <Download className="w-4 h-4" />
+                            <span className="hidden sm:inline">Exportar</span>
+                        </button>
+                    )}
+
                     <button
                         onClick={() => setShowAddModal(true)}
                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
@@ -481,156 +507,202 @@ export function DayView() {
             </div>
 
             {/* A/B Loading state */}
-            {isABLoading && (
-                <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex items-center gap-3 p-4 rounded-xl bg-purple-500/10 border border-purple-500/20"
-                >
-                    <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
-                    <div>
-                        <p className="text-sm font-medium text-purple-300">Gerando dois planos alternativos...</p>
-                        <p className="text-xs text-purple-300/60">Plano A (Foco) e Plano B (Equilíbrio)</p>
-                    </div>
-                </motion.div>
-            )}
+            {
+                isABLoading && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center gap-3 p-4 rounded-xl bg-purple-500/10 border border-purple-500/20"
+                    >
+                        <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
+                        <div>
+                            <p className="text-sm font-medium text-purple-300">Gerando dois planos alternativos...</p>
+                            <p className="text-xs text-purple-300/60">Plano A (Foco) e Plano B (Equilíbrio)</p>
+                        </div>
+                    </motion.div>
+                )
+            }
 
             {/* No plan state */}
-            {!todayPlan && !isLoading && !isABLoading && (
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col items-center justify-center py-16 text-center"
-                >
-                    <div className="w-20 h-20 rounded-2xl bg-brand-primary/20 flex items-center justify-center mb-4">
-                        <Calendar className="w-10 h-10 text-brand-primary" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-white mb-2">Nenhum plano para hoje</h3>
-                    <p className="text-white/60 max-w-sm mb-6">
-                        Gere um plano com IA baseado nos seus compromissos fixos e objetivos, ou adicione blocos manualmente.
-                    </p>
-                    <div className="flex gap-3">
-                        <button
-                            onClick={() => generatePlan()}
-                            disabled={isLoading || !selectedDate}
-                            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-primary hover:bg-brand-primary/90 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <Sparkles className="w-5 h-5" />
-                            Plano Único
-                        </button>
-                        <button
-                            onClick={() => generateABPlan()}
-                            disabled={isABLoading || !selectedDate}
-                            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-600/90 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <GitCompareArrows className="w-5 h-5" />
-                            Comparar A/B
-                        </button>
-                    </div>
-                </motion.div>
-            )}
+            {
+                !todayPlan && !isLoading && !isABLoading && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex flex-col items-center justify-center py-16 text-center"
+                    >
+                        <div className="w-20 h-20 rounded-2xl bg-brand-primary/20 flex items-center justify-center mb-4">
+                            <Calendar className="w-10 h-10 text-brand-primary" />
+                        </div>
+                        <h3 className="text-xl font-semibold text-white mb-2">Nenhum plano para hoje</h3>
+                        <p className="text-white/60 max-w-sm mb-6">
+                            Gere um plano com IA baseado nos seus compromissos fixos e objetivos, ou adicione blocos manualmente.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => generatePlan()}
+                                disabled={isLoading || !selectedDate}
+                                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-primary hover:bg-brand-primary/90 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Sparkles className="w-5 h-5" />
+                                Plano Único
+                            </button>
+                            <button
+                                onClick={() => generateABPlan()}
+                                disabled={isABLoading || !selectedDate}
+                                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-600/90 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <GitCompareArrows className="w-5 h-5" />
+                                Comparar A/B
+                            </button>
+                        </div>
+                    </motion.div>
+                )
+            }
 
             {/* Loading state */}
-            {isLoading && (
-                <div className="flex flex-col items-center justify-center py-16">
-                    <Loader2 className="w-10 h-10 text-brand-primary animate-spin mb-4" />
-                    <p className="text-white/60">Gerando seu plano...</p>
-                </div>
-            )}
+            {
+                isLoading && (
+                    <div className="flex flex-col items-center justify-center py-16">
+                        <Loader2 className="w-10 h-10 text-brand-primary animate-spin mb-4" />
+                        <p className="text-white/60">Gerando seu plano...</p>
+                    </div>
+                )
+            }
+
+            {/* AI Summary and Warnings */}
+            <AnimatePresence>
+                {(lastAISummary || lastSolverWarnings.length > 0) && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="space-y-3 overflow-hidden"
+                    >
+                        {lastAISummary && (
+                            <div className="p-4 rounded-2xl bg-brand-primary/10 border border-brand-primary/20 flex gap-3 items-start">
+                                <Sparkles className="w-5 h-5 text-brand-primary shrink-0 mt-0.5" />
+                                <div>
+                                    <h4 className="text-sm font-semibold text-brand-primary">Insight do Dia</h4>
+                                    <p className="text-sm text-white/80 mt-1 leading-relaxed">
+                                        {lastAISummary}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {lastSolverWarnings.length > 0 && (
+                            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex gap-3 items-start">
+                                <X className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                                <div>
+                                    <h4 className="text-sm font-semibold text-amber-500">Ajustes Automáticos</h4>
+                                    <ul className="mt-1 space-y-1">
+                                        {lastSolverWarnings.map((warning, i) => (
+                                            <li key={i} className="text-sm text-amber-200/80">• {warning}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            </div>
+                        )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Blocks list with timeline */}
-            {todayPlan && !isLoading && (
-                <div className="space-y-6">
-                    {/* Mini timeline progress bar */}
-                    <div className="relative">
-                        <div className="flex justify-between text-[10px] text-white/30 mb-1">
-                            <span>06:00</span>
-                            <span>10:00</span>
-                            <span>14:00</span>
-                            <span>18:00</span>
-                            <span>22:00</span>
+            {
+                todayPlan && !isLoading && (
+                    <div className="space-y-6">
+                        {/* Mini timeline progress bar */}
+                        <div className="relative">
+                            <div className="flex justify-between text-[10px] text-white/30 mb-1">
+                                <span>06:00</span>
+                                <span>10:00</span>
+                                <span>14:00</span>
+                                <span>18:00</span>
+                                <span>22:00</span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                                <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${timelineProgress}%` }}
+                                    transition={{ duration: 1, ease: 'easeOut' }}
+                                    className="h-full rounded-full bg-gradient-to-r from-brand-primary to-purple-500"
+                                />
+                            </div>
+                            {/* Block dots on timeline */}
+                            <div className="relative h-2 mt-0.5">
+                                {todayBlocks.map(block => {
+                                    const start = new Date(block.start_datetime);
+                                    const startH = start.getHours() + start.getMinutes() / 60;
+                                    const left = Math.max(0, Math.min(100, ((startH - 6) / 16) * 100));
+                                    return (
+                                        <div
+                                            key={block.id}
+                                            className={`absolute w-1.5 h-1.5 rounded-full -translate-x-0.5 ${block.is_done ? 'bg-green-400' :
+                                                block.is_skipped ? 'bg-red-400/50' :
+                                                    block.status === 'current' ? 'bg-brand-primary' :
+                                                        'bg-white/30'
+                                                }`}
+                                            style={{ left: `${left}%` }}
+                                        />
+                                    );
+                                })}
+                            </div>
                         </div>
-                        <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                            <motion.div
-                                initial={{ width: 0 }}
-                                animate={{ width: `${timelineProgress}%` }}
-                                transition={{ duration: 1, ease: 'easeOut' }}
-                                className="h-full rounded-full bg-gradient-to-r from-brand-primary to-purple-500"
-                            />
-                        </div>
-                        {/* Block dots on timeline */}
-                        <div className="relative h-2 mt-0.5">
-                            {todayBlocks.map(block => {
-                                const start = new Date(block.start_datetime);
-                                const startH = start.getHours() + start.getMinutes() / 60;
-                                const left = Math.max(0, Math.min(100, ((startH - 6) / 16) * 100));
-                                return (
-                                    <div
-                                        key={block.id}
-                                        className={`absolute w-1.5 h-1.5 rounded-full -translate-x-0.5 ${block.is_done ? 'bg-green-400' :
-                                            block.is_skipped ? 'bg-red-400/50' :
-                                                block.status === 'current' ? 'bg-brand-primary' :
-                                                    'bg-white/30'
-                                            }`}
-                                        style={{ left: `${left}%` }}
-                                    />
-                                );
-                            })}
-                        </div>
+
+                        {/* Delayed blocks warning */}
+                        {delayedBlocks.length > 0 && (
+                            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                                <p className="text-amber-400 text-sm font-medium">
+                                    {delayedBlocks.length} bloco(s) atrasado(s)
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Current block */}
+                        {currentBlock && (
+                            <div>
+                                <h3 className="text-sm font-medium text-white/50 mb-3 uppercase tracking-wider">
+                                    Agora
+                                </h3>
+                                <BlockCard block={currentBlock} />
+                            </div>
+                        )}
+
+                        {/* Upcoming blocks */}
+                        {upcomingBlocks.length > 0 && (
+                            <div>
+                                <h3 className="text-sm font-medium text-white/50 mb-3 uppercase tracking-wider">
+                                    Próximos
+                                </h3>
+                                <div className="space-y-3">
+                                    <AnimatePresence>
+                                        {upcomingBlocks.map(block => (
+                                            <BlockCard key={block.id} block={block} />
+                                        ))}
+                                    </AnimatePresence>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Completed blocks */}
+                        {pastBlocks.length > 0 && (
+                            <div>
+                                <h3 className="text-sm font-medium text-white/50 mb-3 uppercase tracking-wider">
+                                    Concluídos
+                                </h3>
+                                <div className="space-y-3">
+                                    <AnimatePresence>
+                                        {pastBlocks.map(block => (
+                                            <BlockCard key={block.id} block={block} />
+                                        ))}
+                                    </AnimatePresence>
+                                </div>
+                            </div>
+                        )}
                     </div>
-
-                    {/* Delayed blocks warning */}
-                    {delayedBlocks.length > 0 && (
-                        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                            <p className="text-amber-400 text-sm font-medium">
-                                {delayedBlocks.length} bloco(s) atrasado(s)
-                            </p>
-                        </div>
-                    )}
-
-                    {/* Current block */}
-                    {currentBlock && (
-                        <div>
-                            <h3 className="text-sm font-medium text-white/50 mb-3 uppercase tracking-wider">
-                                Agora
-                            </h3>
-                            <BlockCard block={currentBlock} />
-                        </div>
-                    )}
-
-                    {/* Upcoming blocks */}
-                    {upcomingBlocks.length > 0 && (
-                        <div>
-                            <h3 className="text-sm font-medium text-white/50 mb-3 uppercase tracking-wider">
-                                Próximos
-                            </h3>
-                            <div className="space-y-3">
-                                <AnimatePresence>
-                                    {upcomingBlocks.map(block => (
-                                        <BlockCard key={block.id} block={block} />
-                                    ))}
-                                </AnimatePresence>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Completed blocks */}
-                    {pastBlocks.length > 0 && (
-                        <div>
-                            <h3 className="text-sm font-medium text-white/50 mb-3 uppercase tracking-wider">
-                                Concluídos
-                            </h3>
-                            <div className="space-y-3">
-                                <AnimatePresence>
-                                    {pastBlocks.map(block => (
-                                        <BlockCard key={block.id} block={block} />
-                                    ))}
-                                </AnimatePresence>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
+                )
+            }
 
             {/* Modals */}
             <AnimatePresence>
@@ -658,6 +730,6 @@ export function DayView() {
             <AnimatePresence>
                 <ABPlanComparison />
             </AnimatePresence>
-        </div>
+        </div >
     );
 }

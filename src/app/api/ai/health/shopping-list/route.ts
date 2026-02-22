@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getGeminiModel } from '@/lib/ai/gemini';
 import { createClient } from '@supabase/supabase-js';
 import { createShoppingListPrompt } from '@/ai/prompts/healthCoachPrompt';
 import { ShoppingListAIResponseSchema } from '@/ai/schemas/aiSchemas';
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+        const model = getGeminiModel({ temperature: 0.6 });
 
         const body = await req.json();
         const { user_id, focus = 'alimentação saudável', days = 7 } = body;
@@ -62,10 +62,6 @@ export async function POST(req: NextRequest) {
             dislikes,
         });
 
-        const model = genAI.getGenerativeModel({
-            model: 'gemini-2.5-flash',
-            generationConfig: { responseMimeType: 'application/json', temperature: 0.6 }
-        });
 
         const result = await model.generateContent(prompt);
         const responseText = result.response.text();

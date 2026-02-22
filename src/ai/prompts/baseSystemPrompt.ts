@@ -53,6 +53,9 @@ export function buildUserContextBlock(data: {
         sleep_time?: string;
         weight_kg?: number;
         height_cm?: number;
+        peak_productivity?: string;
+        energy_level?: string;
+        objectives?: string[];
     };
     memoryRecent?: {
         recentMeals?: string[];
@@ -81,7 +84,10 @@ export function buildUserContextBlock(data: {
 - Acordar: ${p.wake_time || '07:00'}
 - Dormir: ${p.sleep_time || '22:00'}
 ${p.weight_kg ? `- Peso: ${p.weight_kg}kg` : ''}
-${p.height_cm ? `- Altura: ${p.height_cm}cm` : ''}`);
+${p.height_cm ? `- Altura: ${p.height_cm}cm` : ''}
+${p.peak_productivity ? `- Pico de Produtividade: ${p.peak_productivity}` : ''}
+${p.energy_level ? `- Nível de Energia Habitual: ${p.energy_level}` : ''}
+${p.objectives?.length ? `- Objetivos: ${p.objectives.join(', ')}` : ''}`);
     }
 
     if (data.memoryRecent) {

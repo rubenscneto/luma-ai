@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getGeminiModel } from '@/lib/ai/gemini';
 import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { PROGRESSION_SYSTEM_PROMPT, buildProgressionPrompt } from '@/ai/prompts/trainingPrompts';
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+        const model = getGeminiModel({ temperature: 0.5 });
 
         const body = await req.json();
         const { user_id } = body;
@@ -135,10 +135,6 @@ export async function POST(req: NextRequest) {
             sessionDurationMin: sessions[0]?.duration_min,
         });
 
-        const model = genAI.getGenerativeModel({
-            model: 'gemini-2.5-flash',
-            generationConfig: { responseMimeType: 'application/json', temperature: 0.5 },
-        });
 
         const result = await model.generateContent({
             contents: [

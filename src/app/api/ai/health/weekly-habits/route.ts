@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getGeminiModel } from '@/lib/ai/gemini';
 import { createClient } from '@supabase/supabase-js';
 import { WEEKLY_HABITS_PROMPT } from '@/ai/prompts/healthCoachPrompt';
 import { WeeklyHabitsAIResponseSchema } from '@/ai/schemas/aiSchemas';
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+        const model = getGeminiModel();
 
         const body = await req.json();
         const { user_id } = body;
@@ -39,11 +39,6 @@ PERFIL DO USUÁRIO:
 
 Gere sugestões de hábitos semanais alinhados com o objetivo do usuário.
 `;
-
-        const model = genAI.getGenerativeModel({
-            model: 'gemini-2.5-flash',
-            generationConfig: { responseMimeType: 'application/json' }
-        });
 
         const prompt = `${WEEKLY_HABITS_PROMPT}\n\n${contextPrompt}`;
 

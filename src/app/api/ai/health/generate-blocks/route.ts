@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getGeminiModel } from '@/lib/ai/gemini';
 import { z } from 'zod';
 
 // Force dynamic to avoid static generation issues
@@ -12,7 +12,6 @@ const getSupabase = () => createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const getGenAI = () => new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 const inputSchema = z.object({
     user_id: z.string().uuid(),
@@ -81,7 +80,7 @@ Responda APENAS com o JSON, sem texto adicional.
 export async function POST(request: NextRequest) {
     try {
         const supabase = getSupabase();
-        const genAI = getGenAI();
+        const model = getGeminiModel();
 
         const body = await request.json();
         const input = inputSchema.parse(body);
@@ -138,10 +137,6 @@ ${input.include_workouts ? '- Bloco de exercício adequado ao nível' : ''}
 Considere que hoje é ${new Date(dateStr + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long' })}.
 `;
 
-        const model = genAI.getGenerativeModel({
-            model: 'gemini-2.5-flash',
-            generationConfig: { responseMimeType: 'application/json' }
-        });
 
         const prompt = `${HEALTH_BLOCKS_PROMPT}\n\n${contextPrompt}`;
         const result = await model.generateContent(prompt);

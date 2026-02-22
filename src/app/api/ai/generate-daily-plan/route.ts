@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
 import { DAILY_PLAN_SYSTEM_PROMPT, DAILY_PLAN_USER_PROMPT } from '@/ai/prompts/dailyPlanPrompt';
 import { DailyPlanAIResponseSchema } from '@/ai/schemas/aiSchemas';
 import { persistDailyBlocks, BlockInput } from '@/lib/persistDailyBlocks';
 import { timeToTimestamptz } from '@/lib/mealWindows';
-
-const apiKey = process.env.GEMINI_API_KEY || '';
-const genAI = new GoogleGenerativeAI(apiKey);
+import { getGeminiModel } from '@/lib/ai/gemini';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -67,10 +64,7 @@ export async function POST(req: NextRequest) {
         };
 
         // Generate plan with Gemini
-        const model = genAI.getGenerativeModel({
-            model: 'gemini-2.5-flash',
-            generationConfig: { responseMimeType: 'application/json' }
-        });
+        const model = getGeminiModel();
 
         const prompt = `${DAILY_PLAN_SYSTEM_PROMPT}\n\n${DAILY_PLAN_USER_PROMPT(context)}`;
         const result = await model.generateContent(prompt);

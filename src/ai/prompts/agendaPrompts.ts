@@ -131,6 +131,11 @@ export function buildPlanDayPrompt(context: {
     training_level?: string;
     equipment?: string[];
   };
+  routineProfile?: {
+    peak_productivity?: string;
+    energy_level?: string;
+    objectives?: string[];
+  };
   mode: 'first_time' | 'regenerate' | 'fill_gaps';
   recentAgendaBlocks?: string[];
   energyPreference?: string;
@@ -164,6 +169,9 @@ ${context.existingBlocks.map(b => `- ${b.start}-${b.end}: ${b.title} (${b.source
         preferences: context.healthProfile.dietary_preferences,
         training_level: context.healthProfile.training_level,
         equipment: context.healthProfile.equipment,
+        peak_productivity: context.routineProfile?.peak_productivity,
+        energy_level: context.routineProfile?.energy_level,
+        objectives: context.routineProfile?.objectives,
       },
       memoryRecent: {
         recentAgendaBlocks: context.recentAgendaBlocks || [],
@@ -238,6 +246,11 @@ export function buildABPlanPrompt(context: {
     training_level?: string;
     equipment?: string[];
   };
+  routineProfile?: {
+    peak_productivity?: string;
+    energy_level?: string;
+    objectives?: string[];
+  };
   recentAgendaBlocks?: string[];
   planStyle: 'focused' | 'balanced';
 }): string {
@@ -288,6 +301,9 @@ ${context.existingBlocks.map(b => `- ${b.start}-${b.end}: ${b.title} (${b.source
         preferences: context.healthProfile.dietary_preferences,
         training_level: context.healthProfile.training_level,
         equipment: context.healthProfile.equipment,
+        peak_productivity: context.routineProfile?.peak_productivity,
+        energy_level: context.routineProfile?.energy_level,
+        objectives: context.routineProfile?.objectives,
       },
       memoryRecent: {
         recentAgendaBlocks: context.recentAgendaBlocks || [],

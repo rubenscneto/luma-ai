@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getGeminiModel } from '@/lib/ai/gemini';
 import { z } from 'zod';
 import { AGENDA_REPLANNER_SYSTEM_PROMPT, buildReplanPrompt } from '@/ai/prompts/agendaPrompts';
 import { solveTimeline, dailyBlockToSolverBlock, solverBlockToTimeFields, SolverBlock } from '@/lib/timelineSolver';
@@ -15,7 +15,6 @@ const getSupabase = () => createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const getGenAI = () => new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 const replanInputSchema = z.object({
     date: z.string().optional(),
@@ -43,7 +42,7 @@ const aiReplanResponseSchema = z.object({
 export async function POST(request: NextRequest) {
     try {
         const supabase = getSupabase();
-        const genAI = getGenAI();
+        const model = getGeminiModel();
 
         const body = await request.json();
         const input = replanInputSchema.parse(body);
@@ -59,6 +58,30 @@ export async function POST(request: NextRequest) {
             .eq('user_id', input.user_id)
             .eq('plan_date', dateStr)
             .single();
+
+        // Fetch User Context
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name, occupation')
+            .eq('id', input.user_id)
+            .single();
+
+        const { data: routineProfile } = await supabase
+            .from('routine_profiles')
+            .select('*')
+            .eq('user_id', input.user_id)
+            .single();
+
+        const userContextBlock = routineProfile ? `
+USER PROFILE:
+${JSON.stringify({
+            name: profile?.full_name,
+            occupation: profile?.occupation,
+            peak_productivity: routineProfile.peak_productivity,
+            energy_level: routineProfile.energy_level,
+            objectives: routineProfile.objectives
+        }, null, 2)}
+` : '';
 
         if (!plan) {
             return NextResponse.json(
@@ -152,10 +175,9 @@ export async function POST(request: NextRequest) {
                 userNote: input.user_note,
             });
 
-            const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
             const result = await model.generateContent({
                 contents: [
-                    { role: 'user', parts: [{ text: AGENDA_REPLANNER_SYSTEM_PROMPT }] },
+                    { role: 'user', parts: [{ text: AGENDA_REPLANNER_SYSTEM_PROMPT + (userContextBlock ? '\n\n' + userContextBlock : '') }] },
                     { role: 'model', parts: [{ text: 'Entendido. Aguardo a situação para replanejar.' }] },
                     { role: 'user', parts: [{ text: prompt }] },
                 ],

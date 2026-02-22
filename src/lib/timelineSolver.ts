@@ -20,6 +20,7 @@ export interface SolverBlock {
     canSplit?: boolean;
     canShorten?: boolean;
     minDuration?: number; // minimum duration in minutes (for shortening)
+    locked?: boolean;
     meta?: Record<string, unknown>;
 }
 
@@ -145,6 +146,17 @@ export function solveTimeline(
         if (!conflict) {
             // No conflict, place directly
             placed.push({ ...block });
+            continue;
+        }
+
+        // 3.1. If the current block is LOCKED, it MUST stay here.
+        // If there's a conflict with a previously placed block, we have a critical error.
+        // (Note: since fixed blocks are placed first and are usually locked, 
+        // they shouldn't conflict with each other if the DB is clean).
+        if (block.locked) {
+            placed.push({ ...block });
+            hasErrors = true;
+            warnings.push(`CRÍTICO: Bloco trancado "${block.title}" em conflito com "${conflict.title}".`);
             continue;
         }
 
@@ -318,8 +330,8 @@ export function dailyBlockToSolverBlock(block: {
         priority: getPriorityForBlock(block.category, block.source, isDerived),
         parentEventId: block.meta?.parentEventId as string | undefined,
         canSplit: block.category === 'work' || block.category === 'study',
-        canShorten: block.category !== 'fixed' && block.category !== 'sleep',
         minDuration: block.category === 'meal' ? 15 : 20,
+        locked: block.locked || (block.meta?.locked === true) || block.source === 'fixed',
         meta: block.meta,
     };
 }

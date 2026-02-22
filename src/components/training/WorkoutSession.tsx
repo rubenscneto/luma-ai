@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Dumbbell, Plus, Check, X, Clock, Flame,
-    ChevronDown, ChevronUp, Loader2
+    ChevronDown, ChevronUp, Loader2, Target
 } from 'lucide-react';
 import { useTraining } from '@/context/trainingContext';
 import { TrainingPlanDay, WorkoutExercise, WorkoutSet } from '@/types';
@@ -16,7 +16,10 @@ interface WorkoutSessionProps {
 }
 
 export default function WorkoutSession({ dayPlan, onComplete, onCancel }: WorkoutSessionProps) {
-    const { activeSession, sessionSets, logSet, completeSession, cancelSession, isLoading } = useTraining();
+    const {
+        activeSession, sessionSets, logSet, completeSession, cancelSession,
+        isLoading, personalRecords, progressions
+    } = useTraining();
     const [expandedExercise, setExpandedExercise] = useState<string | null>(dayPlan.workout[0]?.exerciseId || null);
     const [setForm, setSetForm] = useState<{ weight: string; reps: string; rest: string; rpe: string }>({
         weight: '', reps: '', rest: '60', rpe: '',
@@ -114,8 +117,15 @@ export default function WorkoutSession({ dayPlan, onComplete, onCancel }: Workou
                                         </div>
                                     )}
                                     <div className="text-left">
-                                        <p className={`text-sm font-medium ${isDone ? 'text-green-300' : 'text-white'}`}>
-                                            {exercise.name}
+                                        <p className="text-left py-0.5">
+                                            <span className={`text-sm font-medium ${isDone ? 'text-green-300' : 'text-white'}`}>
+                                                {exercise.name}
+                                            </span>
+                                            {personalRecords[exercise.exerciseId] && (
+                                                <span className="ml-2 px-1.5 py-0.5 rounded-md bg-purple-500/10 text-[10px] text-purple-400 border border-purple-500/20">
+                                                    PR: {personalRecords[exercise.exerciseId]}kg
+                                                </span>
+                                            )}
                                         </p>
                                         <p className="text-xs text-white/40">
                                             {exercise.machineOrType} • {exercise.setsTarget}x{exercise.repsTarget} • {exercise.restSecTarget}s desc
@@ -164,9 +174,17 @@ export default function WorkoutSession({ dayPlan, onComplete, onCancel }: Workou
                                             {/* New Set Form */}
                                             {!isDone && (
                                                 <div className="space-y-2">
-                                                    <p className="text-xs text-white/50">
-                                                        Série {sets.length + 1} de {exercise.setsTarget}
-                                                    </p>
+                                                    <div className="flex items-center justify-between">
+                                                        <p className="text-xs text-white/50">
+                                                            Série {sets.length + 1} de {exercise.setsTarget}
+                                                        </p>
+                                                        {progressions.find(p => p.exerciseName === exercise.name) && (
+                                                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                                                                <Target className="w-3 h-3 text-blue-400" />
+                                                                <span className="text-[10px] text-blue-300 font-medium">Meta: {progressions.find(p => p.exerciseName === exercise.name)?.detail}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                     <div className="grid grid-cols-4 gap-2">
                                                         <div>
                                                             <label className="text-[10px] text-white/40">Peso (kg)</label>

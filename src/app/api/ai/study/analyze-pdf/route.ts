@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getGeminiModel } from '@/lib/ai/gemini';
 
 export const dynamic = 'force-dynamic';
-
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '');
 
 export async function POST(request: NextRequest) {
     try {
@@ -13,7 +11,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'PDF content required' }, { status: 400 });
         }
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const model = getGeminiModel();
 
         const prompt = `Analise o conteúdo deste PDF${subject_name ? ` da matéria "${subject_name}"` : ''} (arquivo: ${filename || 'documento.pdf'}).
 

@@ -56,6 +56,9 @@ interface DailyPlanContextType {
     detectRecurrences: () => Promise<void>;
     addRecurrenceAsFixed: (suggestion: RecurrenceSuggestion) => Promise<void>;
     dismissRecurrence: (id: string) => void;
+    lastSolverWarnings: string[];
+    lastAISummary: string | null;
+    consistencyScore: number;
 }
 
 const DailyPlanContext = createContext<DailyPlanContextType | undefined>(undefined);
@@ -100,6 +103,10 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
     // Recurrence state
     const [recurrenceSuggestions, setRecurrenceSuggestions] = useState<RecurrenceSuggestion[]>([]);
     const [isRecurrenceLoading, setIsRecurrenceLoading] = useState(false);
+
+    // Transparency state
+    const [lastSolverWarnings, setLastSolverWarnings] = useState<string[]>([]);
+    const [lastAISummary, setLastAISummary] = useState<string | null>(null);
 
     // Date selection (for future day support)
     const today = new Date().toISOString().split('T')[0];
@@ -354,6 +361,9 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
 
             if (response.ok) {
                 const data = await response.json();
+                setLastSolverWarnings(data.warnings || []);
+                setLastAISummary(data.ai_summary || null);
+
                 toast.success(`Agenda gerada: ${data.blocks_count?.total || 0} blocos criados!`);
                 await loadTodayPlan();
             } else {
@@ -596,6 +606,8 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
 
             if (response.ok) {
                 const data = await response.json();
+                setLastSolverWarnings(data.solver_warnings || []);
+
                 if (data.blocks && Array.isArray(data.blocks)) {
                     // Merge: preserve local done/skipped state (avoids race condition)
                     setTodayBlocks(prev => {
@@ -798,6 +810,13 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
     const currentBlock = todayBlocks.find(b => b.status === 'current') || null;
     const nextBlock = todayBlocks.find(b => b.status === 'upcoming') || null;
 
+    const consistencyScore = React.useMemo(() => {
+        const actionableBlocks = todayBlocks.filter(b => !b.is_fixed && b.category !== 'sleep');
+        if (actionableBlocks.length === 0) return 100;
+        const completedCount = actionableBlocks.filter(b => b.is_done).length;
+        return Math.round((completedCount / actionableBlocks.length) * 100);
+    }, [todayBlocks]);
+
     return (
         <DailyPlanContext.Provider value={{
             todayPlan,
@@ -830,6 +849,9 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
             loadPlanForDate,
             weekBlocks,
             fetchWeekBlocks,
+            lastSolverWarnings,
+            lastAISummary,
+            consistencyScore
         }}>
             {children}
         </DailyPlanContext.Provider>

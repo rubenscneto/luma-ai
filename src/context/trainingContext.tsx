@@ -13,6 +13,8 @@ interface TrainingContextType {
     recentSessions: WorkoutSession[];
     bodyMetrics: BodyMetric[];
     progressions: ProgressionSuggestion[];
+    personalRecords: Record<string, number>;
+    volumeHistory: { date: string; volume: number }[];
     isLoading: boolean;
 
     loadWeeklyPlan: () => Promise<void>;
@@ -23,6 +25,8 @@ interface TrainingContextType {
     cancelSession: () => Promise<void>;
     loadRecentSessions: () => Promise<void>;
     loadProgressions: () => Promise<void>;
+    loadPersonalRecords: () => Promise<void>;
+    loadVolumeHistory: () => Promise<void>;
     logBodyWeight: (weightKg: number, notes?: string) => Promise<void>;
     loadBodyMetrics: () => Promise<void>;
 }
@@ -37,6 +41,8 @@ export function TrainingProvider({ children }: { children: React.ReactNode }) {
     const [recentSessions, setRecentSessions] = useState<WorkoutSession[]>([]);
     const [bodyMetrics, setBodyMetrics] = useState<BodyMetric[]>([]);
     const [progressions, setProgressions] = useState<ProgressionSuggestion[]>([]);
+    const [personalRecords, setPersonalRecords] = useState<Record<string, number>>({});
+    const [volumeHistory, setVolumeHistory] = useState<{ date: string; volume: number }[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
     const loadWeeklyPlan = useCallback(async () => {
@@ -120,6 +126,59 @@ export function TrainingProvider({ children }: { children: React.ReactNode }) {
         }
     }, [user]);
 
+    const loadPersonalRecords = useCallback(async () => {
+        if (!user) return;
+        try {
+            const { data } = await supabase
+                .from('workout_sets')
+                .select('exercise_id, weight_kg')
+                .eq('user_id', user.id);
+
+            const prs: Record<string, number> = {};
+            (data || []).forEach(set => {
+                if (set.weight_kg && (!prs[set.exercise_id] || set.weight_kg > prs[set.exercise_id])) {
+                    prs[set.exercise_id] = set.weight_kg;
+                }
+            });
+            setPersonalRecords(prs);
+        } catch (error) {
+            console.error('Load PRs error:', error);
+        }
+    }, [user]);
+
+    const loadVolumeHistory = useCallback(async () => {
+        if (!user) return;
+        try {
+            const { data: sessions } = await supabase
+                .from('workout_sessions')
+                .select('id, date')
+                .eq('user_id', user.id)
+                .order('date', { ascending: true });
+
+            if (!sessions || sessions.length === 0) return;
+
+            const sessionIds = sessions.map(s => s.id);
+            const { data: sets } = await supabase
+                .from('workout_sets')
+                .select('session_id, weight_kg, reps')
+                .in('session_id', sessionIds);
+
+            const volumeByDate: Record<string, number> = {};
+            sessions.forEach(s => {
+                const sessionSets = (sets || []).filter(set => set.session_id === s.id);
+                const volume = sessionSets.reduce((sum, set) => sum + (set.weight_kg || 0) * (set.reps || 0), 0);
+                if (volume > 0) {
+                    volumeByDate[s.date] = (volumeByDate[s.date] || 0) + volume;
+                }
+            });
+
+            const history = Object.entries(volumeByDate).map(([date, volume]) => ({ date, volume }));
+            setVolumeHistory(history);
+        } catch (error) {
+            console.error('Load volume history error:', error);
+        }
+    }, [user]);
+
     // Auto-load on mount
     useEffect(() => {
         if (user) {
@@ -127,8 +186,10 @@ export function TrainingProvider({ children }: { children: React.ReactNode }) {
             loadActiveSession();
             loadRecentSessions();
             loadBodyMetrics();
+            loadPersonalRecords();
+            loadVolumeHistory();
         }
-    }, [user, loadWeeklyPlan, loadActiveSession, loadRecentSessions, loadBodyMetrics]);
+    }, [user, loadWeeklyPlan, loadActiveSession, loadRecentSessions, loadBodyMetrics, loadPersonalRecords, loadVolumeHistory]);
 
     const generateWeeklyPlan = async (options?: { goal?: string; level?: string; timePerSession?: number; equipment?: string[] }) => {
         if (!user) return;
@@ -214,6 +275,16 @@ export function TrainingProvider({ children }: { children: React.ReactNode }) {
             if (error) throw error;
 
             setSessionSets(prev => [...prev, savedSet as WorkoutSet]);
+
+            // Check for PR
+            const currentPR = personalRecords[exerciseId] || 0;
+            if (data.weightKg > currentPR) {
+                setPersonalRecords(prev => ({ ...prev, [exerciseId]: data.weightKg }));
+                toast.success(`🎉 Novo Recorde Pessoal em ${exerciseName}! (${data.weightKg} kg)`, {
+                    description: currentPR > 0 ? `Superou seu recorde anterior de ${currentPR} kg!` : 'Primeiro recorde registrado!',
+                    duration: 5000,
+                });
+            }
         } catch (error) {
             console.error('Log set error:', error);
             toast.error('Erro ao salvar série.');
@@ -319,6 +390,8 @@ export function TrainingProvider({ children }: { children: React.ReactNode }) {
             recentSessions,
             bodyMetrics,
             progressions,
+            personalRecords,
+            volumeHistory,
             isLoading,
             loadWeeklyPlan,
             generateWeeklyPlan,
@@ -328,6 +401,8 @@ export function TrainingProvider({ children }: { children: React.ReactNode }) {
             cancelSession,
             loadRecentSessions,
             loadProgressions,
+            loadPersonalRecords,
+            loadVolumeHistory,
             logBodyWeight,
             loadBodyMetrics,
         }}>

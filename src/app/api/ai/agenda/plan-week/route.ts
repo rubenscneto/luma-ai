@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getGeminiModel } from '@/lib/ai/gemini';
 import { z } from 'zod';
 import { AGENDA_PLANNER_SYSTEM_PROMPT, buildPlanDayPrompt } from '@/ai/prompts/agendaPrompts';
 import { solveTimeline, dailyBlockToSolverBlock, solverBlockToTimeFields, SolverBlock } from '@/lib/timelineSolver';
@@ -52,9 +52,13 @@ function addDaysToDate(dateStr: string, days: number): string {
 }
 
 export async function POST(request: NextRequest) {
+    let lockAcquired = false;
+    let userId: string | null = null;
+
     try {
         const body = await request.json();
         const input = planWeekInputSchema.parse(body);
+        userId = input.user_id;
 
         // STRICT VALIDATION: start_date must be valid YYYY-MM-DD
         if (!input.start_date || !/^\d{4}-\d{2}-\d{2}$/.test(input.start_date)) {
@@ -63,76 +67,77 @@ export async function POST(request: NextRequest) {
 
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
         const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-        const geminiKey = process.env.GEMINI_API_KEY;
 
-        if (!supabaseUrl || !supabaseKey || !geminiKey) {
-            const missing = [
-                !supabaseUrl && 'SUPABASE_URL',
-                !supabaseKey && 'SUPABASE_SERVICE_ROLE_KEY',
-                !geminiKey && 'GEMINI_API_KEY',
-            ].filter(Boolean).join(', ');
-            return NextResponse.json(
-                { error: `Configuração do servidor incompleta. Faltando: ${missing}`, rlsHint: !supabaseKey ? 'SUPABASE_SERVICE_ROLE_KEY is required for writes — anon key is blocked by RLS' : undefined },
-                { status: 500 }
-            );
+        if (!supabaseUrl || !supabaseKey) {
+            return NextResponse.json({ error: 'Configuração do servidor incompleta.' }, { status: 500 });
         }
 
         const supabase = createClient(supabaseUrl, supabaseKey);
-        const genAI = new GoogleGenerativeAI(geminiKey);
+        const lockKey = `plan-week:${userId}`;
+
+        // 1. Try to acquire lock
+        const { data: existingLock } = await supabase
+            .from('processing_locks')
+            .select('*')
+            .eq('lock_key', lockKey)
+            .single();
+
+        if (existingLock && new Date(existingLock.expires_at).getTime() > Date.now()) {
+            return NextResponse.json({
+                error: 'PLANEJAMENTO_EM_CURSO',
+                message: 'Já existe um planejamento semanal em andamento para este usuário. Aguarde alguns segundos.'
+            }, { status: 429 });
+        }
+
+        await supabase.from('processing_locks').upsert({
+            lock_key: lockKey,
+            user_id: userId,
+            locked_at: new Date().toISOString(),
+            expires_at: new Date(Date.now() + 120000).toISOString()
+        });
+        lockAcquired = true;
+
+        const model = getGeminiModel();
 
         // Determine which days to plan (default: all 7)
         const daysOfWeek = input.days_to_plan || [0, 1, 2, 3, 4, 5, 6];
         const datesToPlan = daysOfWeek.map(dow => {
-            // startDate is the Monday (or Sunday), calculate each day
             const startDow = getDayOfWeek(input.start_date);
             const diff = dow - startDow;
-            return addDaysToDate(input.start_date, diff >= 0 ? diff : diff + 7);
+            let targetDate = addDaysToDate(input.start_date, diff);
+            // If the calculated date is before start_date, it's for next week
+            if (new Date(targetDate) < new Date(input.start_date)) {
+                targetDate = addDaysToDate(targetDate, 7);
+            }
+            return targetDate;
         });
 
-        // Load user's fixed blocks for all relevant days
-        const { data: allFixedBlocks, error: fixedError } = await supabase
-            .from('fixed_blocks')
-            .select('*')
-            .eq('user_id', input.user_id)
-            .eq('is_active', true)
-            .in('day_of_week', daysOfWeek);
+        // Load user data
+        const [fixedRes, profileRes, healthRes, routineRes] = await Promise.all([
+            supabase.from('fixed_blocks').select('*').eq('user_id', userId).eq('is_active', true).in('day_of_week', daysOfWeek),
+            supabase.from('profiles').select('*').eq('id', userId).single(),
+            supabase.from('health_profile').select('*').eq('user_id', userId).single(),
+            supabase.from('routine_profiles').select('*').eq('user_id', userId).single(),
+        ]);
 
-        if (input.debug) {
-            console.log(`[plan-week] DEBUG: Fetched ${allFixedBlocks?.length || 0} fixed blocks. Error: ${fixedError?.message}`);
-        }
+        const allFixedBlocks = fixedRes.data || [];
+        const profile = profileRes.data;
+        const healthProfile = healthRes.data;
+        const routineProfile = routineRes.data;
 
-        // Load user profile
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', input.user_id)
-            .single();
-
-        // Load health profile
-        const { data: healthProfile } = await supabase
-            .from('health_profile')
-            .select('*')
-            .eq('user_id', input.user_id)
-            .single();
-
-        // Load existing blocks for the week to avoid duplicates
+        // Load existing blocks for the week
         const weekStart = datesToPlan[0];
         const weekEnd = datesToPlan[datesToPlan.length - 1];
-        const { data: existingBlocks, error: blocksError } = await supabase
+        const { data: existingBlocks } = await supabase
             .from('daily_blocks')
             .select('*')
-            .eq('user_id', input.user_id)
+            .eq('user_id', userId)
             .gte('start_datetime', `${weekStart}T00:00:00`)
             .lte('start_datetime', `${weekEnd}T23:59:59`);
 
-        if (blocksError) {
-            console.error('Error fetching existing blocks:', blocksError);
-            throw new Error(`Database error (fetching blocks): ${blocksError.message}`);
-        }
-
         // Build context for AI
         const fixedBlocksByDay: Record<number, any[]> = {};
-        (allFixedBlocks || []).forEach(fb => {
+        allFixedBlocks.forEach(fb => {
             if (!fixedBlocksByDay[fb.day_of_week]) fixedBlocksByDay[fb.day_of_week] = [];
             fixedBlocksByDay[fb.day_of_week].push(fb);
         });
@@ -140,308 +145,99 @@ export async function POST(request: NextRequest) {
         const daysContext = datesToPlan.map(date => {
             const dow = getDayOfWeek(date);
             const dayFixed = fixedBlocksByDay[dow] || [];
-            const dayExisting = (existingBlocks || []).filter(b =>
-                b.start_datetime?.startsWith(date)
-            );
+            const dayExisting = (existingBlocks || []).filter(b => b.start_datetime?.startsWith(date));
 
             return {
                 date,
                 dayOfWeek: dow,
                 dayName: ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][dow],
                 fixedBlocks: dayFixed.map(fb => `${fb.title} (${fb.start_time}-${fb.end_time})`),
-                existingBlocks: dayExisting.length,
                 hasExistingPlan: dayExisting.length > 0,
             };
         });
 
-        // AI prompt for week planning
         const weekPrompt = `
 Planeje a semana completa para o usuário.
+Perfil: ${profile?.full_name || 'Usuário'}, ${profile?.occupation || routineProfile?.occupation || 'profissional'}
+${healthProfile ? `Saúde: Treino ${healthProfile.training_frequency || '3x/semana'}, Objetivo: ${healthProfile.goal || routineProfile?.goal || 'saúde'}` : ''}
+${routineProfile ? `Rotina: Objetivos: ${routineProfile.objectives?.join(', ')}, Pico: ${routineProfile.peak_productivity}` : ''}
 
-Perfil: ${profile?.full_name || 'Usuário'}, ${profile?.occupation || 'profissional'}
-${healthProfile ? `Saúde: Treino ${healthProfile.training_frequency || '3x/semana'}, Objetivo: ${healthProfile.goal || 'saúde'}` : ''}
-
-Para cada dia abaixo, gere blocos otimizados respeitando compromissos fixos.
 Regras:
 1. NUNCA sobreponha horários com blocos fixos
 2. Distribua estudo, trabalho, exercício e lazer ao longo da semana
-3. Considere fadiga acumulada (quarta é meio de semana)
-4. Fins de semana devem ser mais leves
-5. Inclua refeições (café, almoço, jantar) em horários regulares
-6. Reserve blocos de foco (deep work) para manhã
-7. Cada bloco tem category: work|study|health|leisure|admin|sleep|meal|commute|fixed
+3. Inclua refeições (café, almoço, jantar) em horários regulares
+4. Cada bloco tem category: work|study|health|leisure|admin|sleep|meal|commute|fixed
 
 Dias para planejar:
-${daysContext.map(d => `
-${d.dayName} (${d.date}):
-  Fixos: ${d.fixedBlocks.length > 0 ? d.fixedBlocks.join(', ') : 'nenhum'}
-  ${d.hasExistingPlan ? `⚠️ Já tem ${d.existingBlocks} blocos - preencher lacunas apenas` : 'Dia vazio - planejar completo'}
-`).join('\n')}
+${daysContext.map(d => `${d.dayName} (${d.date}): Fixos: ${d.fixedBlocks.join(', ') || 'nenhum'} ${d.hasExistingPlan ? '(Complementar)' : '(Completo)'}`).join('\n')}
 
-Responda EXCLUSIVAMENTE em JSON válido:
+Responda EXCLUSIVAMENTE em JSON:
 {
-  "days": [
-    {
-      "date": "YYYY-MM-DD",
-      "blocks": [
-        { "title": "...", "category": "...", "start_time": "HH:MM", "end_time": "HH:MM", "suggested_reason": "...", "energyLevel": "low|medium|high" }
-      ],
-      "summary": "Resumo do dia"
-    }
-  ],
-  "weekSummary": "Resumo geral da semana",
-  "weekInsight": "Dica/insight motivacional"
+  "days": [{ "date": "YYYY-MM-DD", "blocks": [{ "title": "...", "category": "...", "start_time": "HH:MM", "end_time": "HH:MM" }], "summary": "..." }],
+  "weekSummary": "...", "weekInsight": "..."
 }`;
 
-        const model = genAI.getGenerativeModel({
-            model: 'gemini-2.5-flash',
-            generationConfig: { responseMimeType: 'application/json' }
-        });
         const result = await model.generateContent({
             contents: [
                 { role: 'user', parts: [{ text: AGENDA_PLANNER_SYSTEM_PROMPT }] },
-                { role: 'model', parts: [{ text: 'Entendido! Vou planejar a semana otimizando produtividade e bem-estar.' }] },
+                { role: 'model', parts: [{ text: 'Entendido! Vou planejar a semana.' }] },
                 { role: 'user', parts: [{ text: weekPrompt }] },
             ],
         });
 
-        const responseText = result.response.text();
+        const responseText = result.response.text().replace(/```json\n?|```/g, '').trim();
+        const weekPlan = aiWeekResponseSchema.parse(JSON.parse(responseText));
 
-        // Enhanced Error Handling for JSON Parsing
-        let parsed: any;
-        try {
-            // Remove markdown code blocks if present (Gemini sometimes adds ```json ... ```)
-            const cleanJson = responseText.replace(/```json\n?|```/g, '').trim();
-            parsed = JSON.parse(cleanJson);
-        } catch (e) {
-            const aiTextSnippet = responseText.slice(0, 500); // Capture start of response for debug
-            console.error('AI JSON Parse Error:', e);
-            console.error('AI Raw Text:', responseText);
-            return NextResponse.json(
-                {
-                    error: 'AI_JSON_PARSE_FAILED',
-                    details: 'A IA não retornou um JSON válido.',
-                    parseError: String(e),
-                    aiTextSnippet,
-                    requestId: request.headers.get('x-request-id') || 'unknown'
-                },
-                { status: 500 }
-            );
-        }
-
-        const validated = aiWeekResponseSchema.safeParse(parsed);
-
-        if (!validated.success) {
-            console.error('Week plan validation failed:', validated.error.issues);
-            return NextResponse.json({ error: 'Formato da resposta inválido.' }, { status: 400 });
-        }
-
-        const weekPlan = validated.data;
         let totalBlocksCreated = 0;
         const solverWarnings: string[] = [];
-        const debugInfo: any[] = [];
-
-        // Initialize overflow blocks from previous day (for overnight processing)
-        // We use BlockInput[] to carry over full block data including priority/meta if we want,
-        // but here we primarily need basic info.
         let nextDayOverflows: BlockInput[] = [];
 
-        // Process each day
-        for (const [dayIdx, day] of weekPlan.days.entries()) {
+        for (const day of weekPlan.days) {
             const dayOfWeek = getDayOfWeek(day.date);
+            const { data: plan } = await supabase.from('daily_plan').upsert({
+                user_id: userId!, plan_date: day.date, timezone: input.timezone, status: 'active', updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id, plan_date' }).select().single();
+
+            if (!plan) continue;
+
             const dayFixed = fixedBlocksByDay[dayOfWeek] || [];
-
-            // Get or create plan for this date using UPSERT to handle race conditions
-            const { data: plan, error: planError } = await supabase
-                .from('daily_plan')
-                .upsert({
-                    user_id: input.user_id,
-                    plan_date: day.date,
-                    timezone: input.timezone,
-                    status: 'active',
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'user_id, plan_date' })
-                .select()
-                .single();
-
-            if (planError || !plan) {
-                console.error(`Failed to upsert plan for ${day.date}:`, planError);
-                solverWarnings.push(`${day.date}: Falha ao criar/atualizar plano diário.`);
-                continue;
-            }
-
-            // -- DEBUG COUNTERS --
-            let debugAiRaw = day.blocks.length;
-            let debugAfterFilter = 0;
-            let debugMealWindowRejects = 0;
-
-            // Convert Fixed blocks to solver format
             const fixedSolverBlocks: SolverBlock[] = dayFixed.map(fb => ({
-                id: `fixed-${fb.id}`,
-                title: fb.title,
-                category: fb.category || 'fixed',
-                startMin: timeToMinutes(fb.start_time),
-                endMin: timeToMinutes(fb.end_time),
-                source: 'fixed' as const,
-                priority: 100,
-                locked: true, // Fixed blocks are immutable in time
+                id: `fixed-${fb.id}`, title: fb.title, category: fb.category || 'fixed',
+                startMin: timeToMinutes(fb.start_time), endMin: timeToMinutes(fb.end_time),
+                source: 'fixed', priority: 100, locked: true
             }));
 
-            // 1. Prepare AI blocks + Overflows as BlockInputs
-            // We convert everything to BlockInput first to use the overnight utility
-            const rawDayInputs: BlockInput[] = [];
+            const rawDayInputs: BlockInput[] = [...nextDayOverflows];
+            day.blocks.forEach(b => rawDayInputs.push({
+                title: b.title, category: b.category as any, start_datetime: `${day.date}T${b.start_time}:00`,
+                end_datetime: `${day.date}T${b.end_time}:00`, source: 'ai',
+                meta: { energyLevel: b.energyLevel, suggestedReason: b.suggested_reason }
+            }));
 
-            // Add overflows from previous day
-            rawDayInputs.push(...nextDayOverflows);
+            const split = splitOvernightBlocks(rawDayInputs, day.date);
+            nextDayOverflows = split.nextDay;
 
-            // Add new AI blocks
-            day.blocks.forEach((b, idx) => {
-                rawDayInputs.push({
-                    title: b.title,
-                    category: b.category as any,
-                    start_datetime: `${day.date}T${b.start_time}:00`,
-                    end_datetime: `${day.date}T${b.end_time}:00`,
-                    source: 'ai',
-                    meta: {
-                        energyLevel: b.energyLevel,
-                        suggestedReason: b.suggested_reason,
-                        originalTime: `${b.start_time}-${b.end_time}`
-                    }
-                });
-            });
-
-            // 2. Split Overnight Blocks
-            const { today: todayInputs, nextDay: newNextDayOverflows } = splitOvernightBlocks(rawDayInputs, day.date);
-            nextDayOverflows = newNextDayOverflows; // Update for next iteration
-
-            // 3. Convert to SolverBlocks and Apply Logic (Meal Windows, Conflicts)
-            const aiSolverBlocks: SolverBlock[] = [];
-
-            for (const [idx, b] of todayInputs.entries()) {
-                let startMin = extractTimeMinutes(b.start_datetime);
-                let endMin = extractTimeMinutes(b.end_datetime);
-
-                // Re-calculate endMin if it wrapped to next day (should be 23:59 from split utility)
-                // The utility ensures end_datetime is set correctly for today.
-                // But we need to handle the case where 23:59:00 IS the end.
-                // extractTimeMinutes handles standard HH:MM.
-
-                // 1. Meal window enforcement (Only for meals)
+            const aiSolverBlocks: SolverBlock[] = split.today.map((b, idx) => {
+                let sMin = extractTimeMinutes(b.start_datetime);
+                let eMin = extractTimeMinutes(b.end_datetime);
                 if (b.category === 'meal') {
-                    const mealCheck = validateMealWindow(b.title, startMin);
-                    if (mealCheck.window && !mealCheck.valid) {
-                        solverWarnings.push(`${day.date}: Refeição "${b.title}" movida de ${minutesToTimeStr(startMin)} para ${minutesToTimeStr(mealCheck.nearestSlot)} (janela: ${mealCheck.window.label}).`);
-                        startMin = mealCheck.nearestSlot;
-                        // Duration needs to be preserved?
-                        const duration = endMin - extractTimeMinutes(b.start_datetime);
-                        endMin = startMin + duration;
-                        debugMealWindowRejects++;
+                    const check = validateMealWindow(b.title, sMin);
+                    if (check.window && !check.valid) {
+                        sMin = check.nearestSlot;
+                        eMin = sMin + (extractTimeMinutes(b.end_datetime) - extractTimeMinutes(b.start_datetime));
+                        solverWarnings.push(`${day.date}: ${b.title} movido para janela.`);
                     }
                 }
-
-                // 2. Check for overlapping Fixed Block
-                // Note: endMin could be < startMin if raw data was weird, but overnight splitter fixed that?
-                // Actually overnight splitter fixes crossing midnight.
-                // We trust startMin < endMin for "today" blocks now.
-
-                const overlapsFixed = fixedSolverBlocks.some(fb =>
-                    !(endMin <= fb.startMin || startMin >= fb.endMin)
-                );
-
-                if (overlapsFixed) {
-                    // Optional: Decide to drop or keep. Currently keeping for solver to fix.
-                }
-
-                aiSolverBlocks.push({
-                    id: `ai-${dayIdx}-${idx}`,
-                    title: b.title,
-                    category: b.category,
-                    startMin: startMin,
-                    endMin: endMin,
-                    source: 'ai' as const,
-                    priority: b.category === 'meal' ? 70 : 50,
-                    canShorten: true,
-                    minDuration: b.category === 'meal' ? 15 : 15,
-                    meta: b.meta
-                });
-                debugAfterFilter++;
-            }
-
-            // SOLVE TIMELINE (Fix conflicts)
-            const allSolverBlocks = [...fixedSolverBlocks, ...aiSolverBlocks];
-            const solverResult = solveTimeline(allSolverBlocks);
-
-            if (solverResult.conflicts.length > 0) {
-                solverWarnings.push(...solverResult.conflicts.map(c => `${day.date}: ${c.reason}`));
-            }
-
-            // Remover blocos que o solver empurrou para fora da janela útil
-            // (antes das 05:00 ou depois das 23:00 para blocos não-sono e não-fixos)
-            const USEFUL_START = 5 * 60;   // 05:00
-            const USEFUL_END = 23 * 60;  // 23:00
-
-            const filteredResolved = solverResult.resolved.filter(sb => {
-                if (sb.source === 'fixed') return true;
-                if (sb.category === 'sleep') return true;
-
-                // Blocos fora da janela útil são descartados (não persistidos)
-                if (sb.endMin <= USEFUL_START || sb.startMin >= USEFUL_END) {
-                    solverWarnings.push(
-                        `${day.date}: '${sb.title}' descartado — fora da janela útil (${minutesToTimeStr(sb.startMin)}-${minutesToTimeStr(sb.endMin)})`
-                    );
-                    return false;
-                }
-                return true;
+                return { id: `ai-${idx}`, title: b.title, category: b.category, startMin: sMin, endMin: eMin, source: 'ai', priority: b.category === 'meal' ? 70 : 50, canShorten: true, minDuration: 15, meta: b.meta };
             });
 
-            // Convert back to BlockInput for persistence
-            const finalBlocksInput: BlockInput[] = filteredResolved
-                .filter(sb => sb.source !== 'fixed')
-                .map((sb, idx) => {
-                    const timeFields = solverBlockToTimeFields(sb, day.date, input.timezone);
-                    return {
-                        title: sb.title,
-                        category: sb.category as any,
-                        start_datetime: timeFields.start_datetime,
-                        end_datetime: timeFields.end_datetime,
-                        source: sb.source,
-                        order_index: idx,
-                        is_fixed: sb.source === 'fixed',
-                        meta: sb.meta
-                    };
-                });
+            const solverResult = solveTimeline([...fixedSolverBlocks, ...aiSolverBlocks]);
+            const finalInputs: BlockInput[] = solverResult.resolved
+                .filter(sb => sb.source !== 'fixed' && (sb.category === 'sleep' || (sb.startMin < 23 * 60 && sb.endMin > 5 * 60)))
+                .map((sb, idx) => ({ ...solverBlockToTimeFields(sb, day.date, input.timezone), title: sb.title, category: sb.category as any, source: sb.source, order_index: idx, is_fixed: false, meta: sb.meta }));
 
-            // PERSIST TO DB
-            const persistResult = await persistDailyBlocks(
-                supabase,
-                plan.id,
-                input.user_id,
-                day.date,
-                finalBlocksInput,
-                {
-                    deleteStale: true,
-                    deleteNullKeys: true,
-                    staleSources: ['ai']
-                }
-            );
-
-            debugInfo.push({
-                date: day.date,
-                aiRawCount: debugAiRaw,
-                afterSolverCount: finalBlocksInput.length,
-                inserted: persistResult.inserted,
-                updated: persistResult.updated,
-                deleted: persistResult.deleted,
-                persistErrors: persistResult.errors,
-                solverConflicts: solverResult.conflicts.length
-            });
-
+            const persistResult = await persistDailyBlocks(supabase, plan.id, userId!, day.date, finalInputs, { deleteStale: true, staleSources: ['ai'] });
             totalBlocksCreated += persistResult.inserted + persistResult.updated;
-        }
-
-        // Server-side debug log (visible in Vercel logs)
-        if (input.debug && debugInfo.length > 0) {
-            console.log('[plan-week] DEBUG:', JSON.stringify(debugInfo, null, 2));
         }
 
         return NextResponse.json({
@@ -451,23 +247,13 @@ Responda EXCLUSIVAMENTE em JSON válido:
             daysPlanned: weekPlan.days.length,
             totalBlocks: totalBlocksCreated,
             warnings: solverWarnings,
-            ...(input.debug ? { debug: debugInfo } : {}),
         });
 
-    } catch (error) {
-        console.error('Plan week error FULL details:', error);
-
-        // Return 400 for validation errors (Zod)
+    } catch (error: any) {
+        console.error('Plan week error:', error);
         if (error instanceof z.ZodError) {
-            return NextResponse.json(
-                {
-                    error: 'Dados de entrada inválidos.',
-                    details: error.issues
-                },
-                { status: 400 }
-            );
+            return NextResponse.json({ error: 'Dados de entrada inválidos.', details: error.issues }, { status: 400 });
         }
-
         return NextResponse.json(
             {
                 error: error instanceof Error ? error.message : 'Erro crítico ao planejar semana.',
@@ -476,6 +262,11 @@ Responda EXCLUSIVAMENTE em JSON válido:
             },
             { status: 500 }
         );
+    } finally {
+        if (lockAcquired && userId) {
+            const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+            await supabase.from('processing_locks').delete().eq('lock_key', `plan-week:${userId}`);
+        }
     }
 }
 

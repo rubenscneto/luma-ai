@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getGeminiModel } from '@/lib/ai/gemini';
 import { z } from 'zod';
 import { AGENDA_PLANNER_SYSTEM_PROMPT, buildPlanDayPrompt, buildABPlanPrompt } from '@/ai/prompts/agendaPrompts';
 import { persistDailyBlocks, BlockInput } from '@/lib/persistDailyBlocks';
@@ -70,6 +70,13 @@ async function getSharedContext(supabase: any, userId: string, dateStr: string, 
         .eq('user_id', userId)
         .single();
 
+    // Get routine profile
+    const { data: routineProfile } = await supabase
+        .from('routine_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
     // Get recent agenda blocks (last 7 days) for anti-repetition
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -101,7 +108,22 @@ async function getSharedContext(supabase: any, userId: string, dateStr: string, 
         equipment: hp.equipment,
     } : undefined;
 
-    return { fixedBlocks: fixedBlocks || [], fixedForContext, healthProfile, healthForContext, recentAgendaBlocks };
+    const rp = routineProfile as any;
+    const routineForContext = rp ? {
+        peak_productivity: rp.peak_productivity,
+        energy_level: rp.energy_level,
+        objectives: rp.objectives,
+    } : undefined;
+
+    return {
+        fixedBlocks: fixedBlocks || [], // Keep raw fixedBlocks for buildFixedBlockInputs
+        fixedForContext,
+        healthProfile: healthProfile, // Keep raw healthProfile if needed elsewhere
+        healthForContext,
+        routineProfile: routineProfile, // Keep raw routineProfile if needed elsewhere
+        routineForContext,
+        recentAgendaBlocks,
+    };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -161,8 +183,8 @@ function buildFixedBlockInputs(dateStr: string, timezone: string, fixedBlocks: a
     }));
 }
 
-async function generateAIBlocks(genAI: GoogleGenerativeAI, systemPrompt: string, userPrompt: string, temperature: number) {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+async function generateAIBlocks(model: any, systemPrompt: string, userPrompt: string, temperature: number) {
+    // const model = getGeminiModel({ temperature }); // This line was moved to the POST function
 
     const result = await model.generateContent({
         contents: [
@@ -192,7 +214,7 @@ function processAndSolveBlocks(
     dateStr: string,
     timezone: string,
     fixedInputs: BlockInput[]
-): BlockInput[] {
+): { blocks: BlockInput[], warnings: string[] } {
     // 1. Convert to BlockInput (raw)
     const rawInputs: BlockInput[] = aiBlocks.map((b, idx) => ({
         title: b.title,
@@ -256,7 +278,7 @@ function processAndSolveBlocks(
     const USEFUL_START = 5 * 60;   // 05:00
     const USEFUL_END = 23 * 60;  // 23:00
 
-    return result.resolved
+    const finalBlocks = result.resolved
         .filter(sb => {
             if (sb.source === 'fixed') return false;
             if (sb.category === 'sleep') return true;
@@ -274,11 +296,13 @@ function processAndSolveBlocks(
                 category: sb.category as any,
                 start_datetime: timeFields.start_datetime,
                 end_datetime: timeFields.end_datetime,
-                source: 'ai',
+                source: 'ai' as any,
                 order_index: fixedInputs.length + idx, // Append after fixed
                 meta: sb.meta
             };
         });
+
+    return { blocks: finalBlocks, warnings: result.warnings };
 }
 
 function extractTimeMinutes(dt: string): number {
@@ -294,7 +318,7 @@ export async function POST(request: NextRequest) {
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+        const model = getGeminiModel({ temperature: 0.7 }); // Default model for standard modes
 
         const body = await request.json();
         const input = planDayInputSchema.parse(body);
@@ -338,7 +362,7 @@ export async function POST(request: NextRequest) {
                 energyLevel: b.energyLevel as 'low' | 'medium' | 'high' | undefined
             }));
 
-            const confirmedInputs = processAndSolveBlocks(rawPlanBlocks, dateStr, input.timezone, fixedInputs);
+            const { blocks: confirmedInputs, warnings: confirmWarnings } = processAndSolveBlocks(rawPlanBlocks, dateStr, input.timezone, fixedInputs);
 
             // Add confirming meta
             confirmedInputs.forEach(b => {
@@ -404,6 +428,7 @@ export async function POST(request: NextRequest) {
                 fixedBlocks: context.fixedForContext,
                 existingBlocks: existingForContext,
                 healthProfile: context.healthForContext,
+                routineProfile: context.routineForContext, // Added routine profile
                 recentAgendaBlocks: context.recentAgendaBlocks,
             };
 
@@ -411,13 +436,13 @@ export async function POST(request: NextRequest) {
             console.log('Generating A/B plans with Gemini 2.0 Flash...');
             const [planAResult, planBResult] = await Promise.all([
                 generateAIBlocks(
-                    genAI,
+                    getGeminiModel({ temperature: 0.5 }), // Specific temperature for plan A
                     AGENDA_PLANNER_SYSTEM_PROMPT,
                     buildABPlanPrompt({ ...sharedPromptContext, planStyle: 'focused' }),
                     0.5
                 ),
                 generateAIBlocks(
-                    genAI,
+                    getGeminiModel({ temperature: 0.9 }), // Specific temperature for plan B
                     AGENDA_PLANNER_SYSTEM_PROMPT,
                     buildABPlanPrompt({ ...sharedPromptContext, planStyle: 'balanced' }),
                     0.9
@@ -428,8 +453,8 @@ export async function POST(request: NextRequest) {
             const fixedInputs = buildFixedBlockInputs(dateStr, input.timezone, context.fixedBlocks, existingBlocks || []);
 
             // Solve both plans
-            const solvedA = processAndSolveBlocks(planAResult.blocks, dateStr, input.timezone, fixedInputs);
-            const solvedB = processAndSolveBlocks(planBResult.blocks, dateStr, input.timezone, fixedInputs);
+            const { blocks: solvedA, warnings: warningsA } = processAndSolveBlocks(planAResult.blocks, dateStr, input.timezone, fixedInputs);
+            const { blocks: solvedB, warnings: warningsB } = processAndSolveBlocks(planBResult.blocks, dateStr, input.timezone, fixedInputs);
 
             // Convert back to simple response format
             const toResponseFormat = (inputs: BlockInput[]) => inputs.map(b => ({
@@ -451,12 +476,14 @@ export async function POST(request: NextRequest) {
                     summary: planAResult.summary,
                     insight: planAResult.insight,
                     style: 'focused' as const,
+                    warnings: warningsA,
                 },
                 planB: {
                     blocks: toResponseFormat(solvedB),
                     summary: planBResult.summary,
                     insight: planBResult.insight,
                     style: 'balanced' as const,
+                    warnings: warningsB,
                 },
             });
         }
@@ -490,18 +517,26 @@ export async function POST(request: NextRequest) {
             dayOfWeek,
             fixedBlocks: context.fixedForContext,
             existingBlocks: allExistingForContext,
-            healthProfile: context.healthForContext,
+            healthProfile: context.healthForContext ? { ...context.healthForContext } : undefined,
+            routineProfile: context.routineForContext ? { ...context.routineForContext } : undefined,
             mode: input.mode as 'first_time' | 'regenerate' | 'fill_gaps',
             recentAgendaBlocks: context.recentAgendaBlocks,
         });
 
-        const aiBlocks = await generateAIBlocks(genAI, AGENDA_PLANNER_SYSTEM_PROMPT, prompt, 0.7);
+        const aiBlocks = await generateAIBlocks(model, AGENDA_PLANNER_SYSTEM_PROMPT, prompt, 0.7);
 
         // Build AI block inputs
         if (aiBlocks.blocks.length > 0) {
-            // Process and Solve
-            const aiInputs = processAndSolveBlocks(aiBlocks.blocks, dateStr, input.timezone, fixedInputs);
+            // 5. Solve Conflicts & Refine
+            const { blocks: resolvedBlocks, warnings: solverWarnings } = processAndSolveBlocks(
+                aiBlocks.blocks,
+                dateStr,
+                input.timezone,
+                fixedInputs
+            );
 
+            // 6. Pre-process sequence for meals
+            const aiInputs = resolvedBlocks;
             // Add meta
             aiInputs.forEach(b => {
                 b.meta = { ...b.meta, created_via: 'plan_day' };
@@ -531,11 +566,9 @@ export async function POST(request: NextRequest) {
                 blocks: persistResult.blocks,
                 ai_summary: aiBlocks.summary,
                 blocks_count: {
-                    total: persistResult.blocks.length,
-                    fixed: persistResult.blocks.filter((b: any) => b.source === 'fixed').length,
-                    ai: persistResult.blocks.filter((b: any) => b.source === 'ai').length,
                     manual: persistResult.blocks.filter((b: any) => b.source === 'manual').length,
                 },
+                warnings: solverWarnings,
             });
         }
 

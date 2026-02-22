@@ -69,8 +69,72 @@ function WeightTrendChart({ metrics }: { metrics: { date: string; weight_kg: num
     );
 }
 
+function VolumeTrendChart({ history }: { history: { date: string; volume: number }[] }) {
+    const data = useMemo(() => {
+        return [...history]
+            .slice(-14);
+    }, [history]);
+
+    if (data.length < 2) return (
+        <div className="h-10 flex items-center justify-center border border-dashed border-white/10 rounded-lg mt-3">
+            <p className="text-[10px] text-white/30">Dados de volume insuficientes</p>
+        </div>
+    );
+
+    const volumes = data.map(d => d.volume);
+    const min = 0;
+    const max = Math.max(...volumes) * 1.1;
+    const range = max - min || 1;
+
+    const width = 100;
+    const height = 40;
+
+    const points = data.map((d, i) => {
+        const x = (i / (data.length - 1)) * width;
+        const y = height - ((d.volume - min) / range) * height;
+        return `${x},${y}`;
+    }).join(' ');
+
+    return (
+        <div className="mt-3">
+            <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-10" preserveAspectRatio="none">
+                <path
+                    d={`M 0 ${height} ${data.map((d, i) => {
+                        const x = (i / (data.length - 1)) * width;
+                        const y = height - ((d.volume - min) / range) * height;
+                        return `L ${x} ${y}`;
+                    }).join(' ')} L ${width} ${height} Z`}
+                    fill="url(#volumeGradient)"
+                    className="opacity-20"
+                />
+                <defs>
+                    <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#3b82f6" />
+                        <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+                    </linearGradient>
+                </defs>
+                <polyline
+                    points={points}
+                    fill="none"
+                    stroke="#3b82f6"
+                    strokeWidth="1.5"
+                    vectorEffect="non-scaling-stroke"
+                />
+            </svg>
+            <div className="flex justify-between text-[10px] text-white/30 mt-1">
+                <span>{data[0].date.split('-').slice(1).join('/')}</span>
+                <span className="text-blue-400 font-medium">Vol: {Math.round(volumes[volumes.length - 1])} kg</span>
+                <span>{data[data.length - 1].date.split('-').slice(1).join('/')}</span>
+            </div>
+        </div>
+    );
+}
+
 export default function ProgressDashboard() {
-    const { recentSessions, bodyMetrics, progressions, isLoading, loadRecentSessions, loadBodyMetrics, loadProgressions, logBodyWeight } = useTraining();
+    const {
+        recentSessions, bodyMetrics, progressions, personalRecords, volumeHistory,
+        isLoading, loadRecentSessions, loadBodyMetrics, loadProgressions, logBodyWeight
+    } = useTraining();
     const [weightInput, setWeightInput] = useState('');
     const [showWeightForm, setShowWeightForm] = useState(false);
     const [showAllSessions, setShowAllSessions] = useState(false);
@@ -174,6 +238,38 @@ export default function ProgressDashboard() {
                     <p className="text-sm text-white/40">Nenhum registro de peso ainda.</p>
                 )}
             </div>
+
+            {/* Volume Tracking */}
+            <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                <div className="flex items-center justify-between mb-1">
+                    <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                        <Flame className="w-4 h-4 text-orange-400" />
+                        Volume Total
+                    </h4>
+                    <span className="text-[10px] text-white/30">(Últimas 14 sessões)</span>
+                </div>
+                <VolumeTrendChart history={volumeHistory} />
+            </div>
+
+            {/* Personal Records */}
+            {Object.keys(personalRecords).length > 0 && (
+                <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                    <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                        <Target className="w-4 h-4 text-purple-400" />
+                        Recordes Pessoais
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2">
+                        {Object.entries(personalRecords).reverse().slice(0, 4).map(([id, weight]) => {
+                            return (
+                                <div key={id} className="p-2 rounded-xl bg-purple-500/5 border border-purple-500/10">
+                                    <p className="text-[10px] text-white/40 truncate">{id}</p>
+                                    <p className="text-sm font-bold text-white">{weight} kg</p>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* Progression Suggestions */}
             <div className="p-4 rounded-2xl bg-white/5 border border-white/10">

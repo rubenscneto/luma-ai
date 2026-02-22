@@ -206,7 +206,14 @@ export interface DailyBlock {
     is_skipped: boolean;
     skip_reason?: string;
     order_index: number;
-    meta?: Record<string, any>;
+    meta?: {
+        suggested_reason?: string;
+        energyLevel?: 'low' | 'medium' | 'high';
+        [key: string]: any;
+    };
+    is_fixed?: boolean;
+    locked?: boolean;
+    ai_suggested?: boolean;
     created_at?: string;
     updated_at?: string;
 }
@@ -271,6 +278,7 @@ export interface AIGeneratedPlan {
     summary: string;
     insight?: string;
     style: PlanStyle;
+    warnings?: string[];
 }
 
 export interface RecurrenceSuggestion {

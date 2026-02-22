@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Check, X, Clock, MoreHorizontal, Play, Pause,
-    Briefcase, BookOpen, Heart, Coffee, Home, Moon, Bus, Plus
+    Briefcase, BookOpen, Heart, Coffee, Home, Moon, Bus, Plus,
+    Sparkles
 } from 'lucide-react';
 import { DailyBlockWithStatus, BlockCategory } from '@/types';
 import { useDailyPlan } from '@/context/dailyPlanContext';
@@ -146,6 +147,16 @@ export function BlockCard({ block, compact = false }: BlockCardProps) {
                     </button>
                 )}
             </div>
+
+            {/* AI Reasoning / Suggested Reason */}
+            {block.meta?.suggested_reason && !block.is_done && !block.is_skipped && (
+                <div className="mt-3 flex items-start gap-2 p-2 rounded-lg bg-brand-primary/5 border border-brand-primary/10">
+                    <Sparkles className="w-3 h-3 text-brand-primary shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-white/70 leading-relaxed italic">
+                        {block.meta.suggested_reason}
+                    </p>
+                </div>
+            )}
 
             {/* Quick actions */}
             <AnimatePresence>

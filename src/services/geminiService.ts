@@ -1,18 +1,13 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-const apiKey = process.env.GEMINI_API_KEY || "";
-const genAI = new GoogleGenerativeAI(apiKey);
+import { getGeminiModel } from "@/lib/ai/gemini";
 
 // Helper to safely get model or return mock if no key
-const getModel = () => {
-    if (!apiKey) {
-        console.warn("GEMINI_API_KEY is not set. Returning mock data.");
+const getModel = (config?: { temperature?: number }) => {
+    try {
+        return getGeminiModel(config);
+    } catch (error) {
+        console.warn("Gemini Model failed to initialize. Returning null.", error);
         return null;
     }
-    return genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
-        generationConfig: { responseMimeType: "application/json" }
-    });
 };
 
 export async function generateMotivation(): Promise<{ text: string, author: string }> {

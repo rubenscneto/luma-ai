@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
 import { ASSISTANT_SYSTEM_PROMPT } from '@/ai/prompts/assistantSystemPrompt';
 import { AssistantActionsAIResponseSchema, AssistantActionsAIResponse } from '@/ai/schemas/aiSchemas';
-
-const apiKey = process.env.GEMINI_API_KEY || '';
-const genAI = new GoogleGenerativeAI(apiKey);
+import { getGeminiModel } from '@/lib/ai/gemini';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -98,10 +95,7 @@ ${message}
 `;
 
         // Generate response with Gemini
-        const model = genAI.getGenerativeModel({
-            model: 'gemini-2.5-flash',
-            generationConfig: { responseMimeType: 'application/json' }
-        });
+        const model = getGeminiModel();
 
         const prompt = `${ASSISTANT_SYSTEM_PROMPT}\n\n${contextPrompt}`;
 

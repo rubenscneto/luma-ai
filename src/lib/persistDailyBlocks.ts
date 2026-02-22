@@ -84,9 +84,13 @@ export function generateCanonicalKey(block: BlockInput, dateStr: string): string
         const mealType = isCanonicalMealType(canonicalFromMeta)
             ? canonicalFromMeta
             : (canonicalFromWindow || 'unknown_meal');
+
         // Always write back canonical type to meta for consistency
         if (block.meta) block.meta.meal_type = mealType;
-        return `meal::${mealType}::${dateStr}`;
+
+        // Multi-meal support (e.g. snack 1, snack 2)
+        const sequence = meta.meal_sequence ? `::${meta.meal_sequence}` : '';
+        return `meal::${mealType}${sequence}::${dateStr}`;
     }
 
     // 3. Everything else
@@ -162,8 +166,28 @@ export async function persistDailyBlocks(
     let preserved_done_skipped = 0;
     const errors: PersistError[] = [];
 
-    // 1. Generate keys for all incoming blocks
-    const blocksWithKeys = blocks.map((block, idx) => ({
+    // 1. Pre-process meals to assign sequence (handle multiple snacks/meals of same type)
+    const mealCounts: Record<string, number> = {};
+    const processedBlocks = blocks.map(block => {
+        if (block.category === 'meal') {
+            const startMin = extractMinutesFromDatetime(block.start_datetime);
+            const mealWindow = getMealType(block.title, startMin, block.meta as Record<string, unknown>);
+            const mealType = mealWindow?.canonicalType || 'unknown_meal';
+
+            mealCounts[mealType] = (mealCounts[mealType] || 0) + 1;
+            return {
+                ...block,
+                meta: {
+                    ...(block.meta || {}),
+                    meal_sequence: mealCounts[mealType]
+                }
+            };
+        }
+        return block;
+    });
+
+    // 2. Generate keys for all processed blocks
+    const blocksWithKeys = processedBlocks.map((block, idx) => ({
         ...block,
         idempotency_key: generateCanonicalKey(block, dateStr),
         order_index: block.order_index ?? idx * 10,
@@ -197,7 +221,8 @@ export async function persistDailyBlocks(
         }
     }
 
-    // 3. UPSERT: update existing or insert new
+    // 3. UPSERT: Prepare payloads for batch execution
+    const upsertPayloads: any[] = [];
     const newKeys = new Set<string>();
 
     for (const block of dedupedBlocks) {
@@ -205,8 +230,11 @@ export async function persistDailyBlocks(
         const existing = existingByKey.get(block.idempotency_key);
 
         if (existing) {
-            // UPDATE — preserve done/skipped status
-            const updateFields: Record<string, unknown> = {
+            // MERGE Logic
+            const updatePayload: any = {
+                id: existing.id, // Direct ID reference for fast update
+                plan_id: planId,
+                user_id: userId,
                 title: block.title,
                 category: block.category,
                 start_datetime: block.start_datetime,
@@ -214,44 +242,36 @@ export async function persistDailyBlocks(
                 source: block.source,
                 order_index: block.order_index,
                 meta: { ...(existing.meta || {}), ...(block.meta || {}) },
+                idempotency_key: block.idempotency_key,
                 updated_at: new Date().toISOString(),
-                // Explicitly excluding description until schema migration
             };
 
             if (preserveStatus) {
-                // Per-block preservation: done/skipped are mutually exclusive, count max 1
                 const isPreserved = existing.is_done || existing.is_skipped;
                 if (isPreserved) {
                     preserved_done_skipped++;
-                    // Don't overwrite done/skipped — only update times
+                    // Keep existing status
+                    updatePayload.is_done = existing.is_done;
+                    updatePayload.is_skipped = existing.is_skipped;
+                    updatePayload.skip_reason = existing.skip_reason;
+                    updatePayload.done_at = existing.done_at;
                 } else {
-                    if (block.is_done !== undefined) updateFields.is_done = block.is_done;
-                    if (block.is_skipped !== undefined) updateFields.is_skipped = block.is_skipped;
+                    updatePayload.is_done = block.is_done ?? false;
+                    updatePayload.is_skipped = block.is_skipped ?? false;
                 }
             } else {
-                if (block.is_done !== undefined) updateFields.is_done = block.is_done;
-                if (block.is_skipped !== undefined) updateFields.is_skipped = block.is_skipped;
+                updatePayload.is_done = block.is_done ?? false;
+                updatePayload.is_skipped = block.is_skipped ?? false;
             }
 
-            const { error: updateError } = await supabase
-                .from('daily_blocks')
-                .update(updateFields)
-                .eq('id', existing.id);
-
-            if (updateError) {
-                errors.push({ operation: 'update', key: block.idempotency_key, code: updateError.code, message: updateError.message, hint: updateError.hint });
-                console.error('[persistDailyBlocks] UPDATE error:', updateError.message, block.idempotency_key);
-            } else {
-                updated++;
-            }
+            upsertPayloads.push(updatePayload);
+            updated++;
         } else {
-            // INSERT
-            // STRICT WHITELIST to prevent PGRST204 (column not found)
-            const insertPayload = {
+            // NEW Logic
+            upsertPayloads.push({
                 plan_id: planId,
                 user_id: userId,
                 title: block.title,
-                // description: block.description || null, // Removed until schema migration
                 category: block.category,
                 start_datetime: block.start_datetime,
                 end_datetime: block.end_datetime,
@@ -263,22 +283,25 @@ export async function persistDailyBlocks(
                 done_at: block.done_at || null,
                 meta: block.meta || {},
                 idempotency_key: block.idempotency_key,
-            };
+            });
+            inserted++;
+        }
+    }
 
-            const { error } = await supabase
-                .from('daily_blocks')
-                .insert(insertPayload);
+    // Execute Batch UPSERT
+    if (upsertPayloads.length > 0) {
+        const { error: upsertError } = await supabase
+            .from('daily_blocks')
+            .upsert(upsertPayloads, { onConflict: 'plan_id, idempotency_key' });
 
-            if (error) {
-                errors.push({ operation: 'insert', key: block.idempotency_key, code: error.code, message: error.message, hint: error.hint || (error.code === '42501' ? 'RLS policy denied INSERT — use service role key' : undefined) });
-                console.error('[persistDailyBlocks] INSERT error:', error.code, error.message, block.idempotency_key);
-            } else {
-                inserted++;
-            }
+        if (upsertError) {
+            errors.push({ operation: 'insert', code: upsertError.code, message: upsertError.message, hint: upsertError.hint });
+            console.error('[persistDailyBlocks] BATCH UPSERT error:', upsertError.message);
         }
     }
 
     // 4. Delete stale blocks (key exists but not in new set)
+    const idsToDelete: string[] = [];
     if (deleteStale) {
         for (const [key, existing] of existingByKey) {
             if (!newKeys.has(key)) {
@@ -291,10 +314,7 @@ export async function persistDailyBlocks(
                 if (staleSources && !staleSources.includes(existing.source)) {
                     continue;
                 }
-                await supabase
-                    .from('daily_blocks')
-                    .delete()
-                    .eq('id', existing.id);
+                idsToDelete.push(existing.id);
                 deleted++;
             }
         }
@@ -303,20 +323,29 @@ export async function persistDailyBlocks(
     // 5. Delete legacy NULL-key blocks
     if (deleteNullKeys && existingNullKey.length > 0) {
         for (const orphan of existingNullKey) {
-            // Preserve done/skipped even for orphans
             if (preserveStatus && (orphan.is_done || orphan.is_skipped)) {
                 preserved_done_skipped++;
                 continue;
             }
-            await supabase
-                .from('daily_blocks')
-                .delete()
-                .eq('id', orphan.id);
+            idsToDelete.push(orphan.id);
             deleted++;
         }
     }
 
-    // 6. Fetch final state
+    // Execute Batch DELETE
+    if (idsToDelete.length > 0) {
+        const { error: deleteError } = await supabase
+            .from('daily_blocks')
+            .delete()
+            .in('id', idsToDelete);
+
+        if (deleteError) {
+            errors.push({ operation: 'delete', message: deleteError.message });
+            console.error('[persistDailyBlocks] BATCH DELETE error:', deleteError.message);
+        }
+    }
+
+    // 6. Fetch final state (merged view)
     const { data: finalBlocks } = await supabase
         .from('daily_blocks')
         .select('*')
