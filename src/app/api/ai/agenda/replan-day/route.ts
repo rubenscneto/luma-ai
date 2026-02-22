@@ -39,7 +39,54 @@ const aiReplanResponseSchema = z.object({
     could_not_fit: z.array(z.string()).optional(),
 });
 
+const PRIORITY_WEIGHTS: Record<string, number> = {
+    health: 1.5,
+    work: 1.2,
+    study: 1.1,
+    leisure: 1.0,
+    admin: 0.9,
+    commute: 0.8,
+    sleep: 0.8,
+    meal: 1.3,
+    fixed: 1.0,
+};
+
+function calculateWeightedScore(blocks: any[]): number {
+    let totalWeight = 0;
+    let earnedWeight = 0;
+
+    blocks.forEach(b => {
+        const weight = PRIORITY_WEIGHTS[b.category] || 1.0;
+        totalWeight += weight;
+        if (b.is_done) {
+            earnedWeight += weight;
+        }
+    });
+
+    if (totalWeight === 0) return 0;
+    return Math.min(100, Math.round((earnedWeight / totalWeight) * 100));
+}
+
+function calculateAdherence(blocks: any[]): number {
+    const aiBlocks = blocks.filter(b => b.source === 'ai' && b.meta?.original_start);
+    if (aiBlocks.length === 0) return 100;
+
+    let totalDriftMins = 0;
+    aiBlocks.forEach(b => {
+        const original = new Date(b.meta.original_start).getTime();
+        const current = new Date(b.start_datetime).getTime();
+        const drift = Math.abs(current - original) / (1000 * 60);
+        totalDriftMins += drift;
+    });
+
+    const avgDrift = totalDriftMins / aiBlocks.length;
+    // Penalty: 100 - (avgDrift / 2) -> 60 min avg drift = 70 score
+    return Math.max(0, Math.round(100 - (avgDrift / 0.6)));
+}
+
 export async function POST(request: NextRequest) {
+    const runId = crypto.randomUUID();
+    console.log(`[replan-day] [${runId}] Starting replan-day request`);
     try {
         const supabase = getSupabase();
         const model = getGeminiModel();
@@ -125,7 +172,7 @@ ${JSON.stringify({
                 success: true,
                 message: 'Não há blocos para replanejar.',
                 blocks: [],
-            });
+            }, { headers: { 'X-Run-Id': runId } });
         }
 
         // 4. Filter pending blocks (not done, not skipped, starts >= now - 30min tolerance)
@@ -147,14 +194,38 @@ ${JSON.stringify({
                 .eq('plan_id', plan.id)
                 .order('start_datetime', { ascending: true });
 
+            const weightedScore = calculateWeightedScore(updatedBlocks || []);
+            const adherenceScore = calculateAdherence(updatedBlocks || []);
+            const finalConsistency = (weightedScore * 0.7) + (adherenceScore * 0.3);
+
+            await supabase
+                .from('daily_scores')
+                .upsert({
+                    user_id: input.user_id,
+                    plan_date: dateStr,
+                    consistency_score: weightedScore,
+                    adherence_score: adherenceScore,
+                    weighted_final_score: finalConsistency,
+                    meta: {
+                        last_run_id: runId,
+                        stats: { completed: completedToday, skipped: skippedToday }
+                    }
+                }, { onConflict: 'user_id, plan_date' });
+
             return NextResponse.json({
                 success: true,
                 message: input.signal === 'done'
                     ? 'Ótimo trabalho! Continue assim.'
                     : 'Nenhum ajuste necessário.',
                 blocks: updatedBlocks,
-                stats: { completed: completedToday, skipped: skippedToday },
-            });
+                stats: {
+                    completed: completedToday,
+                    skipped: skippedToday,
+                    weighted_score: weightedScore,
+                    adherence_score: adherenceScore,
+                    final_consistency: finalConsistency
+                },
+            }, { headers: { 'X-Run-Id': runId } });
         }
 
         // 7. For late or manual_request, use AI to replan
@@ -228,6 +299,7 @@ ${JSON.stringify({
                 b => !b.is_done && !b.is_skipped
             );
 
+            // 10. Convert to solver format
             const fixedSolverBlocks: SolverBlock[] = (fixedBlocks || []).map(fb => ({
                 id: `fixed-${fb.id}`,
                 title: fb.title,
@@ -236,15 +308,29 @@ ${JSON.stringify({
                 endMin: timeToMinutes(fb.end_time),
                 source: 'fixed' as const,
                 priority: 100,
+                locked: true,
+                meta: { fixed_block_id: fb.id }
             }));
 
-            const pendingSolverBlocks: SolverBlock[] = pendingAdjusted.map(b => {
+            // Filter out existing blocks that were already generated from estas mesmas fixed_blocks
+            // to avoid duplicates if they are already in 'pendingAdjusted'
+            const activeFixedIds = new Set((fixedBlocks || []).map(fb => String(fb.id)));
+            const filteredPending = pendingAdjusted.filter(b => {
+                if (b.source === 'fixed' && b.meta?.fixed_block_id) {
+                    return !activeFixedIds.has(String(b.meta.fixed_block_id));
+                }
+                return true;
+            });
+
+            const pendingSolverBlocks: SolverBlock[] = filteredPending.map(b => {
+                const sb = dailyBlockToSolverBlock(b as any);
+                // Ensure the start time is current (especially for the late signal)
+                // but keep original duration
                 const start = new Date(b.start_datetime);
                 const end = new Date(b.end_datetime);
-                let startMin = start.getHours() * 60 + start.getMinutes();
-                const endMin = end.getHours() * 60 + end.getMinutes();
+                const dur = (end.getHours() * 60 + end.getMinutes()) - (start.getHours() * 60 + start.getMinutes());
 
-                // Meal window validation
+                let startMin = sb.startMin;
                 if (b.category === 'meal') {
                     const mealCheck = validateMealWindow(b.title, startMin, b.meta);
                     if (mealCheck.window && !mealCheck.valid) {
@@ -253,14 +339,9 @@ ${JSON.stringify({
                 }
 
                 return {
-                    id: b.id,
-                    title: b.title,
-                    category: b.category,
+                    ...sb,
                     startMin,
-                    endMin: startMin + (endMin - (start.getHours() * 60 + start.getMinutes())),
-                    source: (b.source === 'derived' ? 'ai' : (b.source || 'ai')) as 'ai' | 'fixed' | 'manual',
-                    priority: b.source === 'fixed' ? 100 : (b.category === 'meal' ? 70 : 60),
-                    meta: b.meta,
+                    endMin: startMin + dur
                 };
             });
 
@@ -290,6 +371,25 @@ ${JSON.stringify({
                 .eq('plan_id', plan.id)
                 .order('start_datetime', { ascending: true });
 
+            // 13. Calculate and Persist Scores (Engine V2)
+            const weightedScore = calculateWeightedScore(finalBlocks || []);
+            const adherenceScore = calculateAdherence(finalBlocks || []);
+            const finalConsistency = (weightedScore * 0.7) + (adherenceScore * 0.3);
+
+            await supabase
+                .from('daily_scores')
+                .upsert({
+                    user_id: input.user_id,
+                    plan_date: dateStr,
+                    consistency_score: weightedScore,
+                    adherence_score: adherenceScore,
+                    weighted_final_score: finalConsistency,
+                    meta: {
+                        last_run_id: runId,
+                        stats: { completed: completedToday, skipped: skippedToday }
+                    }
+                }, { onConflict: 'user_id, plan_date' });
+
             return NextResponse.json({
                 success: true,
                 message: aiResponse.message_to_user,
@@ -297,23 +397,37 @@ ${JSON.stringify({
                 solver_warnings: solverResult.warnings,
                 could_not_fit: aiResponse.could_not_fit,
                 blocks: finalBlocks,
-                stats: { completed: completedToday, skipped: skippedToday },
-            });
+                stats: {
+                    completed: completedToday,
+                    skipped: skippedToday,
+                    weighted_score: weightedScore,
+                    adherence_score: adherenceScore,
+                    final_consistency: finalConsistency
+                },
+            }, { headers: { 'X-Run-Id': runId } });
         }
 
         // Default: return current state
-        const { data: finalBlocks } = await supabase
+        const { data: finalState } = await supabase
             .from('daily_blocks')
             .select('*')
             .eq('plan_id', plan.id)
             .order('start_datetime', { ascending: true });
 
+        const weightedScore = calculateWeightedScore(finalState || []);
+        const adherenceScore = calculateAdherence(finalState || []);
+
         return NextResponse.json({
             success: true,
             message: 'Agenda atualizada.',
-            blocks: finalBlocks,
-            stats: { completed: completedToday, skipped: skippedToday },
-        });
+            blocks: finalState,
+            stats: {
+                completed: completedToday,
+                skipped: skippedToday,
+                weighted_score: weightedScore,
+                adherence_score: adherenceScore
+            },
+        }, { headers: { 'X-Run-Id': runId } });
 
     } catch (error) {
         console.error('Replan day error:', error);

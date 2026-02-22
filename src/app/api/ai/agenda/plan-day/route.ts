@@ -213,20 +213,28 @@ function processAndSolveBlocks(
     aiBlocks: z.infer<typeof aiBlockSchema>[],
     dateStr: string,
     timezone: string,
-    fixedInputs: BlockInput[]
+    fixedInputs: BlockInput[],
+    runId: string
 ): { blocks: BlockInput[], warnings: string[] } {
     // 1. Convert to BlockInput (raw)
-    const rawInputs: BlockInput[] = aiBlocks.map((b, idx) => ({
-        title: b.title,
-        category: b.category,
-        start_datetime: timeToDatetime(dateStr, b.start_time, timezone),
-        end_datetime: timeToDatetime(dateStr, b.end_time, timezone),
-        source: 'ai',
-        meta: {
-            suggested_reason: b.suggested_reason,
-            energyLevel: b.energyLevel
-        }
-    }));
+    const rawInputs: BlockInput[] = aiBlocks.map((b, idx) => {
+        const start = timeToDatetime(dateStr, b.start_time, timezone);
+        const end = timeToDatetime(dateStr, b.end_time, timezone);
+        return {
+            title: b.title,
+            category: b.category,
+            start_datetime: start,
+            end_datetime: end,
+            source: 'ai',
+            meta: {
+                suggested_reason: b.suggested_reason,
+                energyLevel: b.energyLevel,
+                intent_id: runId,
+                original_start: start,
+                original_end: end
+            }
+        };
+    });
 
     // 2. Split Overnight (keep only today's portion for plan-day)
     const { today: todayInputs } = splitOvernightBlocks(rawInputs, dateStr);
@@ -312,6 +320,8 @@ function extractTimeMinutes(dt: string): number {
 }
 
 export async function POST(request: NextRequest) {
+    const runId = crypto.randomUUID();
+    console.log(`[plan-day] [${runId}] Starting plan-day request`);
     try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const supabase: any = createClient(
@@ -327,7 +337,7 @@ export async function POST(request: NextRequest) {
         const dateStr = input.date || now.toISOString().split('T')[0];
 
         if (!input.date) {
-            console.warn('[plan-day] date não fornecida — usando hoje como fallback:', dateStr);
+            console.warn(`[plan-day] [${runId}] date não fornecida — usando hoje como fallback: ${dateStr}`);
         }
         const dayOfWeek = getDayOfWeek(dateStr);
 
@@ -362,7 +372,7 @@ export async function POST(request: NextRequest) {
                 energyLevel: b.energyLevel as 'low' | 'medium' | 'high' | undefined
             }));
 
-            const { blocks: confirmedInputs, warnings: confirmWarnings } = processAndSolveBlocks(rawPlanBlocks, dateStr, input.timezone, fixedInputs);
+            const { blocks: confirmedInputs, warnings: confirmWarnings } = processAndSolveBlocks(rawPlanBlocks, dateStr, input.timezone, fixedInputs, runId);
 
             // Add confirming meta
             confirmedInputs.forEach(b => {
@@ -396,7 +406,7 @@ export async function POST(request: NextRequest) {
                     ai: finalBlocks.filter((b: any) => b.source === 'ai').length,
                     manual: finalBlocks.filter((b: any) => b.source === 'manual').length,
                 },
-            });
+            }, { headers: { 'X-Run-Id': runId } });
         }
 
         // ========================================
@@ -453,8 +463,8 @@ export async function POST(request: NextRequest) {
             const fixedInputs = buildFixedBlockInputs(dateStr, input.timezone, context.fixedBlocks, existingBlocks || []);
 
             // Solve both plans
-            const { blocks: solvedA, warnings: warningsA } = processAndSolveBlocks(planAResult.blocks, dateStr, input.timezone, fixedInputs);
-            const { blocks: solvedB, warnings: warningsB } = processAndSolveBlocks(planBResult.blocks, dateStr, input.timezone, fixedInputs);
+            const { blocks: solvedA, warnings: warningsA } = processAndSolveBlocks(planAResult.blocks, dateStr, input.timezone, fixedInputs, runId);
+            const { blocks: solvedB, warnings: warningsB } = processAndSolveBlocks(planBResult.blocks, dateStr, input.timezone, fixedInputs, runId);
 
             // Convert back to simple response format
             const toResponseFormat = (inputs: BlockInput[]) => inputs.map(b => ({
@@ -485,7 +495,7 @@ export async function POST(request: NextRequest) {
                     style: 'balanced' as const,
                     warnings: warningsB,
                 },
-            });
+            }, { headers: { 'X-Run-Id': runId } });
         }
 
         // ========================================
@@ -532,7 +542,8 @@ export async function POST(request: NextRequest) {
                 aiBlocks.blocks,
                 dateStr,
                 input.timezone,
-                fixedInputs
+                fixedInputs,
+                runId
             );
 
             // 6. Pre-process sequence for meals
@@ -549,7 +560,7 @@ export async function POST(request: NextRequest) {
                 {
                     deleteStale: true, // Always clean up old AI blocks when replanning
                     deleteNullKeys: true,
-                    staleSources: ['ai'],
+                    staleSources: ['ai', 'fixed'],
                 }
             );
 
@@ -569,7 +580,7 @@ export async function POST(request: NextRequest) {
                     manual: persistResult.blocks.filter((b: any) => b.source === 'manual').length,
                 },
                 warnings: solverWarnings,
-            });
+            }, { headers: { 'X-Run-Id': runId } });
         }
 
         // No AI blocks generated — just persist fixed blocks
@@ -599,13 +610,13 @@ export async function POST(request: NextRequest) {
                 ai: finalBlocks?.filter((b: any) => b.source === 'ai').length || 0,
                 manual: finalBlocks?.filter((b: any) => b.source === 'manual').length || 0,
             },
-        });
+        }, { headers: { 'X-Run-Id': runId } });
 
     } catch (error) {
-        console.error('Plan day error:', error);
+        console.error(`[plan-day] [${runId}] Plan day error:`, error);
         return NextResponse.json(
             { error: 'Failed to generate daily plan', details: String(error) },
-            { status: 500 }
+            { status: 500, headers: { 'X-Run-Id': runId } }
         );
     }
 }

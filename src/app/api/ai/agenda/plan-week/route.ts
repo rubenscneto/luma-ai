@@ -52,6 +52,8 @@ function addDaysToDate(dateStr: string, days: number): string {
 }
 
 export async function POST(request: NextRequest) {
+    const runId = crypto.randomUUID();
+    console.log(`[plan-week] [${runId}] Starting weekly plan request`);
     let lockAcquired = false;
     let userId: string | null = null;
 
@@ -208,11 +210,24 @@ Responda EXCLUSIVAMENTE em JSON:
             }));
 
             const rawDayInputs: BlockInput[] = [...nextDayOverflows];
-            day.blocks.forEach(b => rawDayInputs.push({
-                title: b.title, category: b.category as any, start_datetime: `${day.date}T${b.start_time}:00`,
-                end_datetime: `${day.date}T${b.end_time}:00`, source: 'ai',
-                meta: { energyLevel: b.energyLevel, suggestedReason: b.suggested_reason }
-            }));
+            day.blocks.forEach(b => {
+                const start = `${day.date}T${b.start_time}:00`;
+                const end = `${day.date}T${b.end_time}:00`;
+                rawDayInputs.push({
+                    title: b.title,
+                    category: b.category as any,
+                    start_datetime: start,
+                    end_datetime: end,
+                    source: 'ai',
+                    meta: {
+                        energyLevel: b.energyLevel,
+                        suggestedReason: b.suggested_reason,
+                        intent_id: runId,
+                        original_start: start,
+                        original_end: end
+                    }
+                });
+            });
 
             const split = splitOvernightBlocks(rawDayInputs, day.date);
             nextDayOverflows = split.nextDay;
@@ -233,10 +248,24 @@ Responda EXCLUSIVAMENTE em JSON:
 
             const solverResult = solveTimeline([...fixedSolverBlocks, ...aiSolverBlocks]);
             const finalInputs: BlockInput[] = solverResult.resolved
-                .filter(sb => sb.source !== 'fixed' && (sb.category === 'sleep' || (sb.startMin < 23 * 60 && sb.endMin > 5 * 60)))
-                .map((sb, idx) => ({ ...solverBlockToTimeFields(sb, day.date, input.timezone), title: sb.title, category: sb.category as any, source: sb.source, order_index: idx, is_fixed: false, meta: sb.meta }));
+                .filter(sb => sb.category === 'sleep' || (sb.startMin < 23 * 60 && sb.endMin > 5 * 60))
+                .map((sb, idx) => ({
+                    ...solverBlockToTimeFields(sb, day.date, input.timezone),
+                    title: sb.title,
+                    category: sb.category as any,
+                    source: sb.source as any,
+                    order_index: idx,
+                    is_fixed: sb.source === 'fixed',
+                    locked: sb.locked || sb.source === 'fixed',
+                    meta: sb.source === 'fixed'
+                        ? { ...(sb.meta || {}), fixed_block_id: sb.id.startsWith('fixed-') ? sb.id.replace('fixed-', '') : sb.id }
+                        : sb.meta
+                }));
 
-            const persistResult = await persistDailyBlocks(supabase, plan.id, userId!, day.date, finalInputs, { deleteStale: true, staleSources: ['ai'] });
+            const persistResult = await persistDailyBlocks(supabase, plan.id, userId!, day.date, finalInputs, {
+                deleteStale: true,
+                staleSources: ['ai', 'fixed']
+            });
             totalBlocksCreated += persistResult.inserted + persistResult.updated;
         }
 
@@ -247,12 +276,12 @@ Responda EXCLUSIVAMENTE em JSON:
             daysPlanned: weekPlan.days.length,
             totalBlocks: totalBlocksCreated,
             warnings: solverWarnings,
-        });
+        }, { headers: { 'X-Run-Id': runId } });
 
     } catch (error: any) {
-        console.error('Plan week error:', error);
+        console.error(`[plan-week] [${runId}] Error:`, error);
         if (error instanceof z.ZodError) {
-            return NextResponse.json({ error: 'Dados de entrada inválidos.', details: error.issues }, { status: 400 });
+            return NextResponse.json({ error: 'Dados de entrada inválidos.', details: error.issues }, { status: 400, headers: { 'X-Run-Id': runId } });
         }
         return NextResponse.json(
             {
@@ -260,7 +289,7 @@ Responda EXCLUSIVAMENTE em JSON:
                 stack: error instanceof Error ? error.stack : undefined,
                 details: String(error)
             },
-            { status: 500 }
+            { status: 500, headers: { 'X-Run-Id': runId } }
         );
     } finally {
         if (lockAcquired && userId) {

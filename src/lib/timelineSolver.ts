@@ -139,6 +139,7 @@ export function solveTimeline(
 
     // 3. Place blocks
     const placed: SolverBlock[] = [];
+    let hasErrors = false;
 
     for (const block of sorted) {
         const conflict = findConflict(placed, block);
@@ -150,9 +151,6 @@ export function solveTimeline(
         }
 
         // 3.1. If the current block is LOCKED, it MUST stay here.
-        // If there's a conflict with a previously placed block, we have a critical error.
-        // (Note: since fixed blocks are placed first and are usually locked, 
-        // they shouldn't conflict with each other if the DB is clean).
         if (block.locked) {
             placed.push({ ...block });
             hasErrors = true;
@@ -227,7 +225,7 @@ export function solveTimeline(
     // 7. Final assertion: sort by time and verify no overlaps
     placed.sort((a, b) => a.startMin - b.startMin);
 
-    let hasErrors = false;
+    hasErrors = false;
     for (let i = 1; i < placed.length; i++) {
         if (placed[i].startMin < placed[i - 1].endMin) {
             hasErrors = true;
@@ -312,6 +310,7 @@ export function dailyBlockToSolverBlock(block: {
     start_datetime: string;
     end_datetime: string;
     source: string;
+    locked?: boolean;
     meta?: Record<string, unknown>;
 }): SolverBlock {
     const startDate = new Date(block.start_datetime);

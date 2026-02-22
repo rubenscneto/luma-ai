@@ -152,35 +152,8 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
                     .eq('plan_id', plan.id)
                     .order('start_datetime', { ascending: true });
 
-                const fixedAsDailyBlocks: DailyBlockWithStatus[] = (fixed || []).map(fb => {
-                    const startDatetime = `${targetDate}T${fb.start_time}`;
-                    const endDatetime = `${targetDate}T${fb.end_time}`;
-
-                    return enrichBlockWithStatus({
-                        id: `fixed-${fb.id}`,
-                        plan_id: plan.id,
-                        user_id: user.id,
-                        title: fb.title,
-                        description: fb.description,
-                        category: fb.category,
-                        start_datetime: startDatetime,
-                        end_datetime: endDatetime,
-                        is_done: false,
-                        is_skipped: false,
-                        ai_suggested: false,
-                        created_at: fb.created_at,
-                        is_fixed: true,
-                    } as any, now);
-                });
-
                 const dailyEnriched = (blocks || []).map(b => enrichBlockWithStatus(b, now));
-                const allBlocks = [...dailyEnriched, ...fixedAsDailyBlocks].sort((a, b) =>
-                    new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime()
-                );
-
-
-
-                setTodayBlocks(allBlocks);
+                setTodayBlocks(dailyEnriched);
             } else {
                 setTodayPlan(null);
 
@@ -286,19 +259,7 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
 
                 if (planId) {
                     const planBlocks = dbBlocks.filter(b => b.plan_id === planId);
-                    // Dedup: skip virtual fixed if DB already has a block with same normalized title+start+end
-                    const dbKeys = new Set(planBlocks.map(b => {
-                        const s = new Date(b.start_datetime).toTimeString().slice(0, 5);
-                        const e = new Date(b.end_datetime).toTimeString().slice(0, 5);
-                        return `${normalizeForComparison(b.title)}|${s}|${e}`;
-                    }));
-                    const missingFixed = fixedAsDailyBlocks.filter(f => {
-                        const s = new Date(f.start_datetime).toTimeString().slice(0, 5);
-                        const e = new Date(f.end_datetime).toTimeString().slice(0, 5);
-                        return !dbKeys.has(`${normalizeForComparison(f.title)}|${s}|${e}`);
-                    });
-                    newWeekBlocks[dateStr] = [...planBlocks, ...missingFixed]
-                        .sort((a, b) => new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime());
+                    newWeekBlocks[dateStr] = planBlocks;
                 } else {
                     newWeekBlocks[dateStr] = fixedAsDailyBlocks;
                 }
