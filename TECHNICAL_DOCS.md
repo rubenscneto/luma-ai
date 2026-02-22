@@ -1,7 +1,7 @@
 # LumaAI — Documentação Técnica & Diário de Bordo 🛠️
 
-- **Version**: 2.4.0
-- **Last Updated**: 2026-02-21
+- **Version**: 2.5.0
+- **Last Updated**: 2026-02-22
 **Data de Início**: Dezembro 2025
 
 Este documento é a **referência técnica definitiva** do LumaAI. Deve ser atualizado a cada implementação, remoção ou refatoração.
@@ -128,6 +128,24 @@ src/
 | `locked_at` | timestamptz | NO | `now()` | Início do bloqueio |
 | `expires_at` | timestamptz | NO | — | Expiração (TTL) |
 
+### 2.5 Tabela `daily_scores` (Performance e Consistência — Engine V2)
+
+| Coluna | Tipo | Nullable | Default | Notas |
+|---|---|---|---|---|
+| `id` | uuid | NO | `gen_random_uuid()` | PK |
+| `user_id` | uuid | NO | — | FK → auth.users |
+| `plan_date` | date | NO | — | Data |
+| `consistency_score` | integer | NO | `0` | Pontuação ponderada de conclusão (0-100) |
+| `adherence_score` | integer | NO | `0` | Pontuação de desvio temporal (0-100) |
+| `weighted_final_score` | numeric | NO | `0.0` | Média ponderada final |
+| `meta` | jsonb | YES | `'{}'` | `last_run_id`, stats, etc. |
+| `created_at` | timestamptz | NO | `now()` | |
+| `updated_at` | timestamptz | NO | `now()` | |
+
+**Constraints:**
+- `UNIQUE (user_id, plan_date)`
+- Gatilho: `on_daily_scores_updated` (sync `updated_at`)
+
 ### 2.5 Outras Tabelas
 
 | Tabela | Propósito |
@@ -197,7 +215,14 @@ Aplica ajustes no DB
     ↓
 Reordena blocos (order_index)
     ↓
-Response: { success, message, blocks, stats }
+Cálculo de Scores (Engine V2):
+  1. weightedScore = sum(is_done * weight) / totalWeight
+  2. adherenceScore = 100 - (avg_temporal_drift / penalty_factor)
+  3. Final = (weighted * 0.7) + (adherence * 0.3)
+    ↓
+UPSERT daily_scores (persistência histórica)
+    ↓
+Response: { success, message, blocks, stats (incl. scores) }
 ```
 
 ### 3.3 Timeline Solver (`timelineSolver.ts`)
@@ -350,6 +375,13 @@ Gera automaticamente "Pausa pós-refeição" (30min) ancorada a blocos meal.
 ---
 
 ## 📅 Diário de Bordo (Changelog)
+
+### [22/02/2026] - Agenda Engine V2: Scoring & Intent (v2.5.0)
+- **Feature**: Sistema Integrado de Pontuação (Consistency + Adherence).
+- **Backend**: Tracking de Desvio de Intenção (`intent_id`, `original_start/end`).
+- **Backend**: Pesos de Prioridade por Categoria (`health`: 1.5, `work`: 1.2, etc.).
+- **Database**: Criação da tabela `daily_scores` para persistência de métricas diárias.
+- **Git**: Push de toda a implementação Sprint 2b.
 
 ### [21/02/2026] - Workout Progression & Export (v2.4.0)
 - **Feature**: Workout Progression System (PR tracking, volume charts, AI suggestions).
