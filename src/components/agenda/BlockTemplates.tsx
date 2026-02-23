@@ -191,8 +191,8 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
             <div className="flex items-center justify-between">
 
                 <div>
-                    <h2 className="text-xl font-semibold text-white">Templates de Blocos</h2>
-                    <p className="text-sm text-white/60">
+                    <h2 className="text-xl font-semibold text-foreground">Templates de Blocos</h2>
+                    <p className="text-sm text-muted">
                         Use templates prontos ou crie os seus
                     </p>
                 </div>
@@ -200,7 +200,7 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => setShowForm(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl text-white text-sm font-medium"
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl text-foreground text-sm font-medium"
                 >
                     <Plus className="w-4 h-4" />
                     Criar Template
@@ -209,7 +209,7 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
 
             {/* Presets */}
             <div>
-                <h3 className="text-sm font-medium text-white/60 mb-3">Templates Padrão</h3>
+                <h3 className="text-sm font-medium text-muted mb-3">Templates Padrão</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {presets.map(template => {
                         const cat = getCategoryInfo(template.category);
@@ -225,23 +225,23 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
                             >
                                 <div className="flex items-start justify-between">
                                     <div className="flex items-center gap-2">
-                                        <Icon className="w-4 h-4 text-white/80" />
-                                        <h4 className="text-sm font-medium text-white">{template.title}</h4>
+                                        <Icon className="w-4 h-4 text-foreground/80" />
+                                        <h4 className="text-sm font-medium text-foreground">{template.title}</h4>
                                     </div>
                                     <div className="p-1.5 rounded bg-black/20">
                                         {isCopied ? (
                                             <Check className="w-3.5 h-3.5 text-green-300" />
                                         ) : (
-                                            <Copy className="w-3.5 h-3.5 text-white/60 group-hover:text-white" />
+                                            <Copy className="w-3.5 h-3.5 text-muted group-hover:text-foreground" />
                                         )}
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2 mt-2 text-xs text-white/70">
+                                <div className="flex items-center gap-2 mt-2 text-xs text-foreground/70">
                                     <Clock className="w-3 h-3" />
                                     <span>{template.duration_minutes} min</span>
                                 </div>
                                 {template.description && (
-                                    <p className="text-xs text-white/60 mt-1 truncate">{template.description}</p>
+                                    <p className="text-xs text-muted mt-1 truncate">{template.description}</p>
                                 )}
                             </motion.div>
                         );
@@ -252,7 +252,7 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
             {/* Custom Templates */}
             {customTemplates.length > 0 && (
                 <div>
-                    <h3 className="text-sm font-medium text-white/60 mb-3">Meus Templates</h3>
+                    <h3 className="text-sm font-medium text-muted mb-3">Meus Templates</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         {customTemplates.map(template => {
                             const cat = getCategoryInfo(template.category);
@@ -263,7 +263,7 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
                                 <motion.div
                                     key={template.id}
                                     layout
-                                    className="p-4 rounded-xl bg-white/5 border border-white/10 group"
+                                    className="p-4 rounded-xl bg-foreground/5 border border-card-border/50 group"
                                 >
                                     <div className="flex items-start justify-between">
                                         <div
@@ -271,30 +271,30 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
                                             onClick={() => handleUseTemplate(template)}
                                         >
                                             <div className={`p-1.5 rounded bg-gradient-to-br ${cat.color}`}>
-                                                <Icon className="w-3.5 h-3.5 text-white" />
+                                                <Icon className="w-3.5 h-3.5 text-foreground" />
                                             </div>
-                                            <h4 className="text-sm font-medium text-white">{template.title}</h4>
+                                            <h4 className="text-sm font-medium text-foreground">{template.title}</h4>
                                         </div>
                                         <div className="flex gap-1">
                                             <button
                                                 onClick={() => handleUseTemplate(template)}
-                                                className="p-1.5 rounded bg-white/5 hover:bg-white/10"
+                                                className="p-1.5 rounded bg-foreground/5 hover:bg-foreground/10"
                                             >
                                                 {isCopied ? (
                                                     <Check className="w-3.5 h-3.5 text-green-400" />
                                                 ) : (
-                                                    <Copy className="w-3.5 h-3.5 text-white/40" />
+                                                    <Copy className="w-3.5 h-3.5 text-muted/70" />
                                                 )}
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(template.id)}
-                                                className="p-1.5 rounded bg-white/5 hover:bg-red-500/20"
+                                                className="p-1.5 rounded bg-foreground/5 hover:bg-red-500/20"
                                             >
-                                                <Trash2 className="w-3.5 h-3.5 text-white/40 hover:text-red-400" />
+                                                <Trash2 className="w-3.5 h-3.5 text-muted/70 hover:text-red-400" />
                                             </button>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2 mt-2 text-xs text-white/60">
+                                    <div className="flex items-center gap-2 mt-2 text-xs text-muted">
                                         <Clock className="w-3 h-3" />
                                         <span>{template.duration_minutes} min</span>
                                     </div>
@@ -321,18 +321,18 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
                             onClick={e => e.stopPropagation()}
-                            className="bg-[#1a1a2e] rounded-2xl p-6 w-full max-w-sm border border-white/10"
+                            className="bg-[#1a1a2e] rounded-2xl p-6 w-full max-w-sm border border-card-border/50"
                         >
                             <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-semibold text-white">Usar Template</h3>
-                                <button onClick={() => setSelectedTemplate(null)} className="p-2 rounded-lg hover:bg-white/10">
-                                    <X className="w-5 h-5 text-white/60" />
+                                <h3 className="text-lg font-semibold text-foreground">Usar Template</h3>
+                                <button onClick={() => setSelectedTemplate(null)} className="p-2 rounded-lg hover:bg-foreground/10">
+                                    <X className="w-5 h-5 text-muted" />
                                 </button>
                             </div>
 
-                            <div className="mb-6 p-3 bg-white/5 rounded-xl border border-white/10">
-                                <h4 className="font-medium text-white">{selectedTemplate.title}</h4>
-                                <div className="flex items-center gap-2 mt-1 text-xs text-white/60">
+                            <div className="mb-6 p-3 bg-foreground/5 rounded-xl border border-card-border/50">
+                                <h4 className="font-medium text-foreground">{selectedTemplate.title}</h4>
+                                <div className="flex items-center gap-2 mt-1 text-xs text-muted">
                                     <Clock className="w-3 h-3" />
                                     <span>{selectedTemplate.duration_minutes} min</span>
                                     <span>•</span>
@@ -342,23 +342,23 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
 
                             <form onSubmit={handleConfirmUse} className="space-y-4">
                                 <div>
-                                    <label className="block text-sm text-white/60 mb-1">Data</label>
+                                    <label className="block text-sm text-muted mb-1">Data</label>
                                     <input
                                         type="date"
                                         value={useFormData.date}
                                         onChange={e => setUseFormData(prev => ({ ...prev, date: e.target.value }))}
-                                        className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-purple-500/50"
+                                        className="w-full px-4 py-2 bg-foreground/5 border border-card-border/50 rounded-xl text-foreground focus:outline-none focus:border-purple-500/50"
                                         required
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm text-white/60 mb-1">Horário de Início</label>
+                                    <label className="block text-sm text-muted mb-1">Horário de Início</label>
                                     <input
                                         type="time"
                                         value={useFormData.startTime}
                                         onChange={e => setUseFormData(prev => ({ ...prev, startTime: e.target.value }))}
-                                        className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-purple-500/50"
+                                        className="w-full px-4 py-2 bg-foreground/5 border border-card-border/50 rounded-xl text-foreground focus:outline-none focus:border-purple-500/50"
                                         required
                                     />
                                 </div>
@@ -367,13 +367,13 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
                                     <button
                                         type="button"
                                         onClick={() => setSelectedTemplate(null)}
-                                        className="flex-1 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white/60 hover:bg-white/10 transition-colors"
+                                        className="flex-1 py-2.5 bg-foreground/5 border border-card-border/50 rounded-xl text-muted hover:bg-foreground/10 transition-colors"
                                     >
                                         Cancelar
                                     </button>
                                     <button
                                         type="submit"
-                                        className="flex-1 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl text-white font-medium hover:opacity-90 transition-opacity"
+                                        className="flex-1 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl text-foreground font-medium hover:opacity-90 transition-opacity"
                                     >
                                         Agendar
                                     </button>
@@ -399,30 +399,30 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
                             onClick={e => e.stopPropagation()}
-                            className="bg-[#1a1a2e] rounded-2xl p-6 w-full max-w-md border border-white/10"
+                            className="bg-[#1a1a2e] rounded-2xl p-6 w-full max-w-md border border-card-border/50"
                         >
                             <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-semibold text-white">Novo Template</h3>
-                                <button onClick={() => setShowForm(false)} className="p-2 rounded-lg hover:bg-white/10">
-                                    <X className="w-5 h-5 text-white/60" />
+                                <h3 className="text-lg font-semibold text-foreground">Novo Template</h3>
+                                <button onClick={() => setShowForm(false)} className="p-2 rounded-lg hover:bg-foreground/10">
+                                    <X className="w-5 h-5 text-muted" />
                                 </button>
                             </div>
 
                             <form onSubmit={handleSubmit} className="space-y-4">
                                 <div>
-                                    <label className="block text-sm text-white/60 mb-1">Nome</label>
+                                    <label className="block text-sm text-muted mb-1">Nome</label>
                                     <input
                                         type="text"
                                         value={formData.title}
                                         onChange={e => setFormData(prev => ({ ...prev, title: e.target.value }))}
                                         placeholder="Ex: Reunião semanal"
-                                        className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-purple-500/50"
+                                        className="w-full px-4 py-2 bg-foreground/5 border border-card-border/50 rounded-xl text-foreground placeholder:text-muted/50 focus:outline-none focus:border-purple-500/50"
                                         required
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm text-white/60 mb-2">Categoria</label>
+                                    <label className="block text-sm text-muted mb-2">Categoria</label>
                                     <div className="grid grid-cols-4 gap-2">
                                         {CATEGORIES.map(cat => {
                                             const Icon = cat.icon;
@@ -433,8 +433,8 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
                                                     type="button"
                                                     onClick={() => setFormData(prev => ({ ...prev, category: cat.value }))}
                                                     className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${isSelected
-                                                        ? `bg-gradient-to-r ${cat.color} text-white`
-                                                        : 'bg-white/5 text-white/60 hover:bg-white/10'
+                                                        ? `bg-gradient-to-r ${cat.color} text-foreground`
+                                                        : 'bg-foreground/5 text-muted hover:bg-foreground/10'
                                                         }`}
                                                 >
                                                     <Icon className="w-4 h-4" />
@@ -446,7 +446,7 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm text-white/60 mb-1">Duração (minutos)</label>
+                                    <label className="block text-sm text-muted mb-1">Duração (minutos)</label>
                                     <input
                                         type="number"
                                         min="5"
@@ -454,18 +454,18 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
                                         step="5"
                                         value={formData.duration_minutes}
                                         onChange={e => setFormData(prev => ({ ...prev, duration_minutes: parseInt(e.target.value) }))}
-                                        className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-purple-500/50"
+                                        className="w-full px-4 py-2 bg-foreground/5 border border-card-border/50 rounded-xl text-foreground focus:outline-none focus:border-purple-500/50"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm text-white/60 mb-1">Descrição (opcional)</label>
+                                    <label className="block text-sm text-muted mb-1">Descrição (opcional)</label>
                                     <input
                                         type="text"
                                         value={formData.description}
                                         onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
                                         placeholder="Uma breve descrição"
-                                        className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-purple-500/50"
+                                        className="w-full px-4 py-2 bg-foreground/5 border border-card-border/50 rounded-xl text-foreground placeholder:text-muted/50 focus:outline-none focus:border-purple-500/50"
                                     />
                                 </div>
 
@@ -473,13 +473,13 @@ export default function BlockTemplates({ onUseTemplate }: BlockTemplatesProps) {
                                     <button
                                         type="button"
                                         onClick={() => setShowForm(false)}
-                                        className="flex-1 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white/60"
+                                        className="flex-1 py-2.5 bg-foreground/5 border border-card-border/50 rounded-xl text-muted"
                                     >
                                         Cancelar
                                     </button>
                                     <button
                                         type="submit"
-                                        className="flex-1 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl text-white font-medium"
+                                        className="flex-1 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl text-foreground font-medium"
                                     >
                                         Criar Template
                                     </button>

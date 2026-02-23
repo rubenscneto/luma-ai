@@ -213,7 +213,7 @@ export default function DailyReset({ onDismiss }: DailyResetProps) {
 
                         <button
                             onClick={() => setStep('plan')}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl font-medium transition-colors"
+                            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-foreground rounded-xl font-medium transition-colors"
                         >
                             <Sparkles className="w-4 h-4" />
                             Gerar minha agenda
@@ -248,7 +248,7 @@ export default function DailyReset({ onDismiss }: DailyResetProps) {
                             <button
                                 onClick={handleGeneratePlan}
                                 disabled={isGenerating}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl font-medium transition-colors disabled:opacity-50"
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-foreground rounded-xl font-medium transition-colors disabled:opacity-50"
                             >
                                 {isGenerating ? (
                                     <>

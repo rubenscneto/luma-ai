@@ -13,10 +13,12 @@ export const dynamic = 'force-dynamic';
 
 const planWeekInputSchema = z.object({
     user_id: z.string().uuid(),
-    start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // Monday of the week
+    start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // Sunday of the week
     timezone: z.string().default('America/Sao_Paulo'),
     days_to_plan: z.array(z.number().min(0).max(6)).optional(),
     debug: z.boolean().optional().default(false),
+    action: z.string().optional(),
+    feedbacks: z.array(z.any()).optional(),
 });
 
 const aiBlockSchema = z.object({
@@ -158,12 +160,23 @@ export async function POST(request: NextRequest) {
             };
         });
 
+        let feedbackContext = "";
+        if (input.action === 'replan_with_feedback' && input.feedbacks && input.feedbacks.length > 0) {
+            feedbackContext = "\nATENÇÃO AOS FEEDBACKS DO USUÁRIO:\nO usuário acabou de revisar sua agenda e aplicou as seguintes correções manuais. Você DEVE modificar o planejamento da semana atual para respeitar essas restrições:\n";
+            input.feedbacks.forEach((fb: any) => {
+                if (fb.type === 'bad_time') feedbackContext += `- Tarefa "${fb.title}" (Originalmente às ${fb.originalTime}): HORÁRIO RUIM. Agende para outro momento totalmente diferente do dia.\n`;
+                if (fb.type === 'unrealistic') feedbackContext += `- Tarefa "${fb.title}": TEMPO IRREAL. Aloque muito mais tempo para isso ou quebre em tarefas menores ao longo da semana.\n`;
+                if (fb.type === 'dislike') feedbackContext += `- Tarefa "${fb.title}": O usuário NÃO GOSTOU. Remova ou substitua, não repita esse bloco.\n`;
+            });
+            feedbackContext += "\n";
+        }
+
         const weekPrompt = `
 Planeje a semana completa para o usuário.
 Perfil: ${profile?.full_name || 'Usuário'}, ${profile?.occupation || routineProfile?.occupation || 'profissional'}
 ${healthProfile ? `Saúde: Treino ${healthProfile.training_frequency || '3x/semana'}, Objetivo: ${healthProfile.goal || routineProfile?.goal || 'saúde'}` : ''}
 ${routineProfile ? `Rotina: Objetivos: ${routineProfile.objectives?.join(', ')}, Pico: ${routineProfile.peak_productivity}` : ''}
-
+${feedbackContext}
 Regras:
 1. NUNCA sobreponha horários com blocos fixos
 2. Distribua estudo, trabalho, exercício e lazer ao longo da semana
@@ -175,7 +188,7 @@ ${daysContext.map(d => `${d.dayName} (${d.date}): Fixos: ${d.fixedBlocks.join(',
 
 Responda EXCLUSIVAMENTE em JSON:
 {
-  "days": [{ "date": "YYYY-MM-DD", "blocks": [{ "title": "...", "category": "...", "start_time": "HH:MM", "end_time": "HH:MM" }], "summary": "..." }],
+  "days": [{ "date": "YYYY-MM-DD", "blocks": [{ "title": "...", "category": "...", "start_time": "HH:MM", "end_time": "HH:MM", "suggested_reason": "Breve justificativa se baseado num feedback" }], "summary": "..." }],
   "weekSummary": "...", "weekInsight": "..."
 }`;
 

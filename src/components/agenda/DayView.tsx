@@ -55,29 +55,29 @@ function AddBlockModal({ isOpen, onClose, onAdd }: AddBlockModalProps) {
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
-                className="w-full max-w-md p-6 rounded-2xl bg-[#1a1a2e] border border-white/10"
+                className="w-full max-w-md p-6 rounded-2xl bg-[#1a1a2e] border border-card-border/50"
                 onClick={e => e.stopPropagation()}
             >
-                <h3 className="text-lg font-semibold text-white mb-4">Adicionar Bloco</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-4">Adicionar Bloco</h3>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-sm text-white/60 mb-1">Título</label>
+                        <label className="block text-sm text-muted mb-1">Título</label>
                         <input
                             type="text"
                             value={title}
                             onChange={e => setTitle(e.target.value)}
-                            className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white focus:outline-none focus:border-brand-primary"
+                            className="w-full px-4 py-2 rounded-lg bg-foreground/5 border border-card-border/50 text-foreground focus:outline-none focus:border-brand-primary"
                             placeholder="Ex: Reunião com equipe"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm text-white/60 mb-1">Categoria</label>
+                        <label className="block text-sm text-muted mb-1">Categoria</label>
                         <select
                             value={category}
                             onChange={e => setCategory(e.target.value)}
-                            className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white focus:outline-none focus:border-brand-primary"
+                            className="w-full px-4 py-2 rounded-lg bg-foreground/5 border border-card-border/50 text-foreground focus:outline-none focus:border-brand-primary"
                         >
                             <option value="work">Trabalho</option>
                             <option value="study">Estudo</option>
@@ -91,21 +91,21 @@ function AddBlockModal({ isOpen, onClose, onAdd }: AddBlockModalProps) {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm text-white/60 mb-1">Início</label>
+                            <label className="block text-sm text-muted mb-1">Início</label>
                             <input
                                 type="time"
                                 value={startTime}
                                 onChange={e => setStartTime(e.target.value)}
-                                className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white focus:outline-none focus:border-brand-primary"
+                                className="w-full px-4 py-2 rounded-lg bg-foreground/5 border border-card-border/50 text-foreground focus:outline-none focus:border-brand-primary"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm text-white/60 mb-1">Fim</label>
+                            <label className="block text-sm text-muted mb-1">Fim</label>
                             <input
                                 type="time"
                                 value={endTime}
                                 onChange={e => setEndTime(e.target.value)}
-                                className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white focus:outline-none focus:border-brand-primary"
+                                className="w-full px-4 py-2 rounded-lg bg-foreground/5 border border-card-border/50 text-foreground focus:outline-none focus:border-brand-primary"
                             />
                         </div>
                     </div>
@@ -114,7 +114,7 @@ function AddBlockModal({ isOpen, onClose, onAdd }: AddBlockModalProps) {
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex-1 py-2 rounded-lg bg-white/10 text-white/60 hover:bg-white/20 transition-colors"
+                            className="flex-1 py-2 rounded-lg bg-foreground/10 text-muted hover:bg-white/20 transition-colors"
                         >
                             Cancelar
                         </button>
@@ -170,18 +170,18 @@ function PlanCard({
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex-1 p-5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all"
+            className="flex-1 p-5 rounded-2xl bg-foreground/5 border border-card-border/50 hover:border-white/20 transition-all"
         >
             {/* Plan Name */}
             <div className="flex items-center gap-2 mb-3">
                 <div className={`w-8 h-8 rounded-lg ${accentColor} flex items-center justify-center`}>
-                    <Icon className="w-4 h-4 text-white" />
+                    <Icon className="w-4 h-4 text-foreground" />
                 </div>
-                <h4 className="text-lg font-semibold text-white">{label}</h4>
+                <h4 className="text-lg font-semibold text-foreground">{label}</h4>
             </div>
 
             {/* Summary */}
-            <p className="text-sm text-white/70 mb-4 line-clamp-2">{plan.summary}</p>
+            <p className="text-sm text-foreground/70 mb-4 line-clamp-2">{plan.summary}</p>
 
             {/* Insight */}
             {plan.insight && (
@@ -194,7 +194,7 @@ function PlanCard({
             {/* Category breakdown */}
             <div className="flex flex-wrap gap-1.5 mb-4">
                 {Object.entries(categoryCounts).map(([cat, count]) => (
-                    <span key={cat} className="px-2 py-0.5 text-xs rounded-full bg-white/10 text-white/70">
+                    <span key={cat} className="px-2 py-0.5 text-xs rounded-full bg-foreground/10 text-foreground/70">
                         {categoryLabels[cat] || cat}: {count}
                     </span>
                 ))}
@@ -204,10 +204,10 @@ function PlanCard({
             <div className="space-y-1.5 mb-4 max-h-48 overflow-y-auto pr-1">
                 {plan.blocks.map((block, i) => (
                     <div key={i} className="flex items-center gap-2 text-xs">
-                        <span className="text-white/40 w-[72px] shrink-0 font-mono">
+                        <span className="text-muted/70 w-[72px] shrink-0 font-mono">
                             {block.start_time}-{block.end_time}
                         </span>
-                        <div className="flex-1 px-2 py-1 rounded bg-white/5 text-white/80 truncate">
+                        <div className="flex-1 px-2 py-1 rounded bg-foreground/5 text-foreground/80 truncate">
                             {block.title}
                         </div>
                     </div>
@@ -215,7 +215,7 @@ function PlanCard({
             </div>
 
             {/* Stats */}
-            <div className="flex items-center gap-4 text-xs text-white/50 mb-4">
+            <div className="flex items-center gap-4 text-xs text-muted mb-4">
                 <span>{plan.blocks.length} blocos</span>
                 <span>•</span>
                 <span>{Object.keys(categoryCounts).length} categorias</span>
@@ -225,7 +225,7 @@ function PlanCard({
             <button
                 onClick={onSelect}
                 disabled={isLoading}
-                className={`w-full py-2.5 rounded-xl font-medium text-white transition-all disabled:opacity-50 ${accentColor} hover:opacity-90`}
+                className={`w-full py-2.5 rounded-xl font-medium text-foreground transition-all disabled:opacity-50 ${accentColor} hover:opacity-90`}
             >
                 {isLoading ? (
                     <Loader2 className="w-4 h-4 mx-auto animate-spin" />
@@ -253,21 +253,21 @@ function ABPlanComparison() {
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
-                className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[#12122a] border border-white/10 p-6"
+                className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[#12122a] border border-card-border/50 p-6"
             >
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h3 className="text-xl font-bold text-white">Comparar Planos</h3>
-                        <p className="text-sm text-white/50 mt-1">
+                        <h3 className="text-xl font-bold text-foreground">Comparar Planos</h3>
+                        <p className="text-sm text-muted mt-1">
                             Escolha o estilo que melhor se encaixa no seu dia
                         </p>
                     </div>
                     <button
                         onClick={clearABPlans}
-                        className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                        className="p-2 rounded-lg hover:bg-foreground/10 transition-colors"
                     >
-                        <X className="w-5 h-5 text-white/60" />
+                        <X className="w-5 h-5 text-muted" />
                     </button>
                 </div>
 
@@ -328,11 +328,11 @@ function GenerateModePicker({
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
-                className="w-full max-w-sm p-6 rounded-2xl bg-[#1a1a2e] border border-white/10"
+                className="w-full max-w-sm p-6 rounded-2xl bg-[#1a1a2e] border border-card-border/50"
                 onClick={e => e.stopPropagation()}
             >
-                <h3 className="text-lg font-semibold text-white mb-2">Gerar Agenda com IA</h3>
-                <p className="text-sm text-white/50 mb-5">Escolha como deseja gerar o plano do dia</p>
+                <h3 className="text-lg font-semibold text-foreground mb-2">Gerar Agenda com IA</h3>
+                <p className="text-sm text-muted mb-5">Escolha como deseja gerar o plano do dia</p>
 
                 <div className="space-y-3">
                     <button
@@ -344,8 +344,8 @@ function GenerateModePicker({
                             <Sparkles className="w-5 h-5 text-brand-primary" />
                         </div>
                         <div className="text-left">
-                            <p className="text-sm font-medium text-white">Plano Único</p>
-                            <p className="text-xs text-white/50">Gere o melhor plano automaticamente</p>
+                            <p className="text-sm font-medium text-foreground">Plano Único</p>
+                            <p className="text-xs text-muted">Gere o melhor plano automaticamente</p>
                         </div>
                         {isLoading && <Loader2 className="w-4 h-4 text-brand-primary animate-spin ml-auto" />}
                     </button>
@@ -359,8 +359,8 @@ function GenerateModePicker({
                             <GitCompareArrows className="w-5 h-5 text-purple-400" />
                         </div>
                         <div className="text-left">
-                            <p className="text-sm font-medium text-white">Comparar A/B</p>
-                            <p className="text-xs text-white/50">Dois estilos para você escolher</p>
+                            <p className="text-sm font-medium text-foreground">Comparar A/B</p>
+                            <p className="text-xs text-muted">Dois estilos para você escolher</p>
                         </div>
                         {isABLoading && <Loader2 className="w-4 h-4 text-purple-400 animate-spin ml-auto" />}
                     </button>
@@ -431,8 +431,8 @@ export function DayView() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-6">
                     <div>
-                        <h2 className="text-2xl font-bold text-white capitalize">{formattedDate}</h2>
-                        <p className="text-white/60 text-sm mt-1">
+                        <h2 className="text-2xl font-bold text-foreground capitalize">{formattedDate}</h2>
+                        <p className="text-muted text-sm mt-1">
                             {todayBlocks.length} blocos • {pastBlocks.length} concluídos
                             {delayedBlocks.length > 0 && (
                                 <span className="text-amber-400"> • {delayedBlocks.length} atrasado(s)</span>
@@ -485,7 +485,7 @@ export function DayView() {
 
                     <button
                         onClick={() => setShowAddModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-foreground/10 hover:bg-white/20 text-foreground transition-colors"
                     >
                         <Plus className="w-4 h-4" />
                         <span className="hidden sm:inline">Adicionar</span>
@@ -534,8 +534,8 @@ export function DayView() {
                         <div className="w-20 h-20 rounded-2xl bg-brand-primary/20 flex items-center justify-center mb-4">
                             <Calendar className="w-10 h-10 text-brand-primary" />
                         </div>
-                        <h3 className="text-xl font-semibold text-white mb-2">Nenhum plano para hoje</h3>
-                        <p className="text-white/60 max-w-sm mb-6">
+                        <h3 className="text-xl font-semibold text-foreground mb-2">Nenhum plano para hoje</h3>
+                        <p className="text-muted max-w-sm mb-6">
                             Gere um plano com IA baseado nos seus compromissos fixos e objetivos, ou adicione blocos manualmente.
                         </p>
                         <div className="flex gap-3">
@@ -565,7 +565,7 @@ export function DayView() {
                 isLoading && (
                     <div className="flex flex-col items-center justify-center py-16">
                         <Loader2 className="w-10 h-10 text-brand-primary animate-spin mb-4" />
-                        <p className="text-white/60">Gerando seu plano...</p>
+                        <p className="text-muted">Gerando seu plano...</p>
                     </div>
                 )
             }
@@ -584,7 +584,7 @@ export function DayView() {
                                 <Sparkles className="w-5 h-5 text-brand-primary shrink-0 mt-0.5" />
                                 <div>
                                     <h4 className="text-sm font-semibold text-brand-primary">Insight do Dia</h4>
-                                    <p className="text-sm text-white/80 mt-1 leading-relaxed">
+                                    <p className="text-sm text-foreground/80 mt-1 leading-relaxed">
                                         {lastAISummary}
                                     </p>
                                 </div>
@@ -614,14 +614,14 @@ export function DayView() {
                     <div className="space-y-6">
                         {/* Mini timeline progress bar */}
                         <div className="relative">
-                            <div className="flex justify-between text-[10px] text-white/30 mb-1">
+                            <div className="flex justify-between text-[10px] text-muted/50 mb-1">
                                 <span>06:00</span>
                                 <span>10:00</span>
                                 <span>14:00</span>
                                 <span>18:00</span>
                                 <span>22:00</span>
                             </div>
-                            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                            <div className="h-1.5 rounded-full bg-foreground/5 overflow-hidden">
                                 <motion.div
                                     initial={{ width: 0 }}
                                     animate={{ width: `${timelineProgress}%` }}
@@ -662,7 +662,7 @@ export function DayView() {
                         {/* Current block */}
                         {currentBlock && (
                             <div>
-                                <h3 className="text-sm font-medium text-white/50 mb-3 uppercase tracking-wider">
+                                <h3 className="text-sm font-medium text-muted mb-3 uppercase tracking-wider">
                                     Agora
                                 </h3>
                                 <BlockCard block={currentBlock} />
@@ -672,7 +672,7 @@ export function DayView() {
                         {/* Upcoming blocks */}
                         {upcomingBlocks.length > 0 && (
                             <div>
-                                <h3 className="text-sm font-medium text-white/50 mb-3 uppercase tracking-wider">
+                                <h3 className="text-sm font-medium text-muted mb-3 uppercase tracking-wider">
                                     Próximos
                                 </h3>
                                 <div className="space-y-3">
@@ -688,7 +688,7 @@ export function DayView() {
                         {/* Completed blocks */}
                         {pastBlocks.length > 0 && (
                             <div>
-                                <h3 className="text-sm font-medium text-white/50 mb-3 uppercase tracking-wider">
+                                <h3 className="text-sm font-medium text-muted mb-3 uppercase tracking-wider">
                                     Concluídos
                                 </h3>
                                 <div className="space-y-3">

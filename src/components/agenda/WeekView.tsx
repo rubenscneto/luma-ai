@@ -5,10 +5,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     ChevronLeft, ChevronRight, Calendar, Wand2, Loader2,
     Briefcase, GraduationCap, Dumbbell, Utensils,
-    Moon, Heart, Users, Sparkles, CheckCircle2, Plus
+    Moon, Heart, Users, Sparkles, CheckCircle2, Plus,
+    Clock, XCircle, ThumbsDown
 } from 'lucide-react';
 import { useDailyPlan } from '@/context/dailyPlanContext';
 import { useAuth } from '@/context/authContext';
+import { useAgenda } from '@/context/agendaContext';
 import { DailyBlock } from '@/types';
 import { toast } from 'sonner';
 
@@ -65,6 +67,8 @@ export default function WeekView() {
         loadTodayPlan,
     } = useDailyPlan();
     const { user } = useAuth();
+    const { addFeedback, pendingFeedbacks, removeFeedback } = useAgenda();
+    const [activeFeedbackBlock, setActiveFeedbackBlock] = useState<string | null>(null);
     const [currentWeekStart, setCurrentWeekStart] = useState(() => {
         const today = new Date();
         today.setDate(today.getDate() - today.getDay());
@@ -206,24 +210,24 @@ export default function WeekView() {
     }, [weekDates, todayBlocks, weekBlocks]);
 
     return (
-        <div className="bg-white/5 dark:bg-white/5 rounded-2xl border border-white/10 dark:border-white/10 overflow-hidden">
+        <div className="bg-foreground/5 dark:bg-foreground/5 rounded-2xl border border-card-border/50 dark:border-card-border/50 overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-white/10">
+            <div className="flex items-center justify-between p-4 border-b border-card-border/50">
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => navigateWeek('prev')}
-                        className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                        className="p-2 rounded-lg hover:bg-foreground/10 transition-colors"
                     >
-                        <ChevronLeft className="w-5 h-5 text-white/60" />
+                        <ChevronLeft className="w-5 h-5 text-muted" />
                     </button>
-                    <h3 className="text-lg font-medium text-white capitalize">
+                    <h3 className="text-lg font-medium text-foreground capitalize">
                         {weekLabel}
                     </h3>
                     <button
                         onClick={() => navigateWeek('next')}
-                        className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                        className="p-2 rounded-lg hover:bg-foreground/10 transition-colors"
                     >
-                        <ChevronRight className="w-5 h-5 text-white/60" />
+                        <ChevronRight className="w-5 h-5 text-muted" />
                     </button>
                 </div>
 
@@ -242,7 +246,7 @@ export default function WeekView() {
                     </button>
                     <button
                         onClick={goToToday}
-                        className="flex items-center gap-2 px-3 py-1.5 text-sm text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm text-muted hover:text-foreground hover:bg-foreground/10 rounded-lg transition-colors"
                     >
                         <Calendar className="w-4 h-4" />
                         Hoje
@@ -253,13 +257,13 @@ export default function WeekView() {
             {/* Week Grid */}
             <div className="flex">
                 {/* Time Column */}
-                <div className="w-12 flex-shrink-0 border-r border-white/10">
-                    <div className="h-16 border-b border-white/10" /> {/* Header spacer */}
+                <div className="w-12 flex-shrink-0 border-r border-card-border/50">
+                    <div className="h-16 border-b border-card-border/50" /> {/* Header spacer */}
                     <div className="relative" style={{ height: '640px' }}>
                         {HOURS.map(hour => (
                             <div
                                 key={hour}
-                                className="absolute w-full text-[10px] text-white/40 text-right pr-2"
+                                className="absolute w-full text-[10px] text-muted/70 text-right pr-2"
                                 style={{ top: `${((hour - 6) / 16) * 100}%` }}
                             >
                                 {hour}:00
@@ -282,25 +286,25 @@ export default function WeekView() {
                         return (
                             <div
                                 key={dateKey}
-                                className={`flex-1 border-r border-white/10 last:border-r-0 cursor-pointer transition-colors ${isToday ? 'bg-purple-500/5' :
+                                className={`flex-1 border-r border-card-border/50 last:border-r-0 cursor-pointer transition-colors ${isToday ? 'bg-purple-500/5' :
                                     isSelected ? 'bg-blue-500/5' :
                                         isPast ? 'bg-white/[0.02]' : ''
                                     }`}
                                 onClick={() => handleDayClick(date)}
                             >
                                 {/* Day Header */}
-                                <div className={`h-16 flex flex-col items-center justify-center border-b border-white/10 ${isToday ? 'bg-purple-500/10' :
+                                <div className={`h-16 flex flex-col items-center justify-center border-b border-card-border/50 ${isToday ? 'bg-purple-500/10' :
                                     isSelected ? 'bg-blue-500/10' : ''
                                     }`}>
-                                    <span className="text-xs text-white/60">{DAYS[idx]}</span>
+                                    <span className="text-xs text-muted">{DAYS[idx]}</span>
                                     <span className={`text-sm font-medium ${isToday ? 'text-purple-400' :
                                         isSelected ? 'text-blue-400' :
-                                            'text-white'
+                                            'text-foreground'
                                         }`}>
                                         {date.getDate()}
                                     </span>
                                     {blockCount > 0 ? (
-                                        <span className="text-[9px] text-white/40">{blockCount} blocos</span>
+                                        <span className="text-[9px] text-muted/70">{blockCount} blocos</span>
                                     ) : isFuture ? (
                                         <button
                                             onClick={(e) => { e.stopPropagation(); handlePlanDay(date); }}
@@ -347,22 +351,30 @@ export default function WeekView() {
                                                 key={block.id}
                                                 initial={{ opacity: 0, scale: 0.95 }}
                                                 animate={{ opacity: 1, scale: 1 }}
-                                                className={`absolute left-1 right-1 rounded-lg border p-1.5 overflow-hidden ${cat.bg} ${block.is_done ? 'opacity-60' : ''
-                                                    }`}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (block.is_done) return;
+                                                    setActiveFeedbackBlock(activeFeedbackBlock === block.id ? null : block.id);
+                                                }}
+                                                className={`absolute left-1 right-1 rounded-lg border p-1.5 ${cat.bg} ${block.is_done ? 'opacity-60' : ''
+                                                    } ${activeFeedbackBlock === block.id ? 'z-50 shadow-xl' : 'overflow-hidden cursor-pointer hover:ring-1 hover:ring-foreground/20'}`}
                                                 style={style}
                                             >
-                                                <div className="flex items-start gap-1">
+                                                {pendingFeedbacks.find(f => f.blockId === block.id) && (
+                                                    <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500" title="Feedback pendente" />
+                                                )}
+                                                <div className="flex items-start gap-1 pointer-events-none">
                                                     {block.is_done ? (
                                                         <CheckCircle2 className="w-3 h-3 text-green-400 flex-shrink-0 mt-0.5" />
                                                     ) : (
                                                         <Icon className={`w-3 h-3 flex-shrink-0 mt-0.5 ${cat.color}`} />
                                                     )}
                                                     <div className="min-w-0 flex-1">
-                                                        <p className={`text-[10px] font-medium truncate ${block.is_done ? 'text-white/60 line-through' : 'text-white'
+                                                        <p className={`text-[10px] font-medium truncate ${block.is_done ? 'text-muted line-through' : 'text-foreground'
                                                             }`}>
                                                             {block.title}
                                                         </p>
-                                                        <p className="text-[9px] text-white/50">
+                                                        <p className="text-[9px] text-muted">
                                                             {new Date(block.start_datetime).toLocaleTimeString('pt-BR', {
                                                                 hour: '2-digit',
                                                                 minute: '2-digit'
@@ -370,6 +382,42 @@ export default function WeekView() {
                                                         </p>
                                                     </div>
                                                 </div>
+
+                                                {activeFeedbackBlock === block.id && (
+                                                    <div className="absolute top-full left-0 mt-1 w-36 bg-surface border border-card-border rounded-lg shadow-2xl p-1 z-[60]" onClick={e => e.stopPropagation()}>
+                                                        <div className="text-[10px] font-medium text-muted px-2 py-1 mb-1 border-b border-card-border/50">Feedback IA</div>
+                                                        <button
+                                                            onClick={() => {
+                                                                addFeedback({ blockId: block.id, title: block.title, dayKey: formatDateKey(date), originalTime: block.start_datetime, type: 'bad_time' });
+                                                                setActiveFeedbackBlock(null);
+                                                                toast.success("Feedback anotado");
+                                                            }}
+                                                            className="flex items-center gap-2 w-full text-left p-1.5 hover:bg-amber-500/10 rounded text-amber-500 text-[11px] transition-colors"
+                                                        >
+                                                            <Clock className="w-3 h-3" /> Horário Ruim
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                addFeedback({ blockId: block.id, title: block.title, dayKey: formatDateKey(date), originalTime: block.start_datetime, type: 'unrealistic' });
+                                                                setActiveFeedbackBlock(null);
+                                                                toast.success("Feedback anotado");
+                                                            }}
+                                                            className="flex items-center gap-2 w-full text-left p-1.5 hover:bg-orange-500/10 rounded text-orange-500 text-[11px] transition-colors"
+                                                        >
+                                                            <XCircle className="w-3 h-3" /> Tempo Irreal
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                addFeedback({ blockId: block.id, title: block.title, dayKey: formatDateKey(date), originalTime: block.start_datetime, type: 'dislike' });
+                                                                setActiveFeedbackBlock(null);
+                                                                toast.success("Feedback anotado");
+                                                            }}
+                                                            className="flex items-center gap-2 w-full text-left p-1.5 hover:bg-red-500/10 rounded text-red-500 text-[11px] transition-colors"
+                                                        >
+                                                            <ThumbsDown className="w-3 h-3" /> Não Gostei
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </motion.div>
                                         );
                                     })}

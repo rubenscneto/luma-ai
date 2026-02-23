@@ -12,7 +12,7 @@ const PROTECTED_ROUTES = [
     '/biblioteca',
     '/configuracoes',
     '/analytics',
-    '/perdidao',
+    '/onboarding-rotina',
 ];
 
 // Public routes that should redirect to dashboard if logged in

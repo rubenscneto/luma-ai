@@ -86,16 +86,16 @@ export default function SaudePage() {
                     <div className="w-20 h-20 rounded-2xl bg-brand-primary/20 flex items-center justify-center mx-auto mb-6">
                         <Heart className="w-10 h-10 text-brand-primary" />
                     </div>
-                    <h1 className="text-3xl font-bold text-white mb-4">
+                    <h1 className="text-3xl font-bold text-foreground mb-4">
                         Seu Perfil de Saúde
                     </h1>
-                    <p className="text-white/60 mb-8">
+                    <p className="text-muted mb-8">
                         Configure seu perfil para receber sugestões personalizadas de hábitos,
                         refeições e compras alinhadas aos seus objetivos.
                     </p>
                     <button
                         onClick={() => setShowOnboarding(true)}
-                        className="flex items-center justify-center gap-2 w-full max-w-xs mx-auto py-4 rounded-xl bg-brand-primary text-white font-medium hover:bg-brand-primary/90 transition-colors"
+                        className="flex items-center justify-center gap-2 w-full max-w-xs mx-auto py-4 rounded-xl bg-brand-primary text-primary-foreground font-medium hover:bg-brand-primary/90 transition-colors"
                     >
                         <Sparkles className="w-5 h-5" />
                         Começar
@@ -118,15 +118,15 @@ export default function SaudePage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Saúde</h1>
-                    <p className="text-white/60 text-sm mt-1">
+                    <h1 className="text-2xl font-bold text-foreground">Saúde</h1>
+                    <p className="text-muted text-sm mt-1">
                         {goalLabels[healthProfile?.goal || 'general']}
                     </p>
                 </div>
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-2 p-1 rounded-xl bg-white/5 overflow-x-auto">
+            <div className="flex gap-2 p-1 rounded-xl bg-foreground/5 overflow-x-auto">
                 {tabs.map(tab => {
                     const Icon = tab.icon;
                     return (
@@ -136,8 +136,8 @@ export default function SaudePage() {
                             className={cn(
                                 "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap px-3",
                                 activeTab === tab.id
-                                    ? "bg-brand-primary text-white"
-                                    : "text-white/60 hover:text-white hover:bg-white/5"
+                                    ? "bg-brand-primary text-primary-foreground"
+                                    : "text-muted hover:text-foreground hover:bg-foreground/5"
                             )}
                         >
                             <Icon className="w-4 h-4" />
@@ -158,12 +158,12 @@ export default function SaudePage() {
                         className="space-y-4"
                     >
                         {/* Profile summary card */}
-                        <div className="p-5 rounded-2xl bg-white/5 border border-white/10">
+                        <div className="p-5 rounded-2xl bg-surface border border-card-border">
                             <div className="flex items-start justify-between mb-4">
-                                <h3 className="font-semibold text-white">Seu Perfil</h3>
+                                <h3 className="font-semibold text-foreground">Seu Perfil</h3>
                                 <button
                                     onClick={() => setShowOnboarding(true)}
-                                    className="p-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+                                    className="p-2 rounded-lg hover:bg-foreground/10 text-muted hover:text-foreground transition-colors"
                                 >
                                     <Edit2 className="w-4 h-4" />
                                 </button>
@@ -172,34 +172,34 @@ export default function SaudePage() {
                             <div className="grid grid-cols-2 gap-4">
                                 {healthProfile?.height_cm && (
                                     <div>
-                                        <p className="text-xs text-white/40 mb-1">Altura</p>
-                                        <p className="text-white">{healthProfile.height_cm} cm</p>
+                                        <p className="text-xs text-muted mb-1">Altura</p>
+                                        <p className="text-foreground">{healthProfile.height_cm} cm</p>
                                     </div>
                                 )}
                                 {healthProfile?.weight_kg && (
                                     <div>
-                                        <p className="text-xs text-white/40 mb-1">Peso</p>
-                                        <p className="text-white">{healthProfile.weight_kg} kg</p>
+                                        <p className="text-xs text-muted mb-1">Peso</p>
+                                        <p className="text-foreground">{healthProfile.weight_kg} kg</p>
                                     </div>
                                 )}
                                 <div>
-                                    <p className="text-xs text-white/40 mb-1">Objetivo</p>
-                                    <p className="text-white">{goalLabels[healthProfile?.goal || 'general']}</p>
+                                    <p className="text-xs text-muted mb-1">Objetivo</p>
+                                    <p className="text-foreground">{goalLabels[healthProfile?.goal || 'general']}</p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-white/40 mb-1">Nível</p>
-                                    <p className="text-white">{trainingLabels[healthProfile?.training_level || 'beginner']}</p>
+                                    <p className="text-xs text-muted mb-1">Nível</p>
+                                    <p className="text-foreground">{trainingLabels[healthProfile?.training_level || 'beginner']}</p>
                                 </div>
                             </div>
 
                             {healthProfile?.dietary_preferences && healthProfile.dietary_preferences.length > 0 && (
-                                <div className="mt-4 pt-4 border-t border-white/10">
-                                    <p className="text-xs text-white/40 mb-2">Preferências alimentares</p>
+                                <div className="mt-4 pt-4 border-t border-card-border/50">
+                                    <p className="text-xs text-muted mb-2">Preferências alimentares</p>
                                     <div className="flex flex-wrap gap-2">
                                         {healthProfile.dietary_preferences.map((pref: string) => (
                                             <span
                                                 key={pref}
-                                                className="text-xs px-2 py-1 rounded-lg bg-white/10 text-white/70"
+                                                className="text-xs px-2 py-1 rounded-lg bg-foreground/10 text-muted"
                                             >
                                                 {pref}
                                             </span>
@@ -210,16 +210,16 @@ export default function SaudePage() {
                         </div>
 
                         {/* Sleep schedule */}
-                        <div className="p-5 rounded-2xl bg-white/5 border border-white/10">
-                            <h3 className="font-semibold text-white mb-4">Horários</h3>
+                        <div className="p-5 rounded-2xl bg-surface border border-card-border">
+                            <h3 className="font-semibold text-foreground mb-4">Horários</h3>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <p className="text-xs text-white/40 mb-1">Acordar</p>
-                                    <p className="text-white text-lg">{healthProfile?.wake_time || '07:00'}</p>
+                                    <p className="text-xs text-muted mb-1">Acordar</p>
+                                    <p className="text-foreground text-lg">{healthProfile?.wake_time || '07:00'}</p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-white/40 mb-1">Dormir</p>
-                                    <p className="text-white text-lg">{healthProfile?.sleep_time || '22:00'}</p>
+                                    <p className="text-xs text-muted mb-1">Dormir</p>
+                                    <p className="text-foreground text-lg">{healthProfile?.sleep_time || '22:00'}</p>
                                 </div>
                             </div>
                         </div>
@@ -234,7 +234,7 @@ export default function SaudePage() {
                         exit={{ opacity: 0, y: -10 }}
                         className="space-y-4"
                     >
-                        <p className="text-white/60 text-sm">
+                        <p className="text-muted text-sm">
                             Peça sugestões de refeições saudáveis baseadas no seu perfil.
                         </p>
 
@@ -244,14 +244,14 @@ export default function SaudePage() {
                                     key={type}
                                     onClick={() => handleGenerateMeal(type)}
                                     disabled={loadingMeal}
-                                    className="p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-left"
+                                    className="p-4 rounded-xl bg-surface border border-card-border hover:bg-foreground/5 transition-colors text-left"
                                 >
-                                    <p className="font-medium text-white">
+                                    <p className="font-medium text-foreground">
                                         {type === 'breakfast' ? 'Café da manhã' :
                                             type === 'lunch' ? 'Almoço' :
                                                 type === 'dinner' ? 'Jantar' : 'Lanche'}
                                     </p>
-                                    <p className="text-xs text-white/50 mt-1">
+                                    <p className="text-xs text-muted mt-1">
                                         Gerar sugestão
                                     </p>
                                 </button>
@@ -265,8 +265,8 @@ export default function SaudePage() {
                         )}
 
                         {mealSuggestion && !loadingMeal && (
-                            <div className="p-5 rounded-2xl bg-white/5 border border-white/10">
-                                <p className="text-white whitespace-pre-wrap">
+                            <div className="p-5 rounded-2xl bg-surface border border-card-border">
+                                <p className="text-foreground whitespace-pre-wrap">
                                     {mealSuggestion.message_to_user}
                                 </p>
                             </div>
@@ -318,8 +318,8 @@ export default function SaudePage() {
                             </div>
                         ) : (
                             <div className="text-center py-12">
-                                <ShoppingCart className="w-12 h-12 text-white/20 mx-auto mb-4" />
-                                <p className="text-white/60">
+                                <ShoppingCart className="w-12 h-12 text-muted/30 mx-auto mb-4" />
+                                <p className="text-muted">
                                     Nenhuma lista de compras ainda
                                 </p>
                             </div>

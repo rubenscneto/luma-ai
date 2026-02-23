@@ -23,7 +23,7 @@ const pageTitles: Record<string, string> = {
     "/biblioteca": "Biblioteca",
     "/biblioteca/clube": "Clube do Livro",
     "/configuracoes": "Configurações",
-    "/perdidao": "Meu Planejador",
+    "/onboarding-rotina": "Montar Rotina",
 };
 
 export function MobileHeader({

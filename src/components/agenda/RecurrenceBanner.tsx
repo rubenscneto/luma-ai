@@ -63,7 +63,7 @@ export function RecurrenceBanner() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
-                                        <h4 className="text-sm font-semibold text-white truncate">{suggestion.title}</h4>
+                                        <h4 className="text-sm font-semibold text-foreground truncate">{suggestion.title}</h4>
                                         <span className={`text-xs font-medium ${confidenceColor}`}>
                                             {suggestion.confidence}%
                                         </span>

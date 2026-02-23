@@ -29,7 +29,7 @@ function ConfidenceBadge({ confidence }: { confidence: number }) {
         ? 'bg-green-500/20 text-green-400 border-green-500/30'
         : confidence >= 60
             ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-            : 'bg-white/10 text-white/60 border-white/10';
+            : 'bg-foreground/10 text-muted border-card-border/50';
 
     return (
         <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${color}`}>
@@ -58,18 +58,18 @@ function SuggestionCard({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            className="p-5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all"
+            className="p-5 rounded-2xl bg-foreground/5 border border-card-border/50 hover:border-white/20 transition-all"
         >
             <div className="flex items-start gap-4">
                 {/* Icon */}
                 <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${config.gradient} flex items-center justify-center shrink-0`}>
-                    <Icon className="w-6 h-6 text-white" />
+                    <Icon className="w-6 h-6 text-foreground" />
                 </div>
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                        <h4 className="text-base font-semibold text-white truncate">
+                        <h4 className="text-base font-semibold text-foreground truncate">
                             {suggestion.title}
                         </h4>
                         <ConfidenceBadge confidence={suggestion.confidence} />
@@ -77,15 +77,15 @@ function SuggestionCard({
 
                     {/* Schedule pattern */}
                     <div className="flex items-center gap-2 mb-2">
-                        <Clock className="w-3.5 h-3.5 text-white/40" />
-                        <span className="text-sm text-white/60">
+                        <Clock className="w-3.5 h-3.5 text-muted/70" />
+                        <span className="text-sm text-muted">
                             {daysText} • {suggestion.start_time} - {suggestion.end_time}
                         </span>
                     </div>
 
                     {/* Pattern description */}
                     {suggestion.pattern && (
-                        <p className="text-xs text-white/50 mb-3">{suggestion.pattern}</p>
+                        <p className="text-xs text-muted mb-3">{suggestion.pattern}</p>
                     )}
 
                     {/* Day pills */}
@@ -97,7 +97,7 @@ function SuggestionCard({
                                     key={day}
                                     className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-medium transition-all ${isActive
                                             ? `bg-gradient-to-br ${config.gradient} text-white`
-                                            : 'bg-white/5 text-white/30'
+                                            : 'bg-foreground/5 text-muted/50'
                                         }`}
                                 >
                                     {DAY_NAMES[day][0]}
@@ -107,7 +107,7 @@ function SuggestionCard({
                     </div>
 
                     {/* Stats */}
-                    <div className="flex items-center gap-3 text-xs text-white/40">
+                    <div className="flex items-center gap-3 text-xs text-muted/70">
                         <span>{suggestion.occurrences}x detectado</span>
                     </div>
                 </div>
@@ -124,7 +124,7 @@ function SuggestionCard({
                 </button>
                 <button
                     onClick={onDismiss}
-                    className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-white/50 transition-colors text-sm"
+                    className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-foreground/5 hover:bg-foreground/10 text-muted transition-colors text-sm"
                 >
                     <X className="w-4 h-4" />
                     Ignorar
@@ -142,8 +142,8 @@ export default function RecurrenceSuggestions() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-xl font-semibold text-white">Padrões Detectados</h2>
-                    <p className="text-sm text-white/60">
+                    <h2 className="text-xl font-semibold text-foreground">Padrões Detectados</h2>
+                    <p className="text-sm text-muted">
                         A IA analisa sua agenda e detecta atividades recorrentes
                     </p>
                 </div>
@@ -171,8 +171,8 @@ export default function RecurrenceSuggestions() {
                     className="flex flex-col items-center justify-center py-16"
                 >
                     <Loader2 className="w-10 h-10 text-purple-400 animate-spin mb-4" />
-                    <p className="text-white/60 text-sm">Analisando 14 dias de atividades...</p>
-                    <p className="text-white/40 text-xs mt-1">Buscando padrões recorrentes com IA</p>
+                    <p className="text-muted text-sm">Analisando 14 dias de atividades...</p>
+                    <p className="text-muted/70 text-xs mt-1">Buscando padrões recorrentes com IA</p>
                 </motion.div>
             )}
 
@@ -186,10 +186,10 @@ export default function RecurrenceSuggestions() {
                     <div className="w-20 h-20 rounded-2xl bg-purple-500/20 flex items-center justify-center mb-4">
                         <TrendingUp className="w-10 h-10 text-purple-400" />
                     </div>
-                    <h3 className="text-xl font-semibold text-white mb-2">
+                    <h3 className="text-xl font-semibold text-foreground mb-2">
                         Nenhum padrão detectado
                     </h3>
-                    <p className="text-white/60 max-w-sm mb-6">
+                    <p className="text-muted max-w-sm mb-6">
                         Continue usando a agenda por alguns dias e clique em &quot;Detectar Padrões&quot; para que a IA identifique suas atividades recorrentes.
                     </p>
                     <button
@@ -205,7 +205,7 @@ export default function RecurrenceSuggestions() {
             {/* Suggestions list */}
             {!isRecurrenceLoading && recurrenceSuggestions.length > 0 && (
                 <div className="space-y-4">
-                    <p className="text-sm text-white/50">
+                    <p className="text-sm text-muted">
                         {recurrenceSuggestions.length} padrão(ões) encontrado(s). Converta em blocos fixos para automatizar.
                     </p>
                     <AnimatePresence>
