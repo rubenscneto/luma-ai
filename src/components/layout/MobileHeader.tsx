@@ -51,7 +51,7 @@ export function MobileHeader({
 
     return (
         <header
-            className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white/90 dark:bg-[#090C08]/90 backdrop-blur-xl border-b border-zinc-200/30 dark:border-zinc-800/30"
+            className="md:hidden fixed top-0 left-0 right-0 z-40 bg-bg/90 backdrop-blur-xl border-b border-card-border"
             style={{
                 paddingTop: "env(safe-area-inset-top, 0px)",
             }}
@@ -68,7 +68,7 @@ export function MobileHeader({
                         key={title}
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className="text-lg font-semibold text-zinc-900 dark:text-white"
+                        className="text-lg font-semibold text-foreground"
                     >
                         {title}
                     </motion.h1>
@@ -79,7 +79,7 @@ export function MobileHeader({
                     {showSearchButton && (
                         <button
                             onClick={onSearchClick}
-                            className="p-2.5 rounded-xl text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                            className="p-2.5 rounded-xl text-muted hover:bg-foreground/5 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                         >
                             <Search className="w-5 h-5" />
                         </button>
@@ -88,7 +88,7 @@ export function MobileHeader({
                     {showNotifications && (
                         <button
                             onClick={onNotificationsClick}
-                            className="p-2.5 rounded-xl text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center relative"
+                            className="p-2.5 rounded-xl text-muted hover:bg-foreground/5 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center relative"
                         >
                             <Bell className="w-5 h-5" />
                             {/* Notification badge */}

@@ -47,10 +47,10 @@ export default function WeeklyPlan({ onStartSession }: WeeklyPlanProps) {
         return (
             <div className="flex flex-col items-center justify-center py-16">
                 <div className="w-20 h-20 rounded-2xl bg-blue-500/20 flex items-center justify-center mb-6">
-                    <Dumbbell className="w-10 h-10 text-blue-400" />
+                    <Dumbbell className="w-10 h-10 text-blue-600 dark:text-blue-400" />
                 </div>
-                <h3 className="text-xl font-bold text-white mb-3">Plano de Treino Semanal</h3>
-                <p className="text-white/60 text-sm text-center mb-8 max-w-xs">
+                <h3 className="text-xl font-bold text-foreground mb-3">Plano de Treino Semanal</h3>
+                <p className="text-muted text-sm text-center mb-8 max-w-xs">
                     Gere um plano personalizado baseado no seu perfil, objetivos e equipamentos.
                 </p>
                 <motion.button
@@ -79,8 +79,8 @@ export default function WeeklyPlan({ onStartSession }: WeeklyPlanProps) {
         <div className="space-y-4">
             <div className="flex items-center justify-between">
                 <div>
-                    <h3 className="font-semibold text-white">Plano da Semana</h3>
-                    <p className="text-xs text-white/50">
+                    <h3 className="font-semibold text-foreground">Plano da Semana</h3>
+                    <p className="text-xs text-muted">
                         {weeklyPlan.goal && `Objetivo: ${weeklyPlan.goal}`}
                         {weeklyPlan.level && ` • ${weeklyPlan.level}`}
                         {completedDays.size > 0 && ` • ${completedDays.size}/${sortedDays.filter(d => !d.focus.toLowerCase().includes('descanso') && d.workout?.length > 0).length} sessões`}
@@ -89,7 +89,7 @@ export default function WeeklyPlan({ onStartSession }: WeeklyPlanProps) {
                 <button
                     onClick={() => generateWeeklyPlan()}
                     disabled={isLoading}
-                    className="p-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+                    className="p-2 rounded-lg hover:bg-foreground/10 text-muted hover:text-foreground transition-colors"
                     title="Regenerar plano"
                 >
                     {isLoading ? (
@@ -112,48 +112,48 @@ export default function WeeklyPlan({ onStartSession }: WeeklyPlanProps) {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         className={`p-4 rounded-2xl border transition-all ${isCompleted
-                                ? 'bg-green-500/5 border-green-500/20'
-                                : isToday
-                                    ? 'bg-blue-500/10 border-blue-500/30'
-                                    : 'bg-white/5 border-white/10'
+                            ? 'bg-green-500/5 border-green-500/20'
+                            : isToday
+                                ? 'bg-blue-500/10 border-blue-500/30'
+                                : 'bg-foreground/5 border-foreground/10'
                             }`}
                     >
                         <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
-                                <span className={`text-sm font-semibold ${isCompleted ? 'text-green-400' : isToday ? 'text-blue-400' : 'text-white'
+                                <span className={`text-sm font-semibold ${isCompleted ? 'text-green-600 dark:text-green-400' : isToday ? 'text-blue-600 dark:text-blue-400' : 'text-foreground'
                                     }`}>
                                     {DAY_LABELS[day.dayOfWeek] || day.dayOfWeek}
                                 </span>
                                 {isToday && (
-                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300">
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-700 dark:text-blue-300">
                                         HOJE
                                     </span>
                                 )}
                                 {isCompleted && (
-                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-300">
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-700 dark:text-green-300">
                                         ✓ FEITO
                                     </span>
                                 )}
                             </div>
-                            <span className="text-xs text-white/50">{day.focus}</span>
+                            <span className="text-xs text-muted font-medium">{day.focus}</span>
                         </div>
 
                         {isRest ? (
-                            <p className="text-sm text-white/40">Dia de descanso 😌</p>
+                            <p className="text-sm text-muted">Dia de descanso 😌</p>
                         ) : (
                             <>
                                 <div className="space-y-1.5 mb-3">
                                     {day.workout.slice(0, 4).map((ex, idx) => (
                                         <div key={idx} className="flex items-center gap-2 text-sm">
-                                            <Dumbbell className="w-3 h-3 text-white/30" />
-                                            <span className="text-white/70 truncate flex-1">{ex.name}</span>
-                                            <span className="text-white/40 text-xs">
+                                            <Dumbbell className="w-3 h-3 text-muted/30" />
+                                            <span className="text-foreground/70 truncate flex-1">{ex.name}</span>
+                                            <span className="text-muted text-xs">
                                                 {ex.setsTarget}x{ex.repsTarget}
                                             </span>
                                         </div>
                                     ))}
                                     {day.workout.length > 4 && (
-                                        <p className="text-xs text-white/40">+{day.workout.length - 4} mais</p>
+                                        <p className="text-xs text-muted">+{day.workout.length - 4} mais</p>
                                     )}
                                 </div>
 
@@ -164,8 +164,8 @@ export default function WeeklyPlan({ onStartSession }: WeeklyPlanProps) {
                                         whileTap={{ scale: 0.98 }}
                                         onClick={() => onStartSession(day)}
                                         className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-colors ${isToday
-                                                ? 'bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30'
-                                                : 'bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white'
+                                            ? 'bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-300 hover:bg-blue-500/20'
+                                            : 'bg-foreground/5 border border-foreground/10 text-muted hover:bg-foreground/10 hover:text-foreground'
                                             }`}
                                     >
                                         <Play className="w-4 h-4" />

@@ -451,3 +451,24 @@ export interface RecurringBlockRule {
     created_at?: string;
 }
 
+
+// ========== Scoring types ==========
+
+export interface DailyScore {
+    id: string;
+    user_id: string;
+    plan_date: string; // YYYY-MM-DD
+    consistency_score: number;
+    adherence_score: number;
+    weighted_final_score: number;
+    meta: {
+        last_run_id?: string;
+        stats?: {
+            completed: number;
+            skipped: number;
+        };
+        [key: string]: any;
+    };
+    created_at?: string;
+    updated_at?: string;
+}

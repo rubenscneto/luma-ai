@@ -17,15 +17,15 @@ interface BlockCardProps {
 }
 
 const categoryConfig: Record<BlockCategory, { icon: React.ElementType; color: string; bg: string }> = {
-    work: { icon: Briefcase, color: 'text-blue-400', bg: 'bg-blue-500/20' },
-    study: { icon: BookOpen, color: 'text-purple-400', bg: 'bg-purple-500/20' },
-    health: { icon: Heart, color: 'text-green-400', bg: 'bg-green-500/20' },
-    leisure: { icon: Coffee, color: 'text-amber-400', bg: 'bg-amber-500/20' },
-    admin: { icon: Home, color: 'text-gray-400', bg: 'bg-gray-500/20' },
-    sleep: { icon: Moon, color: 'text-indigo-400', bg: 'bg-indigo-500/20' },
-    meal: { icon: Coffee, color: 'text-orange-400', bg: 'bg-orange-500/20' },
-    commute: { icon: Bus, color: 'text-cyan-400', bg: 'bg-cyan-500/20' },
-    fixed: { icon: Plus, color: 'text-pink-400', bg: 'bg-pink-500/20' },
+    work: { icon: Briefcase, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/10 dark:bg-blue-500/20' },
+    study: { icon: BookOpen, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-500/10 dark:bg-purple-500/20' },
+    health: { icon: Heart, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-500/10 dark:bg-green-500/20' },
+    leisure: { icon: Coffee, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10 dark:bg-amber-500/20' },
+    admin: { icon: Home, color: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-500/10 dark:bg-gray-500/20' },
+    sleep: { icon: Moon, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-500/10 dark:bg-indigo-500/20' },
+    meal: { icon: Coffee, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-500/10 dark:bg-orange-500/20' },
+    commute: { icon: Bus, color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-500/10 dark:bg-cyan-500/20' },
+    fixed: { icon: Plus, color: 'text-pink-600 dark:text-pink-400', bg: 'bg-pink-500/10 dark:bg-pink-500/20' },
 };
 
 export function BlockCard({ block, compact = false }: BlockCardProps) {
@@ -62,10 +62,10 @@ export function BlockCard({ block, compact = false }: BlockCardProps) {
     };
 
     const statusStyles = {
-        current: 'border-2 border-brand-primary shadow-lg shadow-brand-primary/20',
-        upcoming: 'border border-white/10',
+        current: 'border-2 border-accent shadow-lg shadow-accent/20',
+        upcoming: 'border border-card-border',
         done: 'opacity-60 border border-green-500/30',
-        skipped: 'opacity-40 border border-white/5',
+        skipped: 'opacity-40 border border-card-border/50',
         delayed: 'border border-amber-500/30',
     };
 
@@ -73,22 +73,22 @@ export function BlockCard({ block, compact = false }: BlockCardProps) {
         return (
             <div className={cn(
                 "flex items-center gap-3 p-2 rounded-lg",
-                block.status === 'current' ? 'bg-brand-primary/10' : 'bg-white/5'
+                block.status === 'current' ? 'bg-accent/10' : 'bg-surface'
             )}>
                 <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", config.bg)}>
                     <Icon className={cn("w-4 h-4", config.color)} />
                 </div>
                 <div className="flex-1 min-w-0">
                     <p className={cn(
-                        "text-sm font-medium truncate",
-                        block.is_done && "line-through text-white/50"
+                        "text-sm font-medium truncate text-foreground",
+                        block.is_done && "line-through text-muted"
                     )}>
                         {block.title}
                     </p>
-                    <p className="text-xs text-white/50">{startTime}</p>
+                    <p className="text-xs text-muted">{startTime}</p>
                 </div>
                 {block.status === 'current' && (
-                    <div className="w-2 h-2 rounded-full bg-brand-primary animate-pulse" />
+                    <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
                 )}
             </div>
         );
@@ -101,7 +101,7 @@ export function BlockCard({ block, compact = false }: BlockCardProps) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             className={cn(
-                "relative p-4 rounded-xl bg-white/5 backdrop-blur-sm transition-all",
+                "relative p-4 rounded-xl bg-card border border-card-border backdrop-blur-sm transition-all",
                 statusStyles[block.status]
             )}
         >
@@ -113,16 +113,16 @@ export function BlockCard({ block, compact = false }: BlockCardProps) {
 
                 <div className="flex-1 min-w-0">
                     <h4 className={cn(
-                        "font-semibold text-white",
-                        block.is_done && "line-through text-white/50"
+                        "font-semibold text-foreground",
+                        block.is_done && "line-through text-muted"
                     )}>
                         {block.title}
                     </h4>
                     <div className="flex items-center gap-2 mt-1">
-                        <Clock className="w-3 h-3 text-white/40" />
-                        <span className="text-sm text-white/60">{startTime} - {endTime}</span>
+                        <Clock className="w-3 h-3 text-muted" />
+                        <span className="text-sm text-muted">{startTime} - {endTime}</span>
                         {(block.source === 'fixed' || (block as any).is_fixed) && (
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-white/10 text-white/50">
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-foreground/10 text-muted">
                                 Fixo
                             </span>
                         )}
@@ -131,9 +131,9 @@ export function BlockCard({ block, compact = false }: BlockCardProps) {
 
                 {/* Status indicator */}
                 {block.status === 'current' && (
-                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-brand-primary/20">
-                        <Play className="w-3 h-3 text-brand-primary fill-current" />
-                        <span className="text-xs font-medium text-brand-primary">Agora</span>
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-accent/20">
+                        <Play className="w-3 h-3 text-accent fill-current" />
+                        <span className="text-xs font-medium text-accent">Agora</span>
                     </div>
                 )}
 
@@ -141,18 +141,18 @@ export function BlockCard({ block, compact = false }: BlockCardProps) {
                 {!block.is_done && !block.is_skipped && !(block as any).is_fixed && block.source !== 'fixed' && (
                     <button
                         onClick={() => setShowActions(!showActions)}
-                        className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                        className="p-1.5 rounded-lg hover:bg-foreground/5 transition-colors"
                     >
-                        <MoreHorizontal className="w-5 h-5 text-white/50" />
+                        <MoreHorizontal className="w-5 h-5 text-muted" />
                     </button>
                 )}
             </div>
 
             {/* AI Reasoning / Suggested Reason */}
             {block.meta?.suggested_reason && !block.is_done && !block.is_skipped && (
-                <div className="mt-3 flex items-start gap-2 p-2 rounded-lg bg-brand-primary/5 border border-brand-primary/10">
-                    <Sparkles className="w-3 h-3 text-brand-primary shrink-0 mt-0.5" />
-                    <p className="text-[11px] text-white/70 leading-relaxed italic">
+                <div className="mt-3 flex items-start gap-2 p-2 rounded-lg bg-accent/5 border border-accent/10">
+                    <Sparkles className="w-3 h-3 text-accent shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-foreground/70 leading-relaxed italic">
                         {block.meta.suggested_reason}
                     </p>
                 </div>
@@ -165,7 +165,7 @@ export function BlockCard({ block, compact = false }: BlockCardProps) {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="mt-3 pt-3 border-t border-white/10"
+                        className="mt-3 pt-3 border-t border-card-border"
                     >
                         {!showDelayOptions ? (
                             <div className="flex gap-2">
@@ -204,7 +204,7 @@ export function BlockCard({ block, compact = false }: BlockCardProps) {
                                 ))}
                                 <button
                                     onClick={() => setShowDelayOptions(false)}
-                                    className="py-2 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white/60 text-sm transition-colors"
+                                    className="py-2 px-3 rounded-lg bg-foreground/10 hover:bg-foreground/20 text-muted text-sm transition-colors"
                                 >
                                     Voltar
                                 </button>

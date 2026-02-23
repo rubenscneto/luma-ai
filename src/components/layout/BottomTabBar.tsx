@@ -61,7 +61,7 @@ export function BottomTabBar({ onMoreClick }: BottomTabBarProps) {
 
     return (
         <nav
-            className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-[#090C08]/95 backdrop-blur-xl border-t border-zinc-200/50 dark:border-zinc-800/50"
+            className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-bg/95 backdrop-blur-xl border-t border-card-border"
             style={{
                 paddingBottom: "env(safe-area-inset-bottom, 0px)",
             }}
@@ -79,7 +79,7 @@ export function BottomTabBar({ onMoreClick }: BottomTabBarProps) {
                                 "flex flex-col items-center justify-center min-w-[64px] min-h-[44px] py-1.5 px-2 rounded-xl transition-all duration-200",
                                 active
                                     ? "text-[#86BBD8]"
-                                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                                    : "text-muted hover:text-foreground"
                             )}
                         >
                             <div className="relative">
@@ -109,7 +109,7 @@ export function BottomTabBar({ onMoreClick }: BottomTabBarProps) {
                         "flex flex-col items-center justify-center min-w-[64px] min-h-[44px] py-1.5 px-2 rounded-xl transition-all duration-200",
                         isMoreActive
                             ? "text-[#86BBD8]"
-                            : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                            : "text-muted hover:text-foreground"
                     )}
                 >
                     <MoreHorizontal className="w-5 h-5" strokeWidth={isMoreActive ? 2.5 : 2} />
@@ -155,14 +155,14 @@ export function MoreMenu({ isOpen, onClose }: MoreMenuProps) {
                 animate={{ y: 0 }}
                 exit={{ y: "100%" }}
                 transition={{ type: "spring", bounce: 0.1, duration: 0.4 }}
-                className="absolute bottom-0 left-0 right-0 bg-white dark:bg-[#090C08] rounded-t-3xl shadow-2xl"
+                className="absolute bottom-0 left-0 right-0 bg-surface rounded-t-3xl shadow-2xl"
                 style={{
                     paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
                 }}
             >
                 {/* Handle */}
                 <div className="flex justify-center py-3">
-                    <div className="w-10 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600" />
+                    <div className="w-10 h-1 rounded-full bg-foreground/10" />
                 </div>
 
                 {/* Menu Items */}
@@ -179,8 +179,8 @@ export function MoreMenu({ isOpen, onClose }: MoreMenuProps) {
                                 className={cn(
                                     "flex items-center gap-4 p-4 rounded-xl transition-all",
                                     active
-                                        ? "bg-[#86BBD8]/10 text-[#86BBD8]"
-                                        : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                                        ? "bg-accent/10 text-accent"
+                                        : "text-foreground hover:bg-foreground/5"
                                 )}
                             >
                                 <Icon className="w-5 h-5" />
@@ -189,10 +189,10 @@ export function MoreMenu({ isOpen, onClose }: MoreMenuProps) {
                         );
                     })}
 
-                    <div className="h-px bg-zinc-200 dark:bg-zinc-800 my-2" />
+                    <div className="h-px bg-card-border my-2" />
 
                     <div className="px-4 py-2">
-                        <ThemeToggleSimple className="text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 p-2 rounded-xl" />
+                        <ThemeToggleSimple className="text-foreground hover:bg-foreground/5 p-2 rounded-xl" />
                     </div>
                 </div>
             </motion.div>

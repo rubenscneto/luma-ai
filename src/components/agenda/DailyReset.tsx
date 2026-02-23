@@ -81,7 +81,7 @@ export default function DailyReset({ onDismiss }: DailyResetProps) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="bg-gradient-to-br from-purple-500/10 via-indigo-500/5 to-blue-500/10 rounded-2xl border border-white/10 p-6 space-y-6"
+            className="bg-card rounded-2xl border border-card-border p-6 space-y-6"
         >
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -90,8 +90,8 @@ export default function DailyReset({ onDismiss }: DailyResetProps) {
                         <span className="text-2xl">{timeEmoji}</span>
                     </div>
                     <div>
-                        <h2 className="text-lg font-semibold text-white">{greeting}</h2>
-                        <p className="text-sm text-white/50">
+                        <h2 className="text-lg font-semibold text-foreground">{greeting}</h2>
+                        <p className="text-sm text-muted">
                             {isNightReview ? "Vamos revisar o seu dia?" : "Pronto para começar?"}
                         </p>
                     </div>
@@ -99,7 +99,7 @@ export default function DailyReset({ onDismiss }: DailyResetProps) {
                 {onDismiss && (
                     <button
                         onClick={onDismiss}
-                        className="text-white/30 hover:text-white/60 transition-colors text-sm"
+                        className="text-muted/60 hover:text-muted transition-colors text-sm"
                     >
                         Pular
                     </button>
@@ -117,9 +117,9 @@ export default function DailyReset({ onDismiss }: DailyResetProps) {
                     >
                         {/* Yesterday/Today Score Card */}
                         {todayBlocks.length > 0 && (
-                            <div className="bg-white/5 rounded-xl p-5 space-y-4">
+                            <div className="bg-surface rounded-xl p-5 space-y-4">
                                 <div className="flex items-center justify-between">
-                                    <h3 className="text-sm font-medium text-white/60">
+                                    <h3 className="text-sm font-medium text-muted">
                                         {isNightReview ? "Resultado de hoje" : "Ontem"}
                                     </h3>
                                     <span className="text-2xl">{scoreInfo.emoji}</span>
@@ -129,7 +129,7 @@ export default function DailyReset({ onDismiss }: DailyResetProps) {
                                 <div className="flex items-center gap-6">
                                     <div className="relative w-20 h-20">
                                         <svg className="w-20 h-20 -rotate-90" viewBox="0 0 40 40">
-                                            <circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3" />
+                                            <circle cx="20" cy="20" r="16" fill="none" stroke="currentColor" className="text-foreground/10" strokeWidth="3" />
                                             <circle
                                                 cx="20" cy="20" r="16" fill="none"
                                                 stroke="url(#gradient)"
@@ -145,22 +145,22 @@ export default function DailyReset({ onDismiss }: DailyResetProps) {
                                             </defs>
                                         </svg>
                                         <div className="absolute inset-0 flex items-center justify-center">
-                                            <span className="text-lg font-bold text-white">{score.percentage}%</span>
+                                            <span className="text-lg font-bold text-foreground">{score.percentage}%</span>
                                         </div>
                                     </div>
 
                                     <div className="flex-1 space-y-2">
                                         <div className="flex items-center gap-2">
-                                            <CheckCircle2 className="w-4 h-4 text-green-400" />
-                                            <span className="text-sm text-white/70">{score.completed} concluídos</span>
+                                            <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                            <span className="text-sm text-foreground/70">{score.completed} concluídos</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                                            <span className="text-sm text-white/70">{score.skipped} pulados</span>
+                                            <AlertTriangle className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                                            <span className="text-sm text-foreground/70">{score.skipped} pulados</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <Target className="w-4 h-4 text-purple-400" />
-                                            <span className="text-sm text-white/70">{score.total} total</span>
+                                            <Target className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                                            <span className="text-sm text-foreground/70">{score.total} total</span>
                                         </div>
                                     </div>
                                 </div>
@@ -173,7 +173,7 @@ export default function DailyReset({ onDismiss }: DailyResetProps) {
 
                         {/* Energy Rating */}
                         <div className="space-y-3">
-                            <h3 className="text-sm font-medium text-white/60">
+                            <h3 className="text-sm font-medium text-muted">
                                 Como está sua energia agora?
                             </h3>
                             <div className="grid grid-cols-3 gap-3">
@@ -186,12 +186,12 @@ export default function DailyReset({ onDismiss }: DailyResetProps) {
                                         key={opt.value}
                                         onClick={() => setEnergyLevel(opt.value)}
                                         className={`p-3 rounded-xl border transition-all text-center ${energyLevel === opt.value
-                                                ? 'bg-purple-500/20 border-purple-500/50'
-                                                : 'border-white/10 hover:border-white/20'
+                                            ? 'bg-accent/20 border-accent/50'
+                                            : 'border-card-border hover:border-accent/30'
                                             }`}
                                     >
                                         <div className="text-xl mb-1">{opt.emoji}</div>
-                                        <div className="text-xs text-white/60">{opt.label}</div>
+                                        <div className="text-xs text-muted">{opt.label}</div>
                                     </button>
                                 ))}
                             </div>
@@ -199,14 +199,14 @@ export default function DailyReset({ onDismiss }: DailyResetProps) {
 
                         {/* Mood Note */}
                         <div className="space-y-3">
-                            <h3 className="text-sm font-medium text-white/60">
+                            <h3 className="text-sm font-medium text-muted">
                                 Alguma nota? (opcional)
                             </h3>
                             <textarea
                                 value={moodNote}
                                 onChange={(e) => setMoodNote(e.target.value)}
                                 placeholder="Ex: Dormi mal, preciso de uma agenda mais leve..."
-                                className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white placeholder:text-white/30 resize-none focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                                className="w-full bg-surface border border-card-border rounded-xl p-3 text-sm text-foreground placeholder:text-muted/50 resize-none focus:outline-none focus:ring-1 focus:ring-accent/50"
                                 rows={2}
                             />
                         </div>
@@ -230,13 +230,13 @@ export default function DailyReset({ onDismiss }: DailyResetProps) {
                         exit={{ opacity: 0 }}
                         className="space-y-4"
                     >
-                        <div className="bg-white/5 rounded-xl p-5 text-center space-y-4">
-                            <div className="w-16 h-16 mx-auto rounded-full bg-purple-500/20 flex items-center justify-center">
-                                <Zap className="w-8 h-8 text-purple-400" />
+                        <div className="bg-surface rounded-xl p-5 text-center space-y-4">
+                            <div className="w-16 h-16 mx-auto rounded-full bg-accent/20 flex items-center justify-center">
+                                <Zap className="w-8 h-8 text-accent" />
                             </div>
                             <div>
-                                <h3 className="text-white font-medium">Vamos montar sua agenda!</h3>
-                                <p className="text-sm text-white/50 mt-1">
+                                <h3 className="text-foreground font-medium">Vamos montar sua agenda!</h3>
+                                <p className="text-sm text-muted mt-1">
                                     {energyLevel === 'low'
                                         ? "Vou criar uma agenda mais leve hoje."
                                         : energyLevel === 'high'
@@ -271,7 +271,7 @@ export default function DailyReset({ onDismiss }: DailyResetProps) {
 
                         <button
                             onClick={() => setStep('review')}
-                            className="text-sm text-white/40 hover:text-white/60 transition-colors mx-auto block"
+                            className="text-sm text-muted/60 hover:text-muted transition-colors mx-auto block"
                         >
                             ← Voltar para revisão
                         </button>

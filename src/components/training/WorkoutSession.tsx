@@ -69,14 +69,14 @@ export default function WorkoutSession({ dayPlan, onComplete, onCancel }: Workou
             {/* Session Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h3 className="font-semibold text-white">Treino: {dayPlan.focus}</h3>
-                    <p className="text-xs text-white/50">
+                    <h3 className="font-semibold text-foreground">Treino: {dayPlan.focus}</h3>
+                    <p className="text-xs text-muted">
                         {dayPlan.workout.length} exercícios • Volume: {totalVolume.toFixed(0)} kg
                     </p>
                 </div>
                 <button
                     onClick={async () => { await cancelSession(); onCancel(); }}
-                    className="p-2 rounded-lg hover:bg-white/10 text-white/50"
+                    className="p-2 rounded-lg hover:bg-foreground/10 text-muted"
                     title="Cancelar"
                 >
                     <X className="w-5 h-5" />
@@ -97,8 +97,8 @@ export default function WorkoutSession({ dayPlan, onComplete, onCancel }: Workou
                             className={`rounded-2xl border overflow-hidden transition-colors ${isDone
                                 ? 'bg-green-500/10 border-green-500/20'
                                 : isExpanded
-                                    ? 'bg-white/10 border-white/20'
-                                    : 'bg-white/5 border-white/10'
+                                    ? 'bg-foreground/10 border-foreground/20'
+                                    : 'bg-foreground/5 border-foreground/10'
                                 }`}
                         >
                             {/* Exercise Header */}
@@ -118,7 +118,7 @@ export default function WorkoutSession({ dayPlan, onComplete, onCancel }: Workou
                                     )}
                                     <div className="text-left">
                                         <p className="text-left py-0.5">
-                                            <span className={`text-sm font-medium ${isDone ? 'text-green-300' : 'text-white'}`}>
+                                            <span className={`text-sm font-medium ${isDone ? 'text-green-600 dark:text-green-300' : 'text-foreground'}`}>
                                                 {exercise.name}
                                             </span>
                                             {personalRecords[exercise.exerciseId] && (
@@ -127,19 +127,19 @@ export default function WorkoutSession({ dayPlan, onComplete, onCancel }: Workou
                                                 </span>
                                             )}
                                         </p>
-                                        <p className="text-xs text-white/40">
+                                        <p className="text-xs text-muted">
                                             {exercise.machineOrType} • {exercise.setsTarget}x{exercise.repsTarget} • {exercise.restSecTarget}s desc
                                         </p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xs text-white/40">
+                                    <span className="text-xs text-muted">
                                         {sets.length}/{exercise.setsTarget}
                                     </span>
                                     {isExpanded ? (
-                                        <ChevronUp className="w-4 h-4 text-white/40" />
+                                        <ChevronUp className="w-4 h-4 text-muted" />
                                     ) : (
-                                        <ChevronDown className="w-4 h-4 text-white/40" />
+                                        <ChevronDown className="w-4 h-4 text-muted" />
                                     )}
                                 </div>
                             </button>
@@ -159,12 +159,12 @@ export default function WorkoutSession({ dayPlan, onComplete, onCancel }: Workou
                                                 <div className="space-y-1">
                                                     {sets.map((s) => (
                                                         <div key={s.id} className="flex items-center gap-3 text-sm">
-                                                            <span className="text-white/40 w-16">Série {s.set_number}</span>
-                                                            <span className="text-white">{s.weight_kg}kg</span>
-                                                            <span className="text-white/60">×</span>
-                                                            <span className="text-white">{s.reps} reps</span>
+                                                            <span className="text-muted w-16">Série {s.set_number}</span>
+                                                            <span className="text-foreground">{s.weight_kg}kg</span>
+                                                            <span className="text-muted">×</span>
+                                                            <span className="text-foreground">{s.reps} reps</span>
                                                             {s.rpe && (
-                                                                <span className="text-orange-400 text-xs">RPE {s.rpe}</span>
+                                                                <span className="text-orange-600 dark:text-orange-400 text-xs">RPE {s.rpe}</span>
                                                             )}
                                                         </div>
                                                     ))}
@@ -175,49 +175,49 @@ export default function WorkoutSession({ dayPlan, onComplete, onCancel }: Workou
                                             {!isDone && (
                                                 <div className="space-y-2">
                                                     <div className="flex items-center justify-between">
-                                                        <p className="text-xs text-white/50">
+                                                        <p className="text-xs text-muted">
                                                             Série {sets.length + 1} de {exercise.setsTarget}
                                                         </p>
                                                         {progressions.find(p => p.exerciseName === exercise.name) && (
                                                             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                                                                <Target className="w-3 h-3 text-blue-400" />
-                                                                <span className="text-[10px] text-blue-300 font-medium">Meta: {progressions.find(p => p.exerciseName === exercise.name)?.detail}</span>
+                                                                <Target className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                                                                <span className="text-[10px] text-blue-700 dark:text-blue-300 font-medium">Meta: {progressions.find(p => p.exerciseName === exercise.name)?.detail}</span>
                                                             </div>
                                                         )}
                                                     </div>
                                                     <div className="grid grid-cols-4 gap-2">
                                                         <div>
-                                                            <label className="text-[10px] text-white/40">Peso (kg)</label>
+                                                            <label className="text-[10px] text-muted">Peso (kg)</label>
                                                             <input
                                                                 type="number"
                                                                 value={setForm.weight}
                                                                 onChange={e => setSetForm(f => ({ ...f, weight: e.target.value }))}
                                                                 placeholder="0"
-                                                                className="w-full px-2 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-blue-500"
+                                                                className="w-full px-2 py-2 rounded-lg bg-input border border-input-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="text-[10px] text-white/40">Reps</label>
+                                                            <label className="text-[10px] text-muted">Reps</label>
                                                             <input
                                                                 type="number"
                                                                 value={setForm.reps}
                                                                 onChange={e => setSetForm(f => ({ ...f, reps: e.target.value }))}
                                                                 placeholder="0"
-                                                                className="w-full px-2 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-blue-500"
+                                                                className="w-full px-2 py-2 rounded-lg bg-input border border-input-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="text-[10px] text-white/40">Desc (s)</label>
+                                                            <label className="text-[10px] text-muted">Desc (s)</label>
                                                             <input
                                                                 type="number"
                                                                 value={setForm.rest}
                                                                 onChange={e => setSetForm(f => ({ ...f, rest: e.target.value }))}
                                                                 placeholder="60"
-                                                                className="w-full px-2 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-blue-500"
+                                                                className="w-full px-2 py-2 rounded-lg bg-input border border-input-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="text-[10px] text-white/40">RPE</label>
+                                                            <label className="text-[10px] text-muted">RPE</label>
                                                             <input
                                                                 type="number"
                                                                 min="1"
@@ -225,7 +225,7 @@ export default function WorkoutSession({ dayPlan, onComplete, onCancel }: Workou
                                                                 value={setForm.rpe}
                                                                 onChange={e => setSetForm(f => ({ ...f, rpe: e.target.value }))}
                                                                 placeholder="7"
-                                                                className="w-full px-2 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-blue-500"
+                                                                className="w-full px-2 py-2 rounded-lg bg-input border border-input-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                                                             />
                                                         </div>
                                                     </div>
@@ -241,7 +241,7 @@ export default function WorkoutSession({ dayPlan, onComplete, onCancel }: Workou
                                             )}
 
                                             {exercise.notes && (
-                                                <p className="text-xs text-white/40 italic">💡 {exercise.notes}</p>
+                                                <p className="text-xs text-muted italic">💡 {exercise.notes}</p>
                                             )}
                                         </div>
                                     </motion.div>
@@ -260,7 +260,7 @@ export default function WorkoutSession({ dayPlan, onComplete, onCancel }: Workou
                 disabled={isLoading || sessionSets.length === 0}
                 className={`w-full flex items-center justify-center gap-2 py-4 rounded-xl font-medium transition-all ${allExercisesDone
                     ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
-                    : 'bg-white/10 border border-white/20 text-white/70'
+                    : 'bg-foreground/10 border border-foreground/20 text-muted'
                     } disabled:opacity-30`}
             >
                 {isLoading ? (
@@ -275,19 +275,19 @@ export default function WorkoutSession({ dayPlan, onComplete, onCancel }: Workou
 
             {/* Session Summary */}
             {sessionSets.length > 0 && (
-                <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                <div className="p-4 rounded-2xl bg-foreground/5 border border-foreground/10">
                     <div className="grid grid-cols-3 gap-4 text-center">
                         <div>
-                            <p className="text-xs text-white/40">Séries</p>
-                            <p className="text-lg font-bold text-white">{sessionSets.length}</p>
+                            <p className="text-xs text-muted">Séries</p>
+                            <p className="text-lg font-bold text-foreground">{sessionSets.length}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-white/40">Volume</p>
-                            <p className="text-lg font-bold text-white">{totalVolume.toFixed(0)}<span className="text-xs font-normal text-white/40"> kg</span></p>
+                            <p className="text-xs text-muted">Volume</p>
+                            <p className="text-lg font-bold text-foreground">{totalVolume.toFixed(0)}<span className="text-xs font-normal text-muted"> kg</span></p>
                         </div>
                         <div>
-                            <p className="text-xs text-white/40">RPE Médio</p>
-                            <p className="text-lg font-bold text-white">
+                            <p className="text-xs text-muted">RPE Médio</p>
+                            <p className="text-lg font-bold text-foreground">
                                 {sessionSets.filter(s => s.rpe).length > 0
                                     ? (sessionSets.filter(s => s.rpe).reduce((sum, s) => sum + (s.rpe || 0), 0) / sessionSets.filter(s => s.rpe).length).toFixed(1)
                                     : '-'}

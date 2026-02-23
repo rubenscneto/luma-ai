@@ -10,11 +10,11 @@
   --muted: #4D626A;
   --accent: #86BBD8;
   --accent2: #AC8887;
-  
+
   /* Legacy aliases for compatibility */
   --background: var(--bg);
   --foreground: var(--text);
-  
+
   /* Original LumaAI Palette */
   --luma-rose: #AC8887;
   --luma-sky: #86BBD8;
@@ -31,21 +31,15 @@
   /* Mobile Tab Bar Height */
   --tab-bar-height: 64px;
   --mobile-header-height: 56px;
+
+  /* Semantic UI Tokens */
+  --card-bg: var(--surface);
+  --card-border: rgba(77, 98, 106, 0.15);
+  --input-bg: white;
+  --input-border: rgba(77, 98, 106, 0.2);
 }
 
-/* Dark Mode - Primary for the app */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #090C08;
-    --surface: #151A17;
-    --text: #EEF4ED;
-    --muted: #4D626A;
-    --background: var(--bg);
-    --foreground: var(--text);
-  }
-}
-
-/* Force dark mode for app (user preference) */
+/* Dark Mode - Consolidated under .dark class (handled by next-themes) */
 .dark {
   --bg: #090C08;
   --surface: #151A17;
@@ -53,12 +47,17 @@
   --muted: #4D626A;
   --background: var(--bg);
   --foreground: var(--text);
+
+  --card-bg: rgba(21, 26, 23, 0.8);
+  --card-border: rgba(77, 98, 106, 0.25);
+  --input-bg: rgba(255, 255, 255, 0.05);
+  --input-border: rgba(255, 255, 255, 0.1);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  
+
   /* Semantic tokens */
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -66,7 +65,12 @@
   --color-muted: var(--muted);
   --color-accent: var(--accent);
   --color-accent2: var(--accent2);
-  
+
+  --color-card: var(--card-bg);
+  --color-card-border: var(--card-border);
+  --color-input: var(--input-bg);
+  --color-input-border: var(--input-border);
+
   /* Legacy palette */
   --color-luma-rose: var(--luma-rose);
   --color-luma-sky: var(--luma-sky);
@@ -172,6 +176,7 @@ a,
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -184,15 +189,20 @@ a,
 
 /* Glow blob animations */
 @keyframes glowDrift {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translate(0, 0) scale(1);
   }
+
   25% {
     transform: translate(5%, 3%) scale(1.02);
   }
+
   50% {
     transform: translate(-3%, 5%) scale(0.98);
   }
+
   75% {
     transform: translate(-5%, -3%) scale(1.01);
   }

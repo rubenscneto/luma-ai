@@ -109,37 +109,37 @@ export function HealthOnboarding({ onComplete }: HealthOnboardingProps) {
             case 'basic':
                 return (
                     <div className="space-y-6">
-                        <p className="text-white/60">
+                        <p className="text-muted">
                             Dados opcionais para personalizar suas sugestões.
                             Pule se preferir não informar.
                         </p>
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm text-white/60 mb-2">Altura (cm)</label>
+                                <label className="block text-sm text-muted mb-2">Altura (cm)</label>
                                 <input
                                     type="number"
                                     value={heightCm || ''}
                                     onChange={e => setHeightCm(e.target.value ? Number(e.target.value) : undefined)}
                                     placeholder="175"
-                                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-brand-primary"
+                                    className="w-full px-4 py-3 rounded-xl bg-input border border-input-border text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm text-white/60 mb-2">Peso (kg)</label>
+                                <label className="block text-sm text-muted mb-2">Peso (kg)</label>
                                 <input
                                     type="number"
                                     value={weightKg || ''}
                                     onChange={e => setWeightKg(e.target.value ? Number(e.target.value) : undefined)}
                                     placeholder="70"
-                                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-brand-primary"
+                                    className="w-full px-4 py-3 rounded-xl bg-input border border-input-border text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
                                 />
                             </div>
                         </div>
 
                         <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex gap-3">
-                            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                            <p className="text-sm text-amber-200">
+                            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                            <p className="text-sm text-amber-700 dark:text-amber-200">
                                 Sugestões gerais apenas. Não substituem orientação profissional.
                             </p>
                         </div>
@@ -149,7 +149,7 @@ export function HealthOnboarding({ onComplete }: HealthOnboardingProps) {
             case 'goal':
                 return (
                     <div className="space-y-4">
-                        <p className="text-white/60 mb-4">
+                        <p className="text-muted mb-4">
                             Qual seu principal objetivo de saúde e bem-estar?
                         </p>
 
@@ -161,17 +161,17 @@ export function HealthOnboarding({ onComplete }: HealthOnboardingProps) {
                                     className={cn(
                                         "w-full p-4 rounded-xl border text-left transition-all",
                                         goal === option.value
-                                            ? "bg-brand-primary/20 border-brand-primary"
-                                            : "bg-white/5 border-white/10 hover:bg-white/10"
+                                            ? "bg-accent/20 border-accent"
+                                            : "bg-foreground/5 border-foreground/10 hover:bg-foreground/10"
                                     )}
                                 >
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <p className="font-medium text-white">{option.label}</p>
-                                            <p className="text-sm text-white/60">{option.description}</p>
+                                            <p className="font-medium text-foreground">{option.label}</p>
+                                            <p className="text-sm text-muted">{option.description}</p>
                                         </div>
                                         {goal === option.value && (
-                                            <Check className="w-5 h-5 text-brand-primary" />
+                                            <Check className="w-5 h-5 text-accent" />
                                         )}
                                     </div>
                                 </button>
@@ -184,7 +184,7 @@ export function HealthOnboarding({ onComplete }: HealthOnboardingProps) {
                 return (
                     <div className="space-y-6">
                         <div>
-                            <p className="text-white/60 mb-4">
+                            <p className="text-muted mb-4">
                                 Preferências alimentares (selecione todas que se aplicam)
                             </p>
                             <div className="flex flex-wrap gap-2">
@@ -195,8 +195,8 @@ export function HealthOnboarding({ onComplete }: HealthOnboardingProps) {
                                         className={cn(
                                             "px-4 py-2 rounded-lg text-sm transition-all",
                                             dietaryPreferences.includes(option)
-                                                ? "bg-brand-primary text-white"
-                                                : "bg-white/10 text-white/60 hover:bg-white/20"
+                                                ? "bg-accent text-white"
+                                                : "bg-foreground/10 text-muted hover:bg-foreground/20"
                                         )}
                                     >
                                         {option}
@@ -206,7 +206,7 @@ export function HealthOnboarding({ onComplete }: HealthOnboardingProps) {
                         </div>
 
                         <div>
-                            <label className="block text-sm text-white/60 mb-2">
+                            <label className="block text-sm text-muted mb-2">
                                 Alergias ou restrições (separar por vírgula)
                             </label>
                             <input
@@ -216,7 +216,7 @@ export function HealthOnboarding({ onComplete }: HealthOnboardingProps) {
                                     e.target.value.split(',').map(s => s.trim()).filter(Boolean)
                                 )}
                                 placeholder="Ex: amendoim, frutos do mar"
-                                className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-brand-primary"
+                                className="w-full px-4 py-3 rounded-xl bg-input border border-input-border text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
                             />
                         </div>
                     </div>
@@ -226,7 +226,7 @@ export function HealthOnboarding({ onComplete }: HealthOnboardingProps) {
                 return (
                     <div className="space-y-6">
                         <div>
-                            <p className="text-white/60 mb-4">Seu nível de atividade física</p>
+                            <p className="text-muted mb-4">Seu nível de atividade física</p>
                             <div className="grid grid-cols-3 gap-3">
                                 {trainingOptions.map(option => (
                                     <button
@@ -235,18 +235,18 @@ export function HealthOnboarding({ onComplete }: HealthOnboardingProps) {
                                         className={cn(
                                             "p-4 rounded-xl border text-center transition-all",
                                             trainingLevel === option.value
-                                                ? "bg-brand-primary/20 border-brand-primary"
-                                                : "bg-white/5 border-white/10 hover:bg-white/10"
+                                                ? "bg-accent border-accent text-white"
+                                                : "bg-foreground/5 border-card-border text-muted hover:bg-foreground/10"
                                         )}
                                     >
-                                        <p className="font-medium text-white">{option.label}</p>
+                                        <div className="text-sm font-semibold">{option.label}</div>
                                     </button>
                                 ))}
                             </div>
                         </div>
 
                         <div>
-                            <p className="text-white/60 mb-4">Equipamentos disponíveis</p>
+                            <p className="text-muted mb-4">Equipamentos disponíveis</p>
                             <div className="flex flex-wrap gap-2">
                                 {equipmentOptions.map(option => (
                                     <button
@@ -255,8 +255,8 @@ export function HealthOnboarding({ onComplete }: HealthOnboardingProps) {
                                         className={cn(
                                             "px-4 py-2 rounded-lg text-sm transition-all",
                                             equipment.includes(option)
-                                                ? "bg-brand-primary text-white"
-                                                : "bg-white/10 text-white/60 hover:bg-white/20"
+                                                ? "bg-accent text-white"
+                                                : "bg-foreground/10 text-muted hover:bg-foreground/20"
                                         )}
                                     >
                                         {option}
@@ -270,27 +270,27 @@ export function HealthOnboarding({ onComplete }: HealthOnboardingProps) {
             case 'sleep':
                 return (
                     <div className="space-y-6">
-                        <p className="text-white/60">
+                        <p className="text-muted">
                             Seus horários ajudam a criar uma rotina equilibrada.
                         </p>
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm text-white/60 mb-2">Horário de acordar</label>
+                                <label className="block text-sm text-muted mb-2">Horário de acordar</label>
                                 <input
                                     type="time"
                                     value={wakeTime}
                                     onChange={e => setWakeTime(e.target.value)}
-                                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-brand-primary"
+                                    className="w-full px-4 py-3 rounded-xl bg-input border border-input-border text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm text-white/60 mb-2">Horário de dormir</label>
+                                <label className="block text-sm text-muted mb-2">Horário de dormir</label>
                                 <input
                                     type="time"
                                     value={sleepTime}
                                     onChange={e => setSleepTime(e.target.value)}
-                                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-brand-primary"
+                                    className="w-full px-4 py-3 rounded-xl bg-input border border-input-border text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
                                 />
                             </div>
                         </div>
@@ -320,10 +320,10 @@ export function HealthOnboarding({ onComplete }: HealthOnboardingProps) {
                                 className={cn(
                                     "w-10 h-10 rounded-full flex items-center justify-center transition-all",
                                     isActive
-                                        ? "bg-brand-primary text-white"
+                                        ? "bg-accent text-white"
                                         : isComplete
-                                            ? "bg-green-500/20 text-green-400"
-                                            : "bg-white/10 text-white/40"
+                                            ? "bg-green-500/20 text-green-600 dark:text-green-400"
+                                            : "bg-foreground/10 text-muted"
                                 )}
                             >
                                 {isComplete ? (
@@ -335,7 +335,7 @@ export function HealthOnboarding({ onComplete }: HealthOnboardingProps) {
                             {index < steps.length - 1 && (
                                 <div className={cn(
                                     "h-0.5 flex-1 mx-2",
-                                    index < currentStep ? "bg-brand-primary" : "bg-white/10"
+                                    index < currentStep ? "bg-accent" : "bg-foreground/10"
                                 )} />
                             )}
                         </React.Fragment>
@@ -351,7 +351,7 @@ export function HealthOnboarding({ onComplete }: HealthOnboardingProps) {
                 exit={{ opacity: 0, x: -20 }}
                 className="mb-8"
             >
-                <h2 className="text-2xl font-bold text-white mb-6">
+                <h2 className="text-2xl font-bold text-foreground mb-6">
                     {steps[currentStep].title}
                 </h2>
                 {renderStep()}
@@ -362,7 +362,7 @@ export function HealthOnboarding({ onComplete }: HealthOnboardingProps) {
                 {currentStep > 0 && (
                     <button
                         onClick={handleBack}
-                        className="px-6 py-3 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors"
+                        className="px-6 py-3 rounded-xl bg-foreground/10 text-foreground hover:bg-foreground/20 transition-colors"
                     >
                         Voltar
                     </button>
@@ -371,7 +371,7 @@ export function HealthOnboarding({ onComplete }: HealthOnboardingProps) {
                 <button
                     onClick={isLastStep ? handleSubmit : handleNext}
                     disabled={isLoading}
-                    className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-brand-primary text-white font-medium hover:bg-brand-primary/90 transition-colors disabled:opacity-50"
+                    className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-accent text-white font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
                 >
                     {isLoading ? (
                         <Loader2 className="w-5 h-5 animate-spin" />

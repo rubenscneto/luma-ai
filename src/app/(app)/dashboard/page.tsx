@@ -10,6 +10,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { LiveTimeline } from "@/components/dashboard/LiveTimeline";
 import { NextTaskBanner } from "@/components/dashboard/NextTaskBanner";
+import { PerformanceDashboard } from "@/components/dashboard/PerformanceDashboard";
 import DailyReset from "@/components/agenda/DailyReset";
 import { useAuth } from "@/context/authContext";
 
@@ -106,34 +107,37 @@ export default function DashboardPage() {
         <div className="space-y-8">
             <header>
                 <h1 className="text-3xl font-bold mb-2">{getGreeting()}, {userName}.</h1>
-                <p className="text-zinc-500 dark:text-zinc-400">Aqui está o seu panorama diário.</p>
+                <p className="text-muted">Aqui está o seu panorama diário.</p>
             </header>
 
             {/* Motivation Banner */}
             <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white dark:bg-zinc-900 rounded-xl p-6 border border-zinc-100 dark:border-zinc-800 shadow-sm relative overflow-hidden group"
+                className="bg-card rounded-xl p-6 border border-card-border shadow-sm relative overflow-hidden group"
             >
                 <div className="absolute top-0 left-0 right-0 h-[2px] bg-[var(--luma-sky)] opacity-50" />
 
                 <div className="relative z-10 flex flex-col h-full justify-between">
                     <div>
-                        <div className="flex items-center gap-2 text-[var(--luma-slate)] mb-3">
+                        <div className="flex items-center gap-2 text-muted mb-3">
                             <span className="text-xs font-semibold uppercase tracking-wider opacity-70">Daily Motivation</span>
                         </div>
-                        <p className="text-lg md:text-xl font-medium text-[var(--luma-black)] dark:text-white leading-relaxed font-sans">
+                        <p className="text-lg md:text-xl font-medium text-foreground leading-relaxed font-sans">
                             "{motivation?.text || 'Carregando...'}"
                         </p>
                     </div>
                     {motivation?.author && (
-                        <p className="text-right text-[var(--luma-slate)] text-sm mt-3 font-medium">— {motivation.author}</p>
+                        <p className="text-right text-muted text-sm mt-3 font-medium">— {motivation.author}</p>
                     )}
                 </div>
             </motion.div>
 
             {/* Next Task Banner */}
             <NextTaskBanner />
+
+            {/* Weekly Performance Dashboard */}
+            <PerformanceDashboard />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Timeline Widget - New AI-powered */}
@@ -157,10 +161,10 @@ export default function DashboardPage() {
 
                         {priorities.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-6 text-center space-y-2">
-                                <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400">
+                                <div className="w-12 h-12 rounded-full bg-foreground/5 flex items-center justify-center text-muted">
                                     <Target size={20} />
                                 </div>
-                                <p className="text-sm text-zinc-500">Nenhuma prioridade definida ainda.</p>
+                                <p className="text-sm text-muted">Nenhuma prioridade definida ainda.</p>
                                 <button
                                     onClick={() => setShowAddModal(true)}
                                     className="text-xs text-[#86BBD8] font-medium hover:underline"
@@ -177,7 +181,7 @@ export default function DashboardPage() {
                                             initial={{ opacity: 0, x: -10 }}
                                             animate={{ opacity: 1, x: 0 }}
                                             exit={{ opacity: 0, x: 10 }}
-                                            className="flex items-center gap-3 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 group"
+                                            className="flex items-center gap-3 p-3 rounded-lg bg-surface group"
                                         >
                                             <button
                                                 onClick={() => togglePriority(priority.id)}
@@ -187,15 +191,15 @@ export default function DashboardPage() {
                                             <span className="flex-1 text-sm">{priority.text}</span>
                                             <button
                                                 onClick={() => deletePriority(priority.id)}
-                                                className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-red-500 transition-all"
+                                                className="opacity-0 group-hover:opacity-100 text-muted hover:text-red-500 transition-all"
                                             >
                                                 <Trash2 size={14} />
                                             </button>
                                         </motion.div>
                                     ))}
                                     {completedPriorities.length > 0 && (
-                                        <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700 mt-2">
-                                            <p className="text-xs text-zinc-400 mb-2">Concluídas ({completedPriorities.length})</p>
+                                        <div className="pt-2 border-t border-card-border mt-2">
+                                            <p className="text-xs text-muted mb-2">Concluídas ({completedPriorities.length})</p>
                                             {completedPriorities.map((priority) => (
                                                 <motion.div
                                                     key={priority.id}
@@ -210,10 +214,10 @@ export default function DashboardPage() {
                                                     >
                                                         <Check size={12} className="text-white" />
                                                     </button>
-                                                    <span className="flex-1 text-sm text-zinc-400 line-through">{priority.text}</span>
+                                                    <span className="flex-1 text-sm text-muted line-through">{priority.text}</span>
                                                     <button
                                                         onClick={() => deletePriority(priority.id)}
-                                                        className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-red-500 transition-all"
+                                                        className="opacity-0 group-hover:opacity-100 text-muted hover:text-red-500 transition-all"
                                                     >
                                                         <Trash2 size={14} />
                                                     </button>
@@ -226,12 +230,12 @@ export default function DashboardPage() {
                         )}
                     </Card>
 
-                    <Card className="p-6 bg-violet-50 dark:bg-zinc-900 border-violet-100 dark:border-violet-900/20">
+                    <Card className="p-6 bg-accent/5 border-card-border">
                         <div className="flex items-center gap-2 mb-2">
-                            <Sparkles className="text-violet-500" size={16} />
-                            <h3 className="font-semibold text-violet-700 dark:text-violet-400 text-sm">AI Insight</h3>
+                            <Sparkles className="text-accent" size={16} />
+                            <h3 className="font-semibold text-accent text-sm">AI Insight</h3>
                         </div>
-                        <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                        <p className="text-sm text-muted leading-relaxed">
                             {insight}
                         </p>
                     </Card>
@@ -255,12 +259,12 @@ export default function DashboardPage() {
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-white dark:bg-zinc-900 rounded-2xl p-6 w-full max-w-md shadow-2xl"
+                            className="bg-surface rounded-2xl p-6 w-full max-w-md shadow-2xl"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-lg font-semibold">Nova Prioridade</h3>
-                                <button onClick={() => setShowAddModal(false)} className="text-zinc-400 hover:text-zinc-600">
+                                <button onClick={() => setShowAddModal(false)} className="text-muted hover:text-foreground">
                                     <X size={20} />
                                 </button>
                             </div>
@@ -269,7 +273,7 @@ export default function DashboardPage() {
                                     placeholder="Ex: Finalizar relatório trimestral"
                                     value={newPriority}
                                     onChange={(e) => setNewPriority(e.target.value)}
-                                    className="mb-4 border-[#4D626A]/30 focus:border-[#86BBD8] focus:ring-[#86BBD8]"
+                                    className="mb-4 bg-input border-input-border text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
                                     autoFocus
                                 />
                                 <div className="flex gap-3">
@@ -283,7 +287,7 @@ export default function DashboardPage() {
                                     </Button>
                                     <Button
                                         type="submit"
-                                        className="flex-1 bg-[#090C08] text-[#EEF4ED] hover:bg-[#4D626A]"
+                                        className="flex-1 bg-foreground text-bg hover:bg-muted"
                                         disabled={!newPriority.trim()}
                                     >
                                         Adicionar
