@@ -186,20 +186,20 @@ export default function AnalyticsPage() {
                         <BarChart3 className="w-8 h-8 text-violet-400" />
                     </div>
                     <div>
-                        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">Analytics</h1>
-                        <p className="text-white/60 text-sm">Seus dados de produtividade</p>
+                        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Analytics</h1>
+                        <p className="text-muted text-sm">Seus dados de produtividade</p>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <div className="flex bg-white/5 rounded-lg p-1">
+                    <div className="flex bg-foreground/5 rounded-lg p-1">
                         {(['week', 'month', 'all'] as const).map((p) => (
                             <button
                                 key={p}
                                 onClick={() => setPeriod(p)}
                                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${period === p
-                                        ? 'bg-brand-primary text-white'
-                                        : 'text-white/60 hover:text-white'
+                                    ? 'bg-brand-primary text-white'
+                                    : 'text-muted hover:text-foreground'
                                     }`}
                             >
                                 {p === 'week' ? '7 dias' : p === 'month' ? '30 dias' : 'Tudo'}
@@ -209,9 +209,9 @@ export default function AnalyticsPage() {
                     <button
                         onClick={fetchStats}
                         disabled={loading}
-                        className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50"
+                        className="p-2 rounded-lg bg-foreground/5 hover:bg-foreground/10 transition-colors disabled:opacity-50"
                     >
-                        <RefreshCw className={`w-5 h-5 text-white/60 ${loading ? 'animate-spin' : ''}`} />
+                        <RefreshCw className={`w-5 h-5 text-muted ${loading ? 'animate-spin' : ''}`} />
                     </button>
                 </div>
             </div>
@@ -221,10 +221,10 @@ export default function AnalyticsPage() {
                     <Loader2 className="w-8 h-8 animate-spin text-brand-primary" />
                 </div>
             ) : stats.totalBlocks === 0 ? (
-                <Card className="p-8 text-center bg-white/5 border-white/10">
+                <Card className="p-8 text-center bg-foreground/5 border-border">
                     <AlertTriangle className="w-12 h-12 text-amber-400 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-white mb-2">Nenhum dado encontrado</h3>
-                    <p className="text-white/60">
+                    <h3 className="text-xl font-semibold text-foreground mb-2">Nenhum dado encontrado</h3>
+                    <p className="text-muted">
                         Comece a usar a Agenda para ver seus analytics aqui.
                     </p>
                 </Card>
@@ -264,11 +264,11 @@ export default function AnalyticsPage() {
                         <Card className="p-5 bg-gradient-to-br from-violet-500/10 to-blue-500/10 border-violet-500/20">
                             <div className="flex items-center gap-2 mb-3">
                                 <BrainCircuit className="w-5 h-5 text-violet-400" />
-                                <h3 className="font-semibold text-white">Insights da IA</h3>
+                                <h3 className="font-semibold text-foreground">Insights da IA</h3>
                             </div>
                             <ul className="space-y-2">
                                 {stats.insights.map((insight, idx) => (
-                                    <li key={idx} className="text-white/80 text-sm">
+                                    <li key={idx} className="text-foreground/80 text-sm">
                                         {insight}
                                     </li>
                                 ))}
@@ -277,14 +277,14 @@ export default function AnalyticsPage() {
                     )}
 
                     {/* Distribution Chart */}
-                    <Card className="p-6 bg-white/5 border-white/10">
-                        <h2 className="text-lg font-bold text-white mb-6">Distribuição por Categoria</h2>
+                    <Card className="p-6 bg-foreground/5 border-border">
+                        <h2 className="text-lg font-bold text-foreground mb-6">Distribuição por Categoria</h2>
                         <div className="flex items-end gap-3 h-48 md:h-64 justify-between max-w-2xl mx-auto">
                             {Object.entries(stats.focusDistribution).map(([key, value]) => {
                                 const heightPercent = maxVal > 0 ? (value / maxVal) * 100 : 0;
                                 return (
                                     <div key={key} className="flex-1 flex flex-col items-center gap-2 group max-w-20">
-                                        <div className="relative w-full bg-white/10 rounded-t-xl h-full flex items-end overflow-hidden min-w-8">
+                                        <div className="relative w-full bg-foreground/10 rounded-t-xl h-full flex items-end overflow-hidden min-w-8">
                                             <motion.div
                                                 initial={{ height: 0 }}
                                                 animate={{ height: `${heightPercent}%` }}
@@ -292,10 +292,10 @@ export default function AnalyticsPage() {
                                                 className={`w-full ${getColor(key)} opacity-80 group-hover:opacity-100 transition-opacity rounded-t-lg`}
                                             />
                                         </div>
-                                        <span className="capitalize font-medium text-white/60 text-xs text-center truncate w-full">
+                                        <span className="capitalize font-medium text-muted text-xs text-center truncate w-full">
                                             {translateType(key)}
                                         </span>
-                                        <span className="text-xs text-white/40 font-mono">
+                                        <span className="text-xs text-muted/70 font-mono">
                                             {Math.round(value / 60)}h
                                         </span>
                                     </div>
@@ -306,24 +306,24 @@ export default function AnalyticsPage() {
 
                     {/* Additional Stats */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Card className="p-5 bg-white/5 border-white/10">
+                        <Card className="p-5 bg-foreground/5 border-border">
                             <div className="flex items-center gap-2 mb-3">
                                 <TrendingUp className="w-5 h-5 text-emerald-400" />
-                                <h3 className="font-semibold text-white">Resumo</h3>
+                                <h3 className="font-semibold text-foreground">Resumo</h3>
                             </div>
                             <div className="space-y-3">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-white/60 text-sm">Dias ativos</span>
-                                    <span className="text-white font-medium">{stats.streakDays}</span>
+                                    <span className="text-muted text-sm">Dias ativos</span>
+                                    <span className="text-foreground font-medium">{stats.streakDays}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-white/60 text-sm">Tarefas puladas</span>
+                                    <span className="text-muted text-sm">Tarefas puladas</span>
                                     <span className="text-orange-400 font-medium">{stats.skippedBlocks}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-white/60 text-sm">Taxa de conclusão</span>
+                                    <span className="text-muted text-sm">Taxa de conclusão</span>
                                     <span className={`font-medium ${stats.completionRate >= 70 ? 'text-emerald-400' :
-                                            stats.completionRate >= 40 ? 'text-amber-400' : 'text-red-400'
+                                        stats.completionRate >= 40 ? 'text-amber-400' : 'text-red-400'
                                         }`}>
                                         {stats.completionRate}%
                                     </span>
@@ -331,23 +331,23 @@ export default function AnalyticsPage() {
                             </div>
                         </Card>
 
-                        <Card className="p-5 bg-white/5 border-white/10">
+                        <Card className="p-5 bg-foreground/5 border-border">
                             <div className="flex items-center gap-2 mb-3">
                                 <XCircle className="w-5 h-5 text-orange-400" />
-                                <h3 className="font-semibold text-white">Tendências</h3>
+                                <h3 className="font-semibold text-foreground">Tendências</h3>
                             </div>
                             <div className="space-y-3">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-white/60 text-sm">Foco principal</span>
-                                    <span className="text-white font-medium">{getTopFocus(stats.focusDistribution)}</span>
+                                    <span className="text-muted text-sm">Foco principal</span>
+                                    <span className="text-foreground font-medium">{getTopFocus(stats.focusDistribution)}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-white/60 text-sm">Melhor horário</span>
-                                    <span className="text-white font-medium">{stats.mostProductiveTime}</span>
+                                    <span className="text-muted text-sm">Melhor horário</span>
+                                    <span className="text-foreground font-medium">{stats.mostProductiveTime}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-white/60 text-sm">Média por dia</span>
-                                    <span className="text-white font-medium">
+                                    <span className="text-muted text-sm">Média por dia</span>
+                                    <span className="text-foreground font-medium">
                                         {stats.streakDays > 0 ? Math.round(stats.totalBlocks / stats.streakDays) : 0} blocos
                                     </span>
                                 </div>
@@ -360,7 +360,7 @@ export default function AnalyticsPage() {
     );
 }
 
-function KpiCard({ icon: Icon, label, value, subtitle, color = "text-white" }: {
+function KpiCard({ icon: Icon, label, value, subtitle, color = "text-foreground" }: {
     icon: React.ElementType;
     label: string;
     value: string | number;
@@ -368,9 +368,9 @@ function KpiCard({ icon: Icon, label, value, subtitle, color = "text-white" }: {
     color?: string;
 }) {
     return (
-        <Card className="p-4 md:p-6 bg-white/5 border-white/10 hover:bg-white/8 transition-colors">
+        <Card className="p-4 md:p-6 bg-foreground/5 border-border hover:bg-foreground/10 transition-colors">
             <div className="flex items-start justify-between">
-                <div className={`p-2 rounded-lg bg-white/10 ${color}`}>
+                <div className={`p-2 rounded-lg bg-foreground/10 ${color}`}>
                     <Icon size={20} />
                 </div>
                 {subtitle && (
@@ -380,8 +380,8 @@ function KpiCard({ icon: Icon, label, value, subtitle, color = "text-white" }: {
                 )}
             </div>
             <div className="mt-3">
-                <h3 className="text-2xl font-bold text-white">{value}</h3>
-                <p className="text-xs text-white/50 mt-0.5">{label}</p>
+                <h3 className="text-2xl font-bold text-foreground">{value}</h3>
+                <p className="text-xs text-muted mt-0.5">{label}</p>
             </div>
         </Card>
     );

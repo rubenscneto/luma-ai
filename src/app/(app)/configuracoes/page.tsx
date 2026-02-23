@@ -17,6 +17,17 @@ import { useTheme } from "next-themes";
 export default function SettingsPage() {
     const { user, signOut } = useAuth();
     const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
+    const [preferences, setPreferences] = useState({
+        blocks: true,
+        health: true,
+        study: true,
+        motivation: false,
+    });
+
+    const togglePreference = (id: keyof typeof preferences) => {
+        setPreferences(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
     const {
         isSupported,
         permission,
@@ -58,11 +69,11 @@ export default function SettingsPage() {
         <div className="p-6 space-y-6 max-w-4xl mx-auto">
             {/* Header */}
             <div>
-                <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
                     <Settings className="w-7 h-7 text-purple-400" />
                     Configurações
                 </h1>
-                <p className="text-white/60 text-sm mt-1">
+                <p className="text-muted text-sm mt-1">
                     Gerencie suas preferências e dados
                 </p>
             </div>
@@ -70,7 +81,7 @@ export default function SettingsPage() {
             <div className="flex flex-col md:flex-row gap-6">
                 {/* Sidebar */}
                 <div className="md:w-64 flex-shrink-0">
-                    <div className="bg-white/5 rounded-2xl border border-white/10 p-2">
+                    <div className="bg-foreground/5 rounded-2xl border border-border p-2">
                         {tabs.map(tab => {
                             const Icon = tab.icon;
                             const isActive = activeTab === tab.id;
@@ -79,8 +90,8 @@ export default function SettingsPage() {
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
                                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive
-                                        ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-white'
-                                        : 'text-white/60 hover:bg-white/5 hover:text-white'
+                                        ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-foreground font-semibold'
+                                        : 'text-muted hover:bg-foreground/5 hover:text-foreground'
                                         }`}
                                 >
                                     <Icon className={`w-5 h-5 ${isActive ? 'text-purple-400' : ''}`} />
@@ -105,8 +116,8 @@ export default function SettingsPage() {
                         {activeTab === 'profile' && (
                             <div className="space-y-6">
                                 {/* User Info */}
-                                <div className="bg-white/5 rounded-2xl border border-white/10 p-6">
-                                    <h3 className="text-lg font-semibold text-white mb-4">Informações da Conta</h3>
+                                <div className="bg-foreground/5 rounded-2xl border border-border p-6">
+                                    <h3 className="text-lg font-semibold text-foreground mb-4">Informações da Conta</h3>
 
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-4">
@@ -114,16 +125,16 @@ export default function SettingsPage() {
                                                 {user?.email?.[0]?.toUpperCase() || 'U'}
                                             </div>
                                             <div>
-                                                <p className="text-white font-medium">{user?.email || 'Usuário'}</p>
-                                                <p className="text-white/60 text-sm">Membro desde {new Date().getFullYear()}</p>
+                                                <p className="text-foreground font-medium">{user?.email || 'Usuário'}</p>
+                                                <p className="text-muted text-sm">Membro desde {new Date().getFullYear()}</p>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Appearance */}
-                                <div className="bg-white/5 rounded-2xl border border-white/10 p-6">
-                                    <h3 className="text-lg font-semibold text-white mb-4">Aparência</h3>
+                                <div className="bg-foreground/5 rounded-2xl border border-border p-6">
+                                    <h3 className="text-lg font-semibold text-foreground mb-4">Aparência</h3>
 
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3">
@@ -133,18 +144,18 @@ export default function SettingsPage() {
                                                 <Sun className="w-5 h-5 text-yellow-400" />
                                             )}
                                             <div>
-                                                <p className="text-white font-medium">Modo Escuro</p>
-                                                <p className="text-white/60 text-sm">Tema da interface</p>
+                                                <p className="text-foreground font-medium">Modo Escuro</p>
+                                                <p className="text-muted text-sm">Tema da interface</p>
                                             </div>
                                         </div>
                                         <button
                                             onClick={toggleTheme}
-                                            className={`w-12 h-6 rounded-full transition-colors ${isDarkMode ? 'bg-purple-500' : 'bg-white/20'
+                                            className={`w-12 h-6 rounded-full transition-colors flex items-center ${isDarkMode ? 'bg-purple-500' : 'bg-foreground/20'
                                                 }`}
                                         >
                                             <motion.div
                                                 layout
-                                                className="w-5 h-5 rounded-full bg-white shadow-md"
+                                                className={`w-5 h-5 rounded-full shadow-md ${isDarkMode ? 'bg-white' : 'bg-background'}`}
                                                 style={{ marginLeft: isDarkMode ? '26px' : '2px' }}
                                             />
                                         </button>
@@ -152,15 +163,15 @@ export default function SettingsPage() {
                                 </div>
 
                                 {/* Security */}
-                                <div className="bg-white/5 rounded-2xl border border-white/10 p-6">
-                                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                                <div className="bg-foreground/5 rounded-2xl border border-border p-6">
+                                    <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                                         <Shield className="w-5 h-5 text-green-400" />
                                         Segurança
                                     </h3>
 
                                     <button
                                         onClick={signOut}
-                                        className="w-full py-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-400 hover:bg-red-500/30 transition-all"
+                                        className="w-full py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500/20 transition-all font-medium"
                                     >
                                         Sair da Conta
                                     </button>
@@ -171,22 +182,22 @@ export default function SettingsPage() {
                         {activeTab === 'notifications' && (
                             <div className="space-y-6">
                                 {/* Push Notifications */}
-                                <div className="bg-white/5 rounded-2xl border border-white/10 p-6">
-                                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                                <div className="bg-foreground/5 rounded-2xl border border-border p-6">
+                                    <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                                         <Smartphone className="w-5 h-5 text-blue-400" />
                                         Notificações Push
                                     </h3>
 
                                     {!isSupported ? (
-                                        <p className="text-white/60 text-sm">
+                                        <p className="text-muted text-sm">
                                             Seu navegador não suporta notificações push.
                                         </p>
                                     ) : (
                                         <div className="space-y-4">
                                             <div className="flex items-center justify-between">
                                                 <div>
-                                                    <p className="text-white font-medium">Ativar Push</p>
-                                                    <p className="text-white/60 text-sm">
+                                                    <p className="text-foreground font-medium">Ativar Push</p>
+                                                    <p className="text-muted text-sm">
                                                         {permission === 'denied'
                                                             ? 'Bloqueado pelo navegador'
                                                             : 'Receber notificações mesmo com app fechado'}
@@ -195,20 +206,20 @@ export default function SettingsPage() {
                                                 <button
                                                     onClick={handleTogglePush}
                                                     disabled={permission === 'denied'}
-                                                    className={`w-12 h-6 rounded-full transition-colors ${isSubscribed ? 'bg-green-500' : 'bg-white/20'
+                                                    className={`w-12 h-6 rounded-full transition-colors flex items-center ${isSubscribed ? 'bg-green-500' : 'bg-foreground/20'
                                                         } ${permission === 'denied' ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                 >
                                                     <motion.div
                                                         layout
-                                                        className="w-5 h-5 rounded-full bg-white shadow-md"
+                                                        className={`w-5 h-5 rounded-full shadow-md ${isSubscribed ? 'bg-white' : 'bg-background'}`}
                                                         style={{ marginLeft: isSubscribed ? '26px' : '2px' }}
                                                     />
                                                 </button>
                                             </div>
 
-                                            <div className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-lg">
-                                                <Bell className="w-4 h-4 text-white/40" />
-                                                <span className="text-xs text-white/60">
+                                            <div className="flex items-center gap-2 px-3 py-2 bg-foreground/5 rounded-lg">
+                                                <Bell className="w-4 h-4 text-muted" />
+                                                <span className="text-xs text-muted">
                                                     Status: {permission === 'granted' ? 'Permitido' : permission === 'denied' ? 'Bloqueado' : 'Não solicitado'}
                                                 </span>
                                             </div>
@@ -217,29 +228,30 @@ export default function SettingsPage() {
                                 </div>
 
                                 {/* Notification Preferences */}
-                                <div className="bg-white/5 rounded-2xl border border-white/10 p-6">
-                                    <h3 className="text-lg font-semibold text-white mb-4">Preferências</h3>
+                                <div className="bg-foreground/5 rounded-2xl border border-border p-6">
+                                    <h3 className="text-lg font-semibold text-foreground mb-4">Preferências</h3>
 
                                     <div className="space-y-4">
                                         {[
-                                            { id: 'blocks', label: 'Lembrete de blocos', desc: '5 minutos antes', default: true },
-                                            { id: 'health', label: 'Dicas de saúde', desc: 'Lembretes diários', default: true },
-                                            { id: 'study', label: 'Revisão de estudos', desc: 'Flashcards para revisar', default: true },
-                                            { id: 'motivation', label: 'Motivação diária', desc: 'Mensagem inspiradora', default: false },
+                                            { id: 'blocks' as const, label: 'Lembrete de blocos', desc: '5 minutos antes' },
+                                            { id: 'health' as const, label: 'Dicas de saúde', desc: 'Lembretes diários' },
+                                            { id: 'study' as const, label: 'Revisão de estudos', desc: 'Flashcards para revisar' },
+                                            { id: 'motivation' as const, label: 'Motivação diária', desc: 'Mensagem inspiradora' },
                                         ].map(pref => (
                                             <div key={pref.id} className="flex items-center justify-between">
                                                 <div>
-                                                    <p className="text-white font-medium">{pref.label}</p>
-                                                    <p className="text-white/60 text-sm">{pref.desc}</p>
+                                                    <p className="text-foreground font-medium">{pref.label}</p>
+                                                    <p className="text-muted text-sm">{pref.desc}</p>
                                                 </div>
                                                 <button
-                                                    className={`w-10 h-5 rounded-full transition-colors ${pref.default ? 'bg-purple-500' : 'bg-white/20'
+                                                    onClick={() => togglePreference(pref.id)}
+                                                    className={`w-12 h-6 rounded-full transition-colors flex items-center ${preferences[pref.id] ? 'bg-purple-500' : 'bg-foreground/20'
                                                         }`}
                                                 >
                                                     <motion.div
                                                         layout
-                                                        className="w-4 h-4 rounded-full bg-white shadow-md"
-                                                        style={{ marginLeft: pref.default ? '22px' : '2px' }}
+                                                        className={`w-5 h-5 rounded-full shadow-md ${preferences[pref.id] ? 'bg-white' : 'bg-background'}`}
+                                                        style={{ marginLeft: preferences[pref.id] ? '26px' : '2px' }}
                                                     />
                                                 </button>
                                             </div>
