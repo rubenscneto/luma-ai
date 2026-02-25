@@ -5,11 +5,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Check, X, Clock, MoreHorizontal, Play, Pause,
     Briefcase, BookOpen, Heart, Coffee, Home, Moon, Bus, Plus,
-    Sparkles
+    Sparkles, Pencil
 } from 'lucide-react';
-import { DailyBlockWithStatus, BlockCategory } from '@/types';
+import { DailyBlockWithStatus, BlockCategory, DailyBlock } from '@/types';
 import { useDailyPlan } from '@/context/dailyPlanContext';
 import { cn } from '@/lib/utils';
+import { BlockEditorModal } from './BlockEditorModal';
 
 interface BlockCardProps {
     block: DailyBlockWithStatus;
@@ -29,9 +30,10 @@ const categoryConfig: Record<BlockCategory, { icon: React.ElementType; color: st
 };
 
 export function BlockCard({ block, compact = false }: BlockCardProps) {
-    const { markBlockDone, skipBlock, delayBlock } = useDailyPlan();
+    const { markBlockDone, skipBlock, delayBlock, updateBlock } = useDailyPlan();
     const [showActions, setShowActions] = useState(false);
     const [showDelayOptions, setShowDelayOptions] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
 
     const config = categoryConfig[block.category] || categoryConfig.work;
     const Icon = config.icon;
@@ -139,12 +141,21 @@ export function BlockCard({ block, compact = false }: BlockCardProps) {
 
                 {/* Actions toggle — DISABLED for virtual fixed blocks (not yet materialized in DB) */}
                 {!block.is_done && !block.is_skipped && !(block as any).is_fixed && block.source !== 'fixed' && (
-                    <button
-                        onClick={() => setShowActions(!showActions)}
-                        className="p-1.5 rounded-lg hover:bg-foreground/5 transition-colors"
-                    >
-                        <MoreHorizontal className="w-5 h-5 text-muted" />
-                    </button>
+                    <div className="flex gap-1 items-center">
+                        <button
+                            onClick={() => setIsEditing(true)}
+                            className="p-1.5 rounded-lg hover:bg-foreground/5 transition-colors"
+                            title="Editar Bloco"
+                        >
+                            <Pencil className="w-4 h-4 text-muted hover:text-foreground" />
+                        </button>
+                        <button
+                            onClick={() => setShowActions(!showActions)}
+                            className="p-1.5 rounded-lg hover:bg-foreground/5 transition-colors"
+                        >
+                            <MoreHorizontal className="w-5 h-5 text-muted" />
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -225,6 +236,20 @@ export function BlockCard({ block, compact = false }: BlockCardProps) {
                     <X className="w-4 h-4 text-red-400" />
                 </div>
             )}
+
+            <AnimatePresence>
+                {isEditing && (
+                    <BlockEditorModal
+                        isOpen={isEditing}
+                        onClose={() => setIsEditing(false)}
+                        onSave={(updates: Partial<DailyBlock>) => {
+                            if (updateBlock) updateBlock(block.id, updates);
+                            setIsEditing(false);
+                        }}
+                        initialData={block}
+                    />
+                )}
+            </AnimatePresence>
         </motion.div>
     );
 }

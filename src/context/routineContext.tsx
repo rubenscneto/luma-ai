@@ -15,6 +15,7 @@ interface RoutineContextType {
     setProfile: (profile: RoutineProfile) => void;
     motivation: { text: string; author: string } | null;
     setMotivation: (data: { text: string; author: string }) => void;
+    isLoadingProfile: boolean;
 }
 
 const RoutineContext = createContext<RoutineContextType | undefined>(undefined);
@@ -24,6 +25,7 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
     const [routine, setRoutineState] = useState<RoutineBlock[]>([]);
     const [profile, setProfileState] = useState<RoutineProfile | null>(null);
     const [motivation, setMotivationState] = useState<{ text: string; author: string } | null>(null);
+    const [isLoadingProfile, setIsLoadingProfile] = useState(true);
 
     // Load Data (Local or Supabase)
     useEffect(() => {
@@ -105,7 +107,11 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
                     }
                 } catch (e) {
                     console.error("Error loading profile:", e);
+                } finally {
+                    setIsLoadingProfile(false);
                 }
+            } else {
+                setIsLoadingProfile(false);
             }
 
             // Fallback to LocalStorage if no user or empty DB
@@ -193,7 +199,7 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <RoutineContext.Provider value={{ routine, addBlock, updateBlock, removeBlock, setRoutine, profile, setProfile, motivation, setMotivation }}>
+        <RoutineContext.Provider value={{ routine, addBlock, updateBlock, removeBlock, setRoutine, profile, setProfile, motivation, setMotivation, isLoadingProfile }}>
             {children}
         </RoutineContext.Provider>
     );

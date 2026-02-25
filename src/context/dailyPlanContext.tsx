@@ -44,6 +44,7 @@ interface DailyPlanContextType {
     skipBlock: (blockId: string, reason?: string) => Promise<void>;
     delayBlock: (blockId: string, minutes: number) => Promise<void>;
     addBlock: (block: Partial<DailyBlock>) => Promise<void>;
+    updateBlock: (blockId: string, updates: Partial<DailyBlock>) => Promise<void>;
     replanDay: (userNote?: string) => Promise<void>;
     refreshBlocks: () => void;
     selectedDate: string;
@@ -548,6 +549,95 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    const updateBlock = async (blockId: string, updates: Partial<DailyBlock>) => {
+        if (!user || !todayPlan) return;
+
+        if (blockId.startsWith('fixed-')) {
+            toast.info('Para editar blocos fixos, vá em Configurações > Rotina.');
+            return;
+        }
+
+        const existingBlocks = todayBlocks.filter(b => b.id !== blockId);
+        const editingBlock = todayBlocks.find(b => b.id === blockId);
+        if (!editingBlock) return;
+
+        const mergedEditingBlock = { ...editingBlock, ...updates };
+
+        // Convert to solver format
+        const solverBlocks = existingBlocks.map(b => dailyBlockToSolverBlock(b as any));
+        const updatedSolverBlock = dailyBlockToSolverBlock(mergedEditingBlock as any);
+        updatedSolverBlock.priority = 85; // Priorize manual edits
+        updatedSolverBlock.source = 'manual';
+        // By setting canShorten and canSplit to false on the updated block, we force the solver to keep its new duration exactly
+        updatedSolverBlock.canShorten = false;
+        updatedSolverBlock.canSplit = false;
+
+        const allWithDerived = processDerivedBlocks([...solverBlocks, updatedSolverBlock]);
+        const result = solveTimeline(allWithDerived);
+
+        for (const conflict of result.conflicts) {
+            if (conflict.action === 'moved' && conflict.newStart !== undefined && conflict.blockId !== blockId) {
+                toast.info(`Ajustei "${conflict.blockTitle}" para ${minutesToTime(conflict.newStart)} para evitar conflito.`, { duration: 5000 });
+            } else if (conflict.action === 'suggest_other_day') {
+                if (conflict.blockId === blockId) {
+                    toast.error(`As novas configurações do bloco não cabem na agenda de hoje.`);
+                    return; // ABORT update if the block itself doesn't fit
+                } else {
+                    toast.warning(`"${conflict.blockTitle}" não cabe mais na agenda de hoje.`, { duration: 5000 });
+                }
+            } else if (conflict.action === 'shortened' && conflict.blockId !== blockId) {
+                toast.info(`"${conflict.blockTitle}" foi encurtado para caber na agenda.`, { duration: 3000 });
+            }
+        }
+
+        const resolvedUpdated = result.resolved.find(b => b.id === blockId);
+        if (!resolvedUpdated) {
+            toast.error(`As novas configurações do bloco não cabem na agenda.`);
+            return;
+        }
+
+        const targetDate = selectedDate || new Date().toISOString().split('T')[0];
+        const timeFields = solverBlockToTimeFields(resolvedUpdated, targetDate);
+
+        // Save to DB
+        const { error } = await supabase
+            .from('daily_blocks')
+            .update({
+                title: updates.title || mergedEditingBlock.title,
+                category: updates.category || mergedEditingBlock.category,
+                start_datetime: timeFields.start_datetime,
+                end_datetime: timeFields.end_datetime,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', blockId)
+            .eq('user_id', user.id);
+
+        if (error) {
+            toast.error('Erro ao atualizar bloco no banco.');
+            return;
+        }
+
+        // Apply moved conflicts recursively to DB
+        const movedConflicts = result.conflicts.filter(c =>
+            (c.action === 'moved' || c.action === 'shortened') && c.blockId !== blockId && !c.blockId.startsWith('fixed-')
+        );
+
+        for (const conflict of movedConflicts) {
+            const resolved = result.resolved.find(b => b.id === conflict.blockId);
+            if (resolved && conflict.newStart !== undefined) {
+                const movedTimes = solverBlockToTimeFields(resolved, targetDate);
+                await supabase.from('daily_blocks').update({
+                    start_datetime: movedTimes.start_datetime,
+                    end_datetime: movedTimes.end_datetime,
+                    updated_at: new Date().toISOString()
+                }).eq('id', conflict.blockId).eq('user_id', user.id);
+            }
+        }
+
+        toast.success('Bloco atualizado!');
+        await loadTodayPlan();
+    };
+
     const triggerReplan = async (signal: 'late' | 'done' | 'skip' | 'manual_request', blockId?: string, note?: string) => {
         if (!user) return;
 
@@ -800,6 +890,7 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
             skipBlock,
             delayBlock,
             addBlock,
+            updateBlock,
             replanDay,
             refreshBlocks,
             detectRecurrences,

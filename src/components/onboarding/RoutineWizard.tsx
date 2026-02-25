@@ -10,6 +10,8 @@ import { FixedTaskInput } from '@/components/perdidao/FixedTaskInput';
 import { FixedTask } from '@/types';
 import { toast } from 'sonner';
 
+const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
 interface RoutineWizardProps {
     onComplete: () => void;
 }
@@ -32,6 +34,12 @@ const STEPS = [
         title: "Compromissos Fixos",
         subtitle: "O que não pode mudar na sua semana?",
         icon: Calendar
+    },
+    {
+        id: 4,
+        title: "Revisão Final",
+        subtitle: "Confirme seus dados antes da IA gerar a sua semana inteira.",
+        icon: CheckCircle
     }
 ];
 
@@ -236,6 +244,44 @@ export function RoutineWizard({ onComplete }: RoutineWizardProps) {
                                     />
                                 </div>
                             )}
+
+                            {currentStep === 4 && (
+                                <div className="space-y-6">
+                                    <div className="p-4 rounded-xl bg-foreground/5 border border-card-border space-y-4">
+                                        <div>
+                                            <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">Ritmo e Energia</h4>
+                                            <p className="text-sm font-medium mt-1 text-foreground">
+                                                Acorda às {userSettings.wake_up_time} | Dorme às {userSettings.bed_time} <br />
+                                                Pico de energia: <span className="text-brand-primary">{peakProductivity}</span>
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">Compromissos Fixos</h4>
+                                            {fixedTasks.length > 0 ? (
+                                                <ul className="text-sm mt-1 space-y-1 text-foreground">
+                                                    {fixedTasks.map((t, idx) => (
+                                                        <li key={idx}>• {t.title} ({t.start_time} - {t.end_time}) - {t.days_of_week.map(d => DAYS[d]).join(', ')}</li>
+                                                    ))}
+                                                </ul>
+                                            ) : (
+                                                <p className="text-sm mt-1 text-muted italic">Nenhum compromisso fixo.</p>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">Sobre sua rotina</h4>
+                                            <p className="text-sm mt-1 text-foreground line-clamp-3">
+                                                {description}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 flex gap-3 items-start">
+                                        <Zap className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
+                                        <p className="text-sm text-purple-300">
+                                            A IA vai cruzar essas instruções com os horários disponíveis para criar a semana perfeita pra você.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </motion.div>
                 </AnimatePresence>
@@ -258,12 +304,12 @@ export function RoutineWizard({ onComplete }: RoutineWizardProps) {
                         {isSubmitting ? (
                             <>
                                 <Loader2 className="w-4 h-4 animate-spin" />
-                                Processando
+                                Processando...
                             </>
                         ) : currentStep === STEPS.length ? (
                             <>
                                 <CheckCircle className="w-4 h-4" />
-                                Finalizar
+                                Gerar minha agenda
                             </>
                         ) : (
                             <>

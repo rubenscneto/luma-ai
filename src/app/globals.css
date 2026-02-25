@@ -12,6 +12,7 @@
   --accent2: #AC8887;
 
   /* Legacy aliases for compatibility */
+  --brand-primary: #8b5cf6;
   --background: var(--bg);
   --foreground: var(--text);
 
@@ -45,6 +46,7 @@
   --surface: #151A17;
   --text: #EEF4ED;
   --muted: #4D626A;
+  --brand-primary: #a78bfa;
   --background: var(--bg);
   --foreground: var(--text);
 
@@ -59,6 +61,7 @@
   --color-foreground: var(--foreground);
 
   /* Semantic tokens */
+  --color-brand-primary: var(--brand-primary);
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-text: var(--text);

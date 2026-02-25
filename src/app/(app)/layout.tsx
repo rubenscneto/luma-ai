@@ -10,8 +10,11 @@ import { HealthProvider } from "@/context/healthContext";
 import { TrainingProvider } from "@/context/trainingContext";
 import { ToastProvider } from "@/context/toastContext";
 import NotificationManager from "@/components/notifications/NotificationManager";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useRoutine } from "@/context/routineContext";
+import { usePathname, useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
 export default function AppLayout({
     children,
@@ -20,6 +23,26 @@ export default function AppLayout({
 }) {
     const [isAssistantOpen, setIsAssistantOpen] = useState(false);
     const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+    const { profile, isLoadingProfile } = useRoutine();
+    const pathname = usePathname();
+    const router = useRouter();
+
+    useEffect(() => {
+        if (!isLoadingProfile && pathname && !pathname.includes('/onboarding-rotina')) {
+            const isEmptyProfile = !profile || !profile.occupations || profile.occupations.length === 0;
+            if (isEmptyProfile) {
+                router.replace('/onboarding-rotina');
+            }
+        }
+    }, [isLoadingProfile, profile, pathname, router]);
+
+    if (isLoadingProfile && pathname && !pathname.includes('/onboarding-rotina')) {
+        return (
+            <div className="flex bg-bg dark:bg-bg min-h-[100dvh] items-center justify-center">
+                <Loader2 className="w-10 h-10 text-brand-primary animate-spin" />
+            </div>
+        );
+    }
 
     return (
         <div

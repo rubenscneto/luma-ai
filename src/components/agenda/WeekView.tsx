@@ -6,13 +6,14 @@ import {
     ChevronLeft, ChevronRight, Calendar, Wand2, Loader2,
     Briefcase, GraduationCap, Dumbbell, Utensils,
     Moon, Heart, Users, Sparkles, CheckCircle2, Plus,
-    Clock, XCircle, ThumbsDown
+    Clock, XCircle, ThumbsDown, Pencil
 } from 'lucide-react';
 import { useDailyPlan } from '@/context/dailyPlanContext';
 import { useAuth } from '@/context/authContext';
 import { useAgenda } from '@/context/agendaContext';
 import { DailyBlock } from '@/types';
 import { toast } from 'sonner';
+import { BlockEditorModal } from './BlockEditorModal';
 
 const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const HOURS = Array.from({ length: 16 }, (_, i) => i + 6); // 6:00 to 21:00
@@ -65,6 +66,7 @@ export default function WeekView() {
         weekBlocks,
         fetchWeekBlocks,
         loadTodayPlan,
+        updateBlock,
     } = useDailyPlan();
     const { user } = useAuth();
     const { addFeedback, pendingFeedbacks, removeFeedback } = useAgenda();
@@ -76,6 +78,7 @@ export default function WeekView() {
     });
     const [isWeekLoading, setIsWeekLoading] = useState(false);
     const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
+    const [editingBlock, setEditingBlock] = useState<DailyBlock | null>(null);
 
     const weekDates = useMemo(() => getWeekDates(currentWeekStart), [currentWeekStart]);
     const today = new Date();
@@ -318,11 +321,11 @@ export default function WeekView() {
 
                                 {/* Blocks Area */}
                                 <div className="relative" style={{ height: '640px' }}>
-                                    {/* Hour Lines */}
+                                    {/* Hour Lines - Enhanced contrast for legibility */}
                                     {HOURS.map(hour => (
                                         <div
                                             key={hour}
-                                            className="absolute w-full border-t border-white/5"
+                                            className="absolute w-full border-t border-card-border/50"
                                             style={{ top: `${((hour - 6) / 16) * 100}%` }}
                                         />
                                     ))}
@@ -356,8 +359,8 @@ export default function WeekView() {
                                                     if (block.is_done) return;
                                                     setActiveFeedbackBlock(activeFeedbackBlock === block.id ? null : block.id);
                                                 }}
-                                                className={`absolute left-1 right-1 rounded-lg border p-1.5 ${cat.bg} ${block.is_done ? 'opacity-60' : ''
-                                                    } ${activeFeedbackBlock === block.id ? 'z-50 shadow-xl' : 'overflow-hidden cursor-pointer hover:ring-1 hover:ring-foreground/20'}`}
+                                                className={`absolute left-1 right-1 rounded-lg border p-1.5 ${cat.bg} ${block.is_done ? 'opacity-60' : 'shadow-sm'
+                                                    } ${activeFeedbackBlock === block.id ? 'z-50 shadow-xl' : 'overflow-hidden cursor-pointer hover:ring-1 hover:ring-foreground/40 transition-all'}`}
                                                 style={style}
                                             >
                                                 {pendingFeedbacks.find(f => f.blockId === block.id) && (
@@ -385,7 +388,17 @@ export default function WeekView() {
 
                                                 {activeFeedbackBlock === block.id && (
                                                     <div className="absolute top-full left-0 mt-1 w-36 bg-surface border border-card-border rounded-lg shadow-2xl p-1 z-[60]" onClick={e => e.stopPropagation()}>
-                                                        <div className="text-[10px] font-medium text-muted px-2 py-1 mb-1 border-b border-card-border/50">Feedback IA</div>
+                                                        <div className="text-[10px] font-medium text-foreground px-2 py-1 mb-1 border-b border-card-border/50">Ações</div>
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingBlock(block);
+                                                                setActiveFeedbackBlock(null);
+                                                            }}
+                                                            className="flex items-center gap-2 w-full text-left p-1.5 hover:bg-blue-500/10 rounded text-blue-500 text-[11px] transition-colors"
+                                                        >
+                                                            <Pencil className="w-3 h-3" /> Editar Bloco
+                                                        </button>
+                                                        <div className="text-[10px] font-medium text-muted px-2 py-1 mt-1 mb-1 border-t border-b border-card-border/50 bg-foreground/5">Feedback IA</div>
                                                         <button
                                                             onClick={() => {
                                                                 addFeedback({ blockId: block.id, title: block.title, dayKey: formatDateKey(date), originalTime: block.start_datetime, type: 'bad_time' });
@@ -440,6 +453,20 @@ export default function WeekView() {
                     })}
                 </div>
             </div>
+
+            <AnimatePresence>
+                {editingBlock && (
+                    <BlockEditorModal
+                        isOpen={!!editingBlock}
+                        onClose={() => setEditingBlock(null)}
+                        onSave={(updates: Partial<DailyBlock>) => {
+                            if (updateBlock) updateBlock(editingBlock.id, updates);
+                            setEditingBlock(null);
+                        }}
+                        initialData={editingBlock}
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 }
