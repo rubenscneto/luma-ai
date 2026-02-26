@@ -8,10 +8,11 @@ interface BlockEditorModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave: (block: Partial<DailyBlock>) => void;
+    onRemove?: (blockId: string) => void;
     initialData?: Partial<DailyBlock>; // If provided, it's Edit mode. If not, Add mode.
 }
 
-export function BlockEditorModal({ isOpen, onClose, onSave, initialData }: BlockEditorModalProps) {
+export function BlockEditorModal({ isOpen, onClose, onSave, onRemove, initialData }: BlockEditorModalProps) {
     const [title, setTitle] = useState('');
     const [category, setCategory] = useState<string>('work');
     const [startTime, setStartTime] = useState('');
@@ -59,6 +60,13 @@ export function BlockEditorModal({ isOpen, onClose, onSave, initialData }: Block
         });
 
         onClose();
+    };
+
+    const handleRemove = () => {
+        if (initialData?.id && onRemove) {
+            onRemove(initialData.id);
+            onClose();
+        }
     };
 
     if (!isOpen) return null;
@@ -139,6 +147,15 @@ export function BlockEditorModal({ isOpen, onClose, onSave, initialData }: Block
                     </div>
 
                     <div className="flex gap-3 pt-6">
+                        {isEdit && onRemove && (
+                            <button
+                                type="button"
+                                onClick={handleRemove}
+                                className="py-3 px-4 rounded-xl bg-red-100 dark:bg-red-500/10 hover:bg-red-200 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 font-semibold transition-colors text-sm"
+                            >
+                                Remover
+                            </button>
+                        )}
                         <button
                             type="button"
                             onClick={onClose}

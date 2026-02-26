@@ -45,6 +45,7 @@ interface DailyPlanContextType {
     delayBlock: (blockId: string, minutes: number) => Promise<void>;
     addBlock: (block: Partial<DailyBlock>) => Promise<void>;
     updateBlock: (blockId: string, updates: Partial<DailyBlock>) => Promise<void>;
+    removeBlock: (blockId: string) => Promise<void>;
     replanDay: (userNote?: string) => Promise<void>;
     refreshBlocks: () => void;
     selectedDate: string;
@@ -596,7 +597,9 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        const targetDate = selectedDate || new Date().toISOString().split('T')[0];
+        const targetDate = mergedEditingBlock.start_datetime
+            ? mergedEditingBlock.start_datetime.split('T')[0]
+            : (selectedDate || new Date().toISOString().split('T')[0]);
         const timeFields = solverBlockToTimeFields(resolvedUpdated, targetDate);
 
         // Save to DB
@@ -636,6 +639,36 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
 
         toast.success('Bloco atualizado!');
         await loadTodayPlan();
+    };
+
+    const removeBlock = async (blockId: string) => {
+        if (!user) return;
+
+        if (blockId.startsWith('fixed-')) {
+            toast.info('Para remover blocos fixos, vá em Configurações > Rotina.');
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const { error } = await supabase
+                .from('daily_blocks')
+                .delete()
+                .eq('id', blockId)
+                .eq('user_id', user.id);
+
+            if (error) {
+                toast.error('Erro ao excluir bloco.');
+                throw error;
+            }
+
+            toast.success('Bloco removido com sucesso!');
+            await triggerReplan('manual_request', blockId, 'Usuário removeu o bloco. Reorganize a agenda mantendo o espaço ou preenchendo adequadamente se necessário.');
+        } catch (error) {
+            console.error('Error removing block:', error);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const triggerReplan = async (signal: 'late' | 'done' | 'skip' | 'manual_request', blockId?: string, note?: string) => {
@@ -891,6 +924,7 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
             delayBlock,
             addBlock,
             updateBlock,
+            removeBlock,
             replanDay,
             refreshBlocks,
             detectRecurrences,

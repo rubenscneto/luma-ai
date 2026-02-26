@@ -474,6 +474,10 @@ export default function WeekView() {
                     <BlockEditorModal
                         isOpen={!!editingBlock}
                         onClose={() => setEditingBlock(null)}
+                        onRemove={(id: string) => {
+                            if (removeBlock) removeBlock(id);
+                            setEditingBlock(null);
+                        }}
                         onSave={(updates: Partial<DailyBlock>) => {
                             if (updateBlock) updateBlock(editingBlock.id, updates);
                             setEditingBlock(null);

@@ -242,6 +242,10 @@ export function BlockCard({ block, compact = false }: BlockCardProps) {
                     <BlockEditorModal
                         isOpen={isEditing}
                         onClose={() => setIsEditing(false)}
+                        onRemove={(id) => {
+                            if (removeBlock) removeBlock(id);
+                            setIsEditing(false);
+                        }}
                         onSave={(updates: Partial<DailyBlock>) => {
                             if (updateBlock) updateBlock(block.id, updates);
                             setIsEditing(false);

@@ -19,6 +19,7 @@ const planWeekInputSchema = z.object({
     debug: z.boolean().optional().default(false),
     action: z.string().optional(),
     feedbacks: z.array(z.any()).optional(),
+    user_feedback: z.string().optional(),
 });
 
 const aiBlockSchema = z.object({
@@ -161,13 +162,18 @@ export async function POST(request: NextRequest) {
         });
 
         let feedbackContext = "";
-        if (input.action === 'replan_with_feedback' && input.feedbacks && input.feedbacks.length > 0) {
-            feedbackContext = "\nATENÇÃO AOS FEEDBACKS DO USUÁRIO:\nO usuário acabou de revisar sua agenda e aplicou as seguintes correções manuais. Você DEVE modificar o planejamento da semana atual para respeitar essas restrições:\n";
-            input.feedbacks.forEach((fb: any) => {
-                if (fb.type === 'bad_time') feedbackContext += `- Tarefa "${fb.title}" (Originalmente às ${fb.originalTime}): HORÁRIO RUIM. Agende para outro momento totalmente diferente do dia.\n`;
-                if (fb.type === 'unrealistic') feedbackContext += `- Tarefa "${fb.title}": TEMPO IRREAL. Aloque muito mais tempo para isso ou quebre em tarefas menores ao longo da semana.\n`;
-                if (fb.type === 'dislike') feedbackContext += `- Tarefa "${fb.title}": O usuário NÃO GOSTOU. Remova ou substitua, não repita esse bloco.\n`;
-            });
+        if (input.action === 'replan_with_feedback') {
+            feedbackContext = "\nATENÇÃO AOS FEEDBACKS DO USUÁRIO:\nO usuário acabou de revisar sua agenda anterior e solicitou as seguintes correções. Você DEVE modificar o planejamento da nova semana para respeitar essas instruções:\n";
+            if (input.feedbacks && input.feedbacks.length > 0) {
+                input.feedbacks.forEach((fb: any) => {
+                    if (fb.type === 'bad_time') feedbackContext += `- Tarefa "${fb.title}" (Originalmente às ${fb.originalTime}): HORÁRIO RUIM. Agende para outro momento totalmente diferente do dia.\n`;
+                    if (fb.type === 'unrealistic') feedbackContext += `- Tarefa "${fb.title}": TEMPO IRREAL. Aloque muito mais tempo para isso ou quebre em tarefas menores ao longo da semana.\n`;
+                    if (fb.type === 'dislike') feedbackContext += `- Tarefa "${fb.title}": O usuário NÃO GOSTOU. Remova ou substitua, não repita esse bloco.\n`;
+                });
+            }
+            if (input.user_feedback) {
+                feedbackContext += `\nMENSAGEM DIRETA DO USUÁRIO O QUE CORRIGIR:\n"${input.user_feedback}"\n`;
+            }
             feedbackContext += "\n";
         }
 
