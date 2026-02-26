@@ -258,15 +258,15 @@ export default function WeekView() {
             </div>
 
             {/* Week Grid */}
-            <div className="flex">
+            <div className="flex bg-surface dark:bg-zinc-950">
                 {/* Time Column */}
-                <div className="w-12 flex-shrink-0 border-r border-card-border/50">
+                <div className="w-14 flex-shrink-0 border-r border-card-border/50 bg-bg">
                     <div className="h-16 border-b border-card-border/50" /> {/* Header spacer */}
-                    <div className="relative" style={{ height: '640px' }}>
+                    <div className="relative" style={{ height: '1152px' }}> {/* 16 * 72px */}
                         {HOURS.map(hour => (
                             <div
                                 key={hour}
-                                className="absolute w-full text-[10px] text-muted/70 text-right pr-2"
+                                className="absolute w-full text-[11px] font-medium text-muted/60 text-right pr-3 -mt-2"
                                 style={{ top: `${((hour - 6) / 16) * 100}%` }}
                             >
                                 {hour}:00
@@ -276,7 +276,7 @@ export default function WeekView() {
                 </div>
 
                 {/* Days Columns */}
-                <div className="flex-1 flex">
+                <div className="flex-1 flex overflow-x-auto snap-x">
                     {weekDates.map((date, idx) => {
                         const dateKey = formatDateKey(date);
                         const isToday = dateKey === todayKey;
@@ -289,43 +289,43 @@ export default function WeekView() {
                         return (
                             <div
                                 key={dateKey}
-                                className={`flex-1 border-r border-card-border/50 last:border-r-0 cursor-pointer transition-colors ${isToday ? 'bg-purple-500/5' :
-                                    isSelected ? 'bg-blue-500/5' :
-                                        isPast ? 'bg-white/[0.02]' : ''
+                                className={`flex-1 min-w-[120px] snap-center border-r border-card-border/50 last:border-r-0 cursor-pointer transition-colors ${isToday ? 'bg-purple-500/[0.03]' :
+                                    isSelected ? 'bg-blue-500/[0.03]' :
+                                        isPast ? 'bg-black/[0.01] dark:bg-white/[0.01]' : ''
                                     }`}
                                 onClick={() => handleDayClick(date)}
                             >
                                 {/* Day Header */}
-                                <div className={`h-16 flex flex-col items-center justify-center border-b border-card-border/50 ${isToday ? 'bg-purple-500/10' :
-                                    isSelected ? 'bg-blue-500/10' : ''
+                                <div className={`h-16 sticky top-0 z-20 flex flex-col items-center justify-center border-b border-card-border/50 backdrop-blur-md ${isToday ? 'bg-purple-500/10' :
+                                    isSelected ? 'bg-blue-500/10' : 'bg-white/80 dark:bg-zinc-950/80'
                                     }`}>
-                                    <span className="text-xs text-muted">{DAYS[idx]}</span>
-                                    <span className={`text-sm font-medium ${isToday ? 'text-purple-400' :
-                                        isSelected ? 'text-blue-400' :
+                                    <span className={`text-[10px] uppercase font-bold tracking-wider ${isToday ? 'text-purple-600 dark:text-purple-400' : 'text-muted'}`}>{DAYS[idx]}</span>
+                                    <div className={`mt-0.5 w-7 h-7 flex items-center justify-center rounded-full text-sm font-semibold ${isToday ? 'bg-purple-600 text-white' :
+                                        isSelected ? 'text-blue-600 dark:text-blue-400' :
                                             'text-foreground'
                                         }`}>
                                         {date.getDate()}
-                                    </span>
+                                    </div>
                                     {blockCount > 0 ? (
-                                        <span className="text-[9px] text-muted/70">{blockCount} blocos</span>
-                                    ) : isFuture ? (
+                                        <span className="text-[9px] text-muted/50 font-medium absolute top-2 right-2">{blockCount}</span>
+                                    ) : isFuture && isToday === false ? (
                                         <button
                                             onClick={(e) => { e.stopPropagation(); handlePlanDay(date); }}
-                                            className="text-[9px] text-purple-400/60 hover:text-purple-400 transition-colors flex items-center gap-0.5"
+                                            className="text-[9px] absolute top-2 right-2 text-purple-600/70 hover:text-purple-600 transition-colors flex items-center justify-center w-5 h-5 rounded-full hover:bg-purple-500/10"
+                                            title="Planejar Dia"
                                         >
-                                            <Plus className="w-2.5 h-2.5" />
-                                            planejar
+                                            <Plus className="w-3 h-3" />
                                         </button>
                                     ) : null}
                                 </div>
 
-                                {/* Blocks Area */}
-                                <div className="relative" style={{ height: '640px' }}>
+                                {/* Blocks Area (Height: 1152px) */}
+                                <div className="relative" style={{ height: '1152px' }}>
                                     {/* Hour Lines - Enhanced contrast for legibility */}
                                     {HOURS.map(hour => (
                                         <div
                                             key={hour}
-                                            className="absolute w-full border-t border-card-border/50"
+                                            className="absolute w-full border-t border-card-border/30"
                                             style={{ top: `${((hour - 6) / 16) * 100}%` }}
                                         />
                                     ))}
@@ -333,13 +333,13 @@ export default function WeekView() {
                                     {/* Current Time Indicator */}
                                     {isToday && (
                                         <div
-                                            className="absolute left-0 right-0 z-10 flex items-center"
+                                            className="absolute left-0 right-0 z-10 flex items-center pointer-events-none"
                                             style={{
                                                 top: `${((today.getHours() + today.getMinutes() / 60 - 6) / 16) * 100}%`
                                             }}
                                         >
-                                            <div className="w-2 h-2 rounded-full bg-red-500" />
-                                            <div className="flex-1 h-0.5 bg-red-500/50" />
+                                            <div className="w-2.5 h-2.5 -ml-1.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
+                                            <div className="flex-1 h-px bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
                                         </div>
                                     )}
 
@@ -349,65 +349,80 @@ export default function WeekView() {
                                         const Icon = cat.icon;
                                         const style = getBlockStyle(block);
 
+                                        // Calc duration for internal layout
+                                        const start = new Date(block.start_datetime);
+                                        const end = new Date(block.end_datetime);
+                                        const durMinutes = (end.getTime() - start.getTime()) / 60000;
+                                        const isShort = durMinutes <= 30;
+
                                         return (
                                             <motion.div
                                                 key={block.id}
-                                                initial={{ opacity: 0, scale: 0.95 }}
+                                                initial={{ opacity: 0, scale: 0.98 }}
                                                 animate={{ opacity: 1, scale: 1 }}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     if (block.is_done) return;
                                                     setActiveFeedbackBlock(activeFeedbackBlock === block.id ? null : block.id);
                                                 }}
-                                                className={`absolute left-1 right-1 rounded-lg border p-1.5 ${cat.bg} ${block.is_done ? 'opacity-60' : 'shadow-sm'
-                                                    } ${activeFeedbackBlock === block.id ? 'z-50 shadow-xl' : 'overflow-hidden cursor-pointer hover:ring-1 hover:ring-foreground/40 transition-all'}`}
+                                                className={`absolute left-0.5 right-0.5 rounded-md border ${cat.bg} ${block.is_done ? 'opacity-50 grayscale' : 'shadow-sm'
+                                                    } ${activeFeedbackBlock === block.id ? 'z-50 shadow-xl ring-2 ring-purple-500' : 'overflow-hidden cursor-pointer hover:shadow-md hover:brightness-105 transition-all z-0'}`}
                                                 style={style}
                                             >
                                                 {pendingFeedbacks.find(f => f.blockId === block.id) && (
-                                                    <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500" title="Feedback pendente" />
+                                                    <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 shadow-sm" title="Feedback pendente" />
                                                 )}
-                                                <div className="flex items-start gap-1 pointer-events-none">
-                                                    {block.is_done ? (
-                                                        <CheckCircle2 className="w-3 h-3 text-green-400 flex-shrink-0 mt-0.5" />
-                                                    ) : (
-                                                        <Icon className={`w-3 h-3 flex-shrink-0 mt-0.5 ${cat.color}`} />
-                                                    )}
-                                                    <div className="min-w-0 flex-1">
-                                                        <p className={`text-[10px] font-medium truncate ${block.is_done ? 'text-muted line-through' : 'text-foreground'
-                                                            }`}>
+
+                                                <div className={`flex items-start gap-1 p-1 h-full pointer-events-none ${isShort ? 'items-center flex-row overflow-hidden' : 'flex-col'}`}>
+                                                    <div className={`flex items-center gap-1 shrink-0 ${isShort ? '' : 'mb-0.5'}`}>
+                                                        {block.is_done ? (
+                                                            <CheckCircle2 className="w-3 h-3 text-green-500" />
+                                                        ) : (
+                                                            <Icon className={`w-3 h-3 ${cat.color}`} />
+                                                        )}
+                                                        {!isShort && (
+                                                            <span className={`text-[9px] font-semibold opacity-80 ${cat.color}`}>
+                                                                {start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className={`text-[11px] font-semibold leading-tight line-clamp-3 ${block.is_done ? 'text-muted line-through' : 'text-zinc-900 dark:text-zinc-100'}`}>
                                                             {block.title}
                                                         </p>
-                                                        <p className="text-[9px] text-muted">
-                                                            {new Date(block.start_datetime).toLocaleTimeString('pt-BR', {
-                                                                hour: '2-digit',
-                                                                minute: '2-digit'
-                                                            })}
-                                                        </p>
+                                                        {isShort && (
+                                                            <span className={`text-[9px] font-semibold opacity-80 ml-1 inline-block ${cat.color}`}>
+                                                                {start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
 
+                                                {/* Action Menu popover */}
                                                 {activeFeedbackBlock === block.id && (
-                                                    <div className="absolute top-full left-0 mt-1 w-36 bg-surface border border-card-border rounded-lg shadow-2xl p-1 z-[60]" onClick={e => e.stopPropagation()}>
-                                                        <div className="text-[10px] font-medium text-foreground px-2 py-1 mb-1 border-b border-card-border/50">Ações</div>
+                                                    <div className="absolute top-full left-0 mt-1 w-40 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl p-1 z-[60]" onClick={e => e.stopPropagation()}>
+                                                        <div className="text-[10px] font-bold text-zinc-900 dark:text-zinc-100 px-2 py-1.5 mb-1 border-b border-zinc-100 dark:border-zinc-800">Opções</div>
                                                         <button
                                                             onClick={() => {
                                                                 setEditingBlock(block);
                                                                 setActiveFeedbackBlock(null);
                                                             }}
-                                                            className="flex items-center gap-2 w-full text-left p-1.5 hover:bg-blue-500/10 rounded text-blue-500 text-[11px] transition-colors"
+                                                            className="flex items-center gap-2 w-full text-left px-2 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-700 dark:text-zinc-300 text-[11px] font-medium transition-colors"
                                                         >
-                                                            <Pencil className="w-3 h-3" /> Editar Bloco
+                                                            <Pencil className="w-3.5 h-3.5" /> Editar Detalhes
                                                         </button>
-                                                        <div className="text-[10px] font-medium text-muted px-2 py-1 mt-1 mb-1 border-t border-b border-card-border/50 bg-foreground/5">Feedback IA</div>
+
+                                                        <div className="text-[10px] font-bold text-red-500 px-2 py-1 mt-1 mb-1 border-t border-zinc-100 dark:border-zinc-800 bg-red-50 dark:bg-red-950/20">Ajustar IA</div>
                                                         <button
                                                             onClick={() => {
                                                                 addFeedback({ blockId: block.id, title: block.title, dayKey: formatDateKey(date), originalTime: block.start_datetime, type: 'bad_time' });
                                                                 setActiveFeedbackBlock(null);
                                                                 toast.success("Feedback anotado");
                                                             }}
-                                                            className="flex items-center gap-2 w-full text-left p-1.5 hover:bg-amber-500/10 rounded text-amber-500 text-[11px] transition-colors"
+                                                            className="flex items-center gap-2 w-full text-left px-2 py-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-600 dark:text-red-400 text-[11px] font-medium transition-colors"
                                                         >
-                                                            <Clock className="w-3 h-3" /> Horário Ruim
+                                                            <Clock className="w-3.5 h-3.5" /> Horário Ruim
                                                         </button>
                                                         <button
                                                             onClick={() => {
@@ -415,9 +430,9 @@ export default function WeekView() {
                                                                 setActiveFeedbackBlock(null);
                                                                 toast.success("Feedback anotado");
                                                             }}
-                                                            className="flex items-center gap-2 w-full text-left p-1.5 hover:bg-orange-500/10 rounded text-orange-500 text-[11px] transition-colors"
+                                                            className="flex items-center gap-2 w-full text-left px-2 py-2 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg text-orange-600 dark:text-orange-400 text-[11px] font-medium transition-colors"
                                                         >
-                                                            <XCircle className="w-3 h-3" /> Tempo Irreal
+                                                            <XCircle className="w-3.5 h-3.5" /> Tempo Irreal
                                                         </button>
                                                         <button
                                                             onClick={() => {
@@ -425,9 +440,9 @@ export default function WeekView() {
                                                                 setActiveFeedbackBlock(null);
                                                                 toast.success("Feedback anotado");
                                                             }}
-                                                            className="flex items-center gap-2 w-full text-left p-1.5 hover:bg-red-500/10 rounded text-red-500 text-[11px] transition-colors"
+                                                            className="flex items-center gap-2 w-full text-left px-2 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-600 dark:text-zinc-400 text-[11px] font-medium transition-colors"
                                                         >
-                                                            <ThumbsDown className="w-3 h-3" /> Não Gostei
+                                                            <ThumbsDown className="w-3.5 h-3.5" /> Não Gostei
                                                         </button>
                                                     </div>
                                                 )}
@@ -437,13 +452,13 @@ export default function WeekView() {
 
                                     {/* Empty state for unplanned future days */}
                                     {blocks.length === 0 && isFuture && (
-                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                                        <div className="absolute inset-x-2 top-10 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity z-10">
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); handlePlanDay(date); }}
-                                                className="flex flex-col items-center gap-1 px-3 py-2 bg-purple-500/10 hover:bg-purple-500/20 rounded-lg border border-purple-500/20 transition-colors"
+                                                className="flex flex-col items-center gap-1.5 px-4 py-3 bg-white dark:bg-zinc-900 shadow-xl rounded-xl border border-zinc-200 dark:border-zinc-800 hover:scale-105 transition-all text-purple-600 dark:text-purple-400"
                                             >
-                                                <Wand2 className="w-4 h-4 text-purple-400" />
-                                                <span className="text-[10px] text-purple-300">Planejar</span>
+                                                <Wand2 className="w-5 h-5" />
+                                                <span className="text-[11px] font-bold">Autocompletar Dia</span>
                                             </button>
                                         </div>
                                     )}

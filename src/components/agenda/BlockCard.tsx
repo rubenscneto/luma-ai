@@ -18,15 +18,15 @@ interface BlockCardProps {
 }
 
 const categoryConfig: Record<BlockCategory, { icon: React.ElementType; color: string; bg: string }> = {
-    work: { icon: Briefcase, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/10 dark:bg-blue-500/20' },
-    study: { icon: BookOpen, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-500/10 dark:bg-purple-500/20' },
-    health: { icon: Heart, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-500/10 dark:bg-green-500/20' },
-    leisure: { icon: Coffee, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10 dark:bg-amber-500/20' },
-    admin: { icon: Home, color: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-500/10 dark:bg-gray-500/20' },
-    sleep: { icon: Moon, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-500/10 dark:bg-indigo-500/20' },
-    meal: { icon: Coffee, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-500/10 dark:bg-orange-500/20' },
-    commute: { icon: Bus, color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-500/10 dark:bg-cyan-500/20' },
-    fixed: { icon: Plus, color: 'text-pink-600 dark:text-pink-400', bg: 'bg-pink-500/10 dark:bg-pink-500/20' },
+    work: { icon: Briefcase, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/20 border border-blue-500/30' },
+    study: { icon: BookOpen, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-500/20 border border-purple-500/30' },
+    health: { icon: Heart, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-500/20 border border-green-500/30' },
+    leisure: { icon: Coffee, color: 'text-pink-600 dark:text-pink-400', bg: 'bg-pink-500/20 border border-pink-500/30' },
+    admin: { icon: Home, color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-500/20 border border-cyan-500/30' },
+    sleep: { icon: Moon, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-500/20 border border-indigo-500/30' },
+    meal: { icon: Coffee, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-500/20 border border-orange-500/30' },
+    commute: { icon: Bus, color: 'text-yellow-600 dark:text-yellow-400', bg: 'bg-yellow-500/20 border border-yellow-500/30' },
+    fixed: { icon: Plus, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/20 border border-red-500/30' },
 };
 
 export function BlockCard({ block, compact = false }: BlockCardProps) {

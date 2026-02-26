@@ -12,7 +12,9 @@ const PROTECTED_ROUTES = [
     '/biblioteca',
     '/configuracoes',
     '/analytics',
+    '/welcome',
     '/onboarding-rotina',
+    '/onboarding-preview',
 ];
 
 // Public routes that should redirect to dashboard if logged in
@@ -95,12 +97,15 @@ export async function updateSession(request: NextRequest) {
             .eq('user_id', user.id)
             .single();
 
-        const isOnboardingRoute = pathname === '/onboarding-rotina';
+        const isOnboardingRoute =
+            pathname === '/welcome' ||
+            pathname === '/onboarding-rotina' ||
+            pathname === '/onboarding-preview';
 
         if (!profile && !isOnboardingRoute) {
             // Force onboarding if profile is missing
             const url = request.nextUrl.clone();
-            url.pathname = '/onboarding-rotina';
+            url.pathname = '/welcome';
             return NextResponse.redirect(url);
         } else if (profile && isOnboardingRoute) {
             // Prevent loop: already onboarded user trying to view onboarding

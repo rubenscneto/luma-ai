@@ -36,8 +36,8 @@ export function FixedTaskInput({ tasks, onChange }: FixedTaskInputProps) {
     return (
         <div className="space-y-4">
             <div className="flex justify-between items-center">
-                <Label className="text-zinc-400">Compromissos Fixos (Trabalho, Aulas, Treinos)</Label>
-                <Button type="button" variant="outline" size="sm" onClick={addTask} className="text-violet-400 border-violet-500/30 hover:bg-violet-500/10">
+                <Label className="text-zinc-500 dark:text-zinc-400">Compromissos Fixos (Trabalho, Aulas, Treinos)</Label>
+                <Button type="button" variant="outline" size="sm" onClick={addTask} className="text-violet-600 dark:text-violet-400 border-violet-500/30 hover:bg-violet-500/10">
                     <Plus className="w-4 h-4 mr-1" /> Adicionar
                 </Button>
             </div>
