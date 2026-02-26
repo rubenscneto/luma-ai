@@ -110,13 +110,21 @@ export function RoutineWizard({ onComplete }: RoutineWizardProps) {
             setProfile(profilePayload as any);
             toast.loading("Analisando perfil e criando sua semana ideal (Isso pode levar de 30 a 60 segundos)...", { id: toastId });
 
+            // Calculate current week's Sunday for start_date
+            const now = new Date();
+            const dayOfWeek = now.getDay();
+            const sunday = new Date(now);
+            sunday.setDate(now.getDate() - dayOfWeek);
+            const startDateStr = sunday.toISOString().split('T')[0];
+
             // 2. Automatically Plan Week
             const planRes = await fetch('/api/ai/agenda/plan-week', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'first_plan',
-                    user_id: user.id
+                    user_id: user.id,
+                    start_date: startDateStr
                 })
             });
 
