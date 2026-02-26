@@ -102,12 +102,16 @@ export async function updateSession(request: NextRequest) {
             pathname === '/onboarding-rotina' ||
             pathname === '/onboarding-preview';
 
+        const isEntryOnboardingRoute =
+            pathname === '/welcome' ||
+            pathname === '/onboarding-rotina';
+
         if (!profile && !isOnboardingRoute) {
             // Force onboarding if profile is missing
             const url = request.nextUrl.clone();
             url.pathname = '/welcome';
             return NextResponse.redirect(url);
-        } else if (profile && isOnboardingRoute) {
+        } else if (profile && isEntryOnboardingRoute) {
             // Prevent loop: already onboarded user trying to view onboarding
             const url = request.nextUrl.clone();
             url.pathname = '/agenda';

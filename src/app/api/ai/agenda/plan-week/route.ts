@@ -174,21 +174,22 @@ export async function POST(request: NextRequest) {
         const weekPrompt = `
 Planeje a semana completa para o usuário.
 Perfil: ${profile?.full_name || 'Usuário'}, ${profile?.occupation || routineProfile?.occupation || 'profissional'}
+Descrição Pessoal Fornecida pelo Usuário: "${routineProfile?.description || 'Nenhuma descrição adicional'}"
 ${healthProfile ? `Saúde: Treino ${healthProfile.training_frequency || '3x/semana'}, Objetivo: ${healthProfile.goal || routineProfile?.goal || 'saúde'}` : ''}
 ${routineProfile ? `Rotina: Objetivos: ${routineProfile.objectives?.join(', ')}, Pico: ${routineProfile.peak_productivity}` : ''}
 ${feedbackContext}
-Regras:
-1. NUNCA sobreponha horários com blocos fixos
-2. Distribua estudo, trabalho, exercício e lazer ao longo da semana
-3. Inclua refeições (café, almoço, jantar) em horários regulares
-4. Cada bloco tem category: work|study|health|leisure|admin|sleep|meal|commute|fixed
+Regras Críticas:
+1. NUNCA sobreponha horários com blocos fixos.
+2. ATENÇÃO MÁXIMA À DESCRIÇÃO DO USUÁRIO: Use os horários exatos e as atividades expressamente citadas por ele no campo "Descrição Pessoal" acima.
+3. NÃO INVENTE BLOCOS. Se o usuário não pediu para adicionar academia estruturada, clube do livro, passeios ou tarefas irrealistas, NÃO adicione. Limite-se ao que foi citado, além de horários de sono, deslocamentos citados e refeições (café, almoço, jantar). É perfeitamente comum, e até desejável, deixar períodos ou tardes inteiras livres ("buracos") se não houver obrigações.
+4. Cada bloco tem category: work|study|health|leisure|admin|sleep|meal|commute|fixed.
 
 Dias para planejar:
 ${daysContext.map(d => `${d.dayName} (${d.date}): Fixos: ${d.fixedBlocks.join(', ') || 'nenhum'} ${d.hasExistingPlan ? '(Complementar)' : '(Completo)'}`).join('\n')}
 
 Responda EXCLUSIVAMENTE em JSON:
 {
-  "days": [{ "date": "YYYY-MM-DD", "blocks": [{ "title": "...", "category": "...", "start_time": "HH:MM", "end_time": "HH:MM", "suggested_reason": "Breve justificativa se baseado num feedback" }], "summary": "..." }],
+  "days": [{ "date": "YYYY-MM-DD", "blocks": [{ "title": "...", "category": "...", "start_time": "HH:MM", "end_time": "HH:MM", "suggested_reason": "Justificativa explícita de onde você tirou isso da descrição" }], "summary": "..." }],
   "weekSummary": "...", "weekInsight": "..."
 }`;
 
