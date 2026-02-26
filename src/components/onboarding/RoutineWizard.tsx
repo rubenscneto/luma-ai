@@ -218,8 +218,8 @@ export function RoutineWizard({ onComplete }: RoutineWizardProps) {
                                                     key={opt.value}
                                                     onClick={() => setPeakProductivity(opt.value)}
                                                     className={`p-3 rounded-xl border transition-all text-center flex flex-col items-center justify-center gap-1 ${peakProductivity === opt.value
-                                                        ? 'bg-purple-500/20 border-purple-500 text-purple-400'
-                                                        : 'bg-foreground/5 border-card-border hover:bg-foreground/10 text-muted hover:text-foreground'
+                                                        ? 'bg-purple-100 dark:bg-purple-500/20 border-purple-500 text-purple-700 dark:text-purple-400'
+                                                        : 'bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
                                                         }`}
                                                 >
                                                     <span className="text-xl">{opt.emoji}</span>
@@ -299,7 +299,7 @@ export function RoutineWizard({ onComplete }: RoutineWizardProps) {
                     <button
                         onClick={handleNext}
                         disabled={isSubmitting || (currentStep === 1 && description.trim().length < 10)}
-                        className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-brand-primary text-white text-sm font-medium hover:bg-brand-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-purple-600 dark:bg-purple-500 text-white text-sm font-medium hover:bg-purple-700 dark:hover:bg-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                     >
                         {isSubmitting ? (
                             <>

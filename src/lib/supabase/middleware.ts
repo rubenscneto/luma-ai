@@ -87,6 +87,30 @@ export async function updateSession(request: NextRequest) {
     // Check if current path is public auth route
     const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
 
+    // Check onboarding status for authenticated users on protected routes
+    if (user && isProtectedRoute) {
+        const { data: profile } = await supabase
+            .from('routine_profiles')
+            .select('user_id')
+            .eq('user_id', user.id)
+            .single();
+
+        const isOnboardingRoute = pathname === '/onboarding-rotina';
+
+        if (!profile && !isOnboardingRoute) {
+            // Force onboarding if profile is missing
+            const url = request.nextUrl.clone();
+            url.pathname = '/onboarding-rotina';
+            return NextResponse.redirect(url);
+        } else if (profile && isOnboardingRoute) {
+            // Prevent loop: already onboarded user trying to view onboarding
+            const url = request.nextUrl.clone();
+            url.pathname = '/agenda';
+            url.searchParams.set('view', 'week');
+            return NextResponse.redirect(url);
+        }
+    }
+
     // Redirect unauthenticated users from protected routes
     if (!user && isProtectedRoute) {
         const url = request.nextUrl.clone();

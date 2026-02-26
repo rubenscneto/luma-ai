@@ -11,7 +11,7 @@ export default function OnboardingRotinaPage() {
 
     // Redireciona ao concluir
     const handleWizardComplete = () => {
-        router.push('/agenda');
+        window.location.href = '/agenda?view=week';
     };
 
     if (!user) {
