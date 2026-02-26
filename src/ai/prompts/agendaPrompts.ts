@@ -2,6 +2,7 @@
 // Used by plan-day and replan-day endpoints
 
 import { LUMA_BASE_SYSTEM_PROMPT, buildUserContextBlock } from './baseSystemPrompt';
+import { baseSystemPrompt } from './baseSystemPrompt';
 
 export const AGENDA_PLANNER_SYSTEM_PROMPT = `${LUMA_BASE_SYSTEM_PROMPT}
 
