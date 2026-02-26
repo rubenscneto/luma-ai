@@ -30,7 +30,7 @@ const categoryConfig: Record<BlockCategory, { icon: React.ElementType; color: st
 };
 
 export function BlockCard({ block, compact = false }: BlockCardProps) {
-    const { markBlockDone, skipBlock, delayBlock, updateBlock } = useDailyPlan();
+    const { markBlockDone, skipBlock, delayBlock, updateBlock, removeBlock } = useDailyPlan();
     const [showActions, setShowActions] = useState(false);
     const [showDelayOptions, setShowDelayOptions] = useState(false);
     const [isEditing, setIsEditing] = useState(false);

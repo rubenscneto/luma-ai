@@ -67,6 +67,7 @@ export default function WeekView() {
         fetchWeekBlocks,
         loadTodayPlan,
         updateBlock,
+        removeBlock,
     } = useDailyPlan();
     const { user } = useAuth();
     const { addFeedback, pendingFeedbacks, removeFeedback } = useAgenda();
