@@ -1,24 +1,37 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 
 export const GEMINI_MODELS = {
+    PRO_2_5: "gemini-2.5-pro",
     FLASH_2_5: "gemini-2.5-flash",
     FLASH_3: "gemini-3-flash", // Future/Experimental
 } as const;
 
-export function getGeminiModel(config?: { temperature?: number }) {
+export function getGeminiModel(config?: { temperature?: number, systemInstruction?: string }) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("Missing GEMINI_API_KEY");
 
-    // Default to 2.5-flash. Support experimental 3-flash via env var or feature flag logic
-    const useG3 = process.env.FEATURE_FLAG_G3 === 'true';
-    const modelName = process.env.GEMINI_MODEL ?? (useG3 ? GEMINI_MODELS.FLASH_3 : GEMINI_MODELS.FLASH_2_5);
-
     const genAI = new GoogleGenerativeAI(apiKey);
+
+    // Explicitly use gemini-2.5-pro for best reasoning unless env overrides
+    const modelName = process.env.GEMINI_MODEL ?? GEMINI_MODELS.PRO_2_5;
+
+    console.log("Usando modelo Gemini:", modelName);
+
     return genAI.getGenerativeModel({
         model: modelName,
+        systemInstruction: config?.systemInstruction,
         generationConfig: {
             responseMimeType: "application/json",
-            temperature: config?.temperature ?? 0.7
-        }
+            temperature: config?.temperature ?? 0.1,
+            topP: 0.8,
+            topK: 32,
+            maxOutputTokens: 8192,
+        },
+        safetySettings: [
+            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        ],
     });
 }

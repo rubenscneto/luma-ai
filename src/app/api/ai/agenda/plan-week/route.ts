@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
         });
         lockAcquired = true;
 
-        const model = getGeminiModel();
+        const model = getGeminiModel({ systemInstruction: AGENDA_PLANNER_SYSTEM_PROMPT });
 
         // Determine which days to plan (default: all 7)
         const daysOfWeek = input.days_to_plan || [0, 1, 2, 3, 4, 5, 6];
@@ -201,8 +201,6 @@ Responda EXCLUSIVAMENTE em JSON:
 
         const result = await model.generateContent({
             contents: [
-                { role: 'user', parts: [{ text: AGENDA_PLANNER_SYSTEM_PROMPT }] },
-                { role: 'model', parts: [{ text: 'Entendido! Vou planejar a semana.' }] },
                 { role: 'user', parts: [{ text: weekPrompt }] },
             ],
         });

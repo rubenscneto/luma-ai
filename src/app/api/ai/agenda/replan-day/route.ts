@@ -98,8 +98,6 @@ export async function POST(request: NextRequest) {
     console.log(`[replan-day] [${runId}] Starting replan-day request`);
     try {
         const supabase = getSupabase();
-        const model = getGeminiModel();
-
         const body = await request.json();
         const input = replanInputSchema.parse(body);
 
@@ -255,10 +253,11 @@ ${JSON.stringify({
                 userNote: input.user_note,
             });
 
+            const combinedSystemPrompt = AGENDA_REPLANNER_SYSTEM_PROMPT + (userContextBlock ? '\n\n' + userContextBlock : '');
+            const model = getGeminiModel({ systemInstruction: combinedSystemPrompt });
+
             const result = await model.generateContent({
                 contents: [
-                    { role: 'user', parts: [{ text: AGENDA_REPLANNER_SYSTEM_PROMPT + (userContextBlock ? '\n\n' + userContextBlock : '') }] },
-                    { role: 'model', parts: [{ text: 'Entendido. Aguardo a situação para replanejar.' }] },
                     { role: 'user', parts: [{ text: prompt }] },
                 ],
                 generationConfig: {

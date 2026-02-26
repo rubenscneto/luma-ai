@@ -183,13 +183,11 @@ function buildFixedBlockInputs(dateStr: string, timezone: string, fixedBlocks: a
     }));
 }
 
-async function generateAIBlocks(model: any, systemPrompt: string, userPrompt: string, temperature: number) {
-    // const model = getGeminiModel({ temperature }); // This line was moved to the POST function
+async function generateAIBlocks(systemPrompt: string, userPrompt: string, temperature: number) {
+    const model = getGeminiModel({ temperature, systemInstruction: systemPrompt });
 
     const result = await model.generateContent({
         contents: [
-            { role: 'user', parts: [{ text: systemPrompt }] },
-            { role: 'model', parts: [{ text: 'Entendido. Aguardo o contexto do dia para gerar o plano.' }] },
             { role: 'user', parts: [{ text: userPrompt }] },
         ],
         generationConfig: {
@@ -328,7 +326,6 @@ export async function POST(request: NextRequest) {
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
-        const model = getGeminiModel({ temperature: 0.7 }); // Default model for standard modes
 
         const body = await request.json();
         const input = planDayInputSchema.parse(body);
@@ -446,13 +443,11 @@ export async function POST(request: NextRequest) {
             console.log('Generating A/B plans with Gemini 2.0 Flash...');
             const [planAResult, planBResult] = await Promise.all([
                 generateAIBlocks(
-                    getGeminiModel({ temperature: 0.5 }), // Specific temperature for plan A
                     AGENDA_PLANNER_SYSTEM_PROMPT,
                     buildABPlanPrompt({ ...sharedPromptContext, planStyle: 'focused' }),
                     0.5
                 ),
                 generateAIBlocks(
-                    getGeminiModel({ temperature: 0.9 }), // Specific temperature for plan B
                     AGENDA_PLANNER_SYSTEM_PROMPT,
                     buildABPlanPrompt({ ...sharedPromptContext, planStyle: 'balanced' }),
                     0.9
@@ -533,7 +528,7 @@ export async function POST(request: NextRequest) {
             recentAgendaBlocks: context.recentAgendaBlocks,
         });
 
-        const aiBlocks = await generateAIBlocks(model, AGENDA_PLANNER_SYSTEM_PROMPT, prompt, 0.7);
+        const aiBlocks = await generateAIBlocks(AGENDA_PLANNER_SYSTEM_PROMPT, prompt, 0.7);
 
         // Build AI block inputs
         if (aiBlocks.blocks.length > 0) {
