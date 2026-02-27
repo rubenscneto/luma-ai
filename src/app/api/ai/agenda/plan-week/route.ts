@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getGeminiModel } from '@/lib/ai/gemini';
 import { z } from 'zod';
-import { AGENDA_PLANNER_SYSTEM_PROMPT, buildPlanDayPrompt } from '@/ai/prompts/agendaPrompts';
+import { AGENDA_PLANNER_SYSTEM_PROMPT, buildPlanDayPrompt, weekPrompt } from '@/ai/prompts/agendaPrompts';
 import { solveTimeline, dailyBlockToSolverBlock, solverBlockToTimeFields, SolverBlock } from '@/lib/timelineSolver';
 import { processDerivedBlocks } from '@/lib/derivedBlocks';
 import { validateMealWindow, normalizeForComparison } from '@/lib/mealWindows';
@@ -10,6 +10,7 @@ import { persistDailyBlocks, BlockInput } from '@/lib/persistDailyBlocks';
 import { splitOvernightBlocks } from '@/lib/overnightSplit';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // Extra time for Gemini 2.5 Pro to complete the full week JSON
 
 const planWeekInputSchema = z.object({
     user_id: z.string().uuid(),
@@ -177,31 +178,19 @@ export async function POST(request: NextRequest) {
             feedbackContext += "\n";
         }
 
-        const weekPrompt = `
-Planeje a semana completa para o usuário.
-Perfil: ${profile?.full_name || 'Usuário'}, ${profile?.occupation || routineProfile?.occupation || 'profissional'}
-Descrição Pessoal Fornecida pelo Usuário: "${routineProfile?.description || 'Nenhuma descrição adicional'}"
-${healthProfile ? `Saúde: Treino ${healthProfile.training_frequency || '3x/semana'}, Objetivo: ${healthProfile.goal || routineProfile?.goal || 'saúde'}` : ''}
-${routineProfile ? `Rotina: Objetivos: ${routineProfile.objectives?.join(', ')}, Pico: ${routineProfile.peak_productivity}` : ''}
-${feedbackContext}
-Regras Críticas:
-1. NUNCA sobreponha horários com blocos fixos.
-2. ATENÇÃO MÁXIMA À DESCRIÇÃO DO USUÁRIO: Use os horários exatos e as atividades expressamente citadas por ele no campo "Descrição Pessoal" acima.
-3. NÃO INVENTE BLOCOS. Se o usuário não pediu para adicionar academia estruturada, clube do livro, passeios ou tarefas irrealistas, NÃO adicione. Limite-se ao que foi citado, além de horários de sono, deslocamentos citados e refeições (café, almoço, jantar). É perfeitamente comum, e até desejável, deixar períodos ou tardes inteiras livres ("buracos") se não houver obrigações.
-4. Cada bloco tem category: work|study|health|leisure|admin|sleep|meal|commute|fixed.
+        const daysContextStr = daysContext.map(d => `${d.dayName} (${d.date}): Fixos: ${d.fixedBlocks.join(', ') || 'nenhum'} ${d.hasExistingPlan ? '(Complementar)' : '(Completo)'}`).join('\n');
 
-Dias para planejar:
-${daysContext.map(d => `${d.dayName} (${d.date}): Fixos: ${d.fixedBlocks.join(', ') || 'nenhum'} ${d.hasExistingPlan ? '(Complementar)' : '(Completo)'}`).join('\n')}
+        const promptParams = {
+            userProfile: profile,
+            routineProfile: routineProfile,
+            healthProfile: healthProfile
+        };
 
-Responda EXCLUSIVAMENTE em JSON:
-{
-  "days": [{ "date": "YYYY-MM-DD", "blocks": [{ "title": "...", "category": "...", "start_time": "HH:MM", "end_time": "HH:MM", "suggested_reason": "Justificativa explícita de onde você tirou isso da descrição" }], "summary": "..." }],
-  "weekSummary": "...", "weekInsight": "..."
-}`;
+        const finalPrompt = weekPrompt(promptParams, allFixedBlocks, '', feedbackContext, daysContextStr);
 
         const result = await model.generateContent({
             contents: [
-                { role: 'user', parts: [{ text: weekPrompt }] },
+                { role: 'user', parts: [{ text: finalPrompt }] },
             ],
         });
 

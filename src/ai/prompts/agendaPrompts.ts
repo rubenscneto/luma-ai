@@ -357,3 +357,45 @@ FORMATO DE RESPOSTA (JSON):
   ]
 }`;
 
+export const weekPrompt = (
+  userData: any,
+  fixedBlocks: any[],
+  pastSummary: string = '',
+  feedbackContext: string = '',
+  daysContextStr: string = ''
+) => `
+${baseSystemPrompt}
+
+DADOS DO USUÁRIO (use como verdade absoluta):
+- Perfil: ${userData.userProfile?.full_name || 'Usuário'}, Ocupação: ${userData.userProfile?.occupation || userData.routineProfile?.occupation || 'Profissional'}
+- Descrição verbal completa: "${userData.routineProfile?.description || 'Nenhuma descrição explícita fornecida pelo usuário'}"
+- Saúde: ${userData.healthProfile?.training_frequency || 'Sem frequência de treino definida'}, Objetivo: ${userData.healthProfile?.goal || userData.routineProfile?.goal || 'saúde'}
+- Rotina Fixa: ${JSON.stringify(fixedBlocks)}
+${feedbackContext}
+
+EXEMPLO FEW-SHOT BASEADO NO PERFIL GERAL (copie a estrutura e a fidelidade estrita às regras inquebráveis acima):
+Dia típico:
+05:30-06:45 Preparação inicial + Café da Manhã
+06:45-07:10 Deslocamento de ida (buffer)
+07:30-11:30 Trabalho Fixo (Seg/Ter/Qui/Sex) ou CIEE (Qua)
+11:30-12:00 Almoço prep
+12:00-13:00 Almoço
+13:00-14:00 Projetos / Afazeres
+14:00-15:00 Buffer
+15:00-16:00 Academia (caso seja dia de treino)
+16:00-16:30 Volta para casa
+16:30-18:30 Tempo Livre
+22:00-22:30 Preparação para o sono
+22:30 Dormir
+
+TAREFA: Gere o planejamento semanal, preenchendo as lacunas mas sem inventar atividades que não foram explicitamente mencionadas na "Descrição verbal completa". É melhor deixar buracos livres do que inventar se a descrição não diz.
+
+Dias para planejar e seus contextos:
+${daysContextStr}
+
+Responda EXCLUSIVAMENTE em JSON no seguinte formato, e NÃO ESCREVA EXPLICAÇÕES texto fora do JSON.
+{
+  "days": [{ "date": "YYYY-MM-DD", "blocks": [{ "title": "...", "category": "work|study|health|leisure|admin|sleep|meal|commute|fixed", "start_time": "HH:MM", "end_time": "HH:MM", "suggested_reason": "Justificativa explícita onde extraiu a informacao" }], "summary": "Resumo leve" }],
+  "weekSummary": "Resumo geral da semana", "weekInsight": "Insight pertinente"
+}
+`;
