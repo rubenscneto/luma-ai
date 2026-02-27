@@ -10,7 +10,6 @@ import { persistDailyBlocks, BlockInput } from '@/lib/persistDailyBlocks';
 import { splitOvernightBlocks } from '@/lib/overnightSplit';
 
 export const dynamic = 'force-dynamic';
-export const runtime = 'edge'; // Edge function gives up to 30s on Hobby instead of Node.js 10s
 export const maxDuration = 60; // Extra time for Gemini 2.5 Pro to complete the full week JSON
 
 const planWeekInputSchema = z.object({
@@ -100,233 +99,249 @@ export async function POST(request: NextRequest) {
             lock_key: lockKey,
             user_id: userId,
             locked_at: new Date().toISOString(),
-            expires_at: new Date(Date.now() + 35000).toISOString() // 35 seconds to avoid permanent lock if edge times out
+            expires_at: new Date(Date.now() + 60000).toISOString() // Background lock limits
         });
         lockAcquired = true;
 
+        // --- BACKGROUND GENERATION ---
+        // Vercel Hobby kills await calls longer than 10 seconds.
+        // We dispatch the heavy 25-sec Gemini prompt into background and return 202 immediately.
         const model = getGeminiModel({ systemInstruction: AGENDA_PLANNER_SYSTEM_PROMPT });
 
-        // Determine which days to plan (default: all 7)
+        // Determine which days to plan
         const daysOfWeek = input.days_to_plan || [0, 1, 2, 3, 4, 5, 6];
         const datesToPlan = daysOfWeek.map(dow => {
             const startDow = getDayOfWeek(input.start_date);
             const diff = dow - startDow;
             let targetDate = addDaysToDate(input.start_date, diff);
-            // If the calculated date is before start_date, it's for next week
             if (new Date(targetDate) < new Date(input.start_date)) {
                 targetDate = addDaysToDate(targetDate, 7);
             }
             return targetDate;
         });
 
-        // Load user data
-        const [fixedRes, profileRes, healthRes, routineRes] = await Promise.all([
-            supabase.from('fixed_blocks').select('*').eq('user_id', userId).eq('is_active', true).in('day_of_week', daysOfWeek),
-            supabase.from('profiles').select('*').eq('id', userId).single(),
-            supabase.from('health_profile').select('*').eq('user_id', userId).single(),
-            supabase.from('routine_profiles').select('*').eq('user_id', userId).single(),
-        ]);
+        const backgroundProcess = async () => {
+            try {
+                // Load user data inside background to not slow the initial 202
+                const [fixedRes, profileRes, healthRes, routineRes] = await Promise.all([
+                    supabase.from('fixed_blocks').select('*').eq('user_id', userId).eq('is_active', true).in('day_of_week', daysOfWeek),
+                    supabase.from('profiles').select('*').eq('id', userId).single(),
+                    supabase.from('health_profile').select('*').eq('user_id', userId).single(),
+                    supabase.from('routine_profiles').select('*').eq('user_id', userId).single(),
+                ]);
 
-        const allFixedBlocks = fixedRes.data || [];
-        const profile = profileRes.data;
-        const healthProfile = healthRes.data;
-        const routineProfile = routineRes.data;
+                const allFixedBlocks = fixedRes.data || [];
+                const profile = profileRes.data;
+                const healthProfile = healthRes.data;
+                const routineProfile = routineRes.data;
 
-        // Load existing blocks for the week
-        const weekStart = datesToPlan[0];
-        const weekEnd = datesToPlan[datesToPlan.length - 1];
-        const { data: existingBlocks } = await supabase
-            .from('daily_blocks')
-            .select('*')
-            .eq('user_id', userId)
-            .gte('start_datetime', `${weekStart}T00:00:00`)
-            .lte('start_datetime', `${weekEnd}T23:59:59`);
+                const weekStart = datesToPlan[0];
+                const weekEnd = datesToPlan[datesToPlan.length - 1];
+                const { data: existingBlocks } = await supabase
+                    .from('daily_blocks')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .gte('start_datetime', `${weekStart}T00:00:00`)
+                    .lte('start_datetime', `${weekEnd}T23:59:59`);
 
-        // Build context for AI
-        const fixedBlocksByDay: Record<number, any[]> = {};
-        allFixedBlocks.forEach(fb => {
-            if (!fixedBlocksByDay[fb.day_of_week]) fixedBlocksByDay[fb.day_of_week] = [];
-            fixedBlocksByDay[fb.day_of_week].push(fb);
-        });
-
-        const daysContext = datesToPlan.map(date => {
-            const dow = getDayOfWeek(date);
-            const dayFixed = fixedBlocksByDay[dow] || [];
-            const dayExisting = (existingBlocks || []).filter(b => b.start_datetime?.startsWith(date));
-
-            return {
-                date,
-                dayOfWeek: dow,
-                dayName: ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][dow],
-                fixedBlocks: dayFixed.map(fb => `${fb.title} (${fb.start_time}-${fb.end_time})`),
-                hasExistingPlan: dayExisting.length > 0,
-            };
-        });
-
-        let feedbackContext = "";
-        if (input.action === 'replan_with_feedback') {
-            feedbackContext = "\nATENÇÃO AOS FEEDBACKS DO USUÁRIO:\nO usuário acabou de revisar sua agenda anterior e solicitou as seguintes correções. Você DEVE modificar o planejamento da nova semana para respeitar essas instruções:\n";
-            if (input.feedbacks && input.feedbacks.length > 0) {
-                input.feedbacks.forEach((fb: any) => {
-                    if (fb.type === 'bad_time') feedbackContext += `- Tarefa "${fb.title}" (Originalmente às ${fb.originalTime}): HORÁRIO RUIM. Agende para outro momento totalmente diferente do dia.\n`;
-                    if (fb.type === 'unrealistic') feedbackContext += `- Tarefa "${fb.title}": TEMPO IRREAL. Aloque muito mais tempo para isso ou quebre em tarefas menores ao longo da semana.\n`;
-                    if (fb.type === 'dislike') feedbackContext += `- Tarefa "${fb.title}": O usuário NÃO GOSTOU. Remova ou substitua, não repita esse bloco.\n`;
+                // Build context for AI
+                const fixedBlocksByDay: Record<number, any[]> = {};
+                allFixedBlocks.forEach(fb => {
+                    if (!fixedBlocksByDay[fb.day_of_week]) fixedBlocksByDay[fb.day_of_week] = [];
+                    fixedBlocksByDay[fb.day_of_week].push(fb);
                 });
-            }
-            if (input.user_feedback) {
-                feedbackContext += `\nMENSAGEM DIRETA DO USUÁRIO O QUE CORRIGIR:\n"${input.user_feedback}"\n`;
-            }
-            feedbackContext += "\n";
-        }
 
-        const daysContextStr = daysContext.map(d => `${d.dayName} (${d.date}): Fixos: ${d.fixedBlocks.join(', ') || 'nenhum'} ${d.hasExistingPlan ? '(Complementar)' : '(Completo)'}`).join('\n');
+                const daysContext = datesToPlan.map(date => {
+                    const dow = getDayOfWeek(date);
+                    const dayFixed = fixedBlocksByDay[dow] || [];
+                    const dayExisting = (existingBlocks || []).filter(b => b.start_datetime?.startsWith(date));
 
-        const promptParams = {
-            userProfile: profile,
-            routineProfile: routineProfile,
-            healthProfile: healthProfile
-        };
+                    return {
+                        date,
+                        dayOfWeek: dow,
+                        dayName: ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][dow],
+                        fixedBlocks: dayFixed.map(fb => `${fb.title} (${fb.start_time}-${fb.end_time})`),
+                        hasExistingPlan: dayExisting.length > 0,
+                    };
+                });
 
-        const finalPrompt = weekPrompt(promptParams, allFixedBlocks, '', feedbackContext, daysContextStr);
-
-        const result = await model.generateContent({
-            contents: [
-                { role: 'user', parts: [{ text: finalPrompt }] },
-            ],
-        });
-
-        const responseText = result.response.text().replace(/```json\n?|```/g, '').trim();
-        const weekPlan = aiWeekResponseSchema.parse(JSON.parse(responseText));
-
-        let totalBlocksCreated = 0;
-        const solverWarnings: string[] = [];
-        let nextDayOverflows: BlockInput[] = [];
-
-        for (const day of weekPlan.days) {
-            const dayOfWeek = getDayOfWeek(day.date);
-            const { data: plan } = await supabase.from('daily_plan').upsert({
-                user_id: userId!, plan_date: day.date, timezone: input.timezone, status: 'active', updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id, plan_date' }).select().single();
-
-            if (!plan) continue;
-
-            const dayFixed = fixedBlocksByDay[dayOfWeek] || [];
-            const fixedSolverBlocks: SolverBlock[] = dayFixed.map(fb => ({
-                id: `fixed-${fb.id}`, title: fb.title, category: fb.category || 'fixed',
-                startMin: timeToMinutes(fb.start_time), endMin: timeToMinutes(fb.end_time),
-                source: 'fixed', priority: 100, locked: true
-            }));
-
-            const rawDayInputs: BlockInput[] = [...nextDayOverflows];
-            day.blocks.forEach(b => {
-                const start = `${day.date}T${b.start_time}:00`;
-                const end = `${day.date}T${b.end_time}:00`;
-                rawDayInputs.push({
-                    title: b.title,
-                    category: b.category as any,
-                    start_datetime: start,
-                    end_datetime: end,
-                    source: 'ai',
-                    meta: {
-                        energyLevel: b.energyLevel,
-                        suggestedReason: b.suggested_reason,
-                        intent_id: runId,
-                        original_start: start,
-                        original_end: end
+                let feedbackContext = "";
+                if (input.action === 'replan_with_feedback') {
+                    feedbackContext = "\nATENÇÃO AOS FEEDBACKS DO USUÁRIO:\nO usuário acabou de revisar sua agenda anterior e solicitou as seguintes correções. Você DEVE modificar o planejamento da nova semana para respeitar essas instruções:\n";
+                    if (input.feedbacks && input.feedbacks.length > 0) {
+                        input.feedbacks.forEach((fb: any) => {
+                            if (fb.type === 'bad_time') feedbackContext += `- Tarefa "${fb.title}" (Originalmente às ${fb.originalTime}): HORÁRIO RUIM. Agende para outro momento totalmente diferente do dia.\n`;
+                            if (fb.type === 'unrealistic') feedbackContext += `- Tarefa "${fb.title}": TEMPO IRREAL. Aloque muito mais tempo para isso ou quebre em tarefas menores ao longo da semana.\n`;
+                            if (fb.type === 'dislike') feedbackContext += `- Tarefa "${fb.title}": O usuário NÃO GOSTOU. Remova ou substitua, não repita esse bloco.\n`;
+                        });
                     }
+                    if (input.user_feedback) {
+                        feedbackContext += `\nMENSAGEM DIRETA DO USUÁRIO O QUE CORRIGIR:\n"${input.user_feedback}"\n`;
+                    }
+                    feedbackContext += "\n";
+                }
+
+                const daysContextStr = daysContext.map(d => `${d.dayName} (${d.date}): Fixos: ${d.fixedBlocks.join(', ') || 'nenhum'} ${d.hasExistingPlan ? '(Complementar)' : '(Completo)'}`).join('\n');
+
+                const promptParams = {
+                    userProfile: profile,
+                    routineProfile: routineProfile,
+                    healthProfile: healthProfile
+                };
+
+                const finalPrompt = weekPrompt(promptParams, allFixedBlocks, '', feedbackContext, daysContextStr);
+
+                const result = await model.generateContent({
+                    contents: [
+                        { role: 'user', parts: [{ text: finalPrompt }] },
+                    ],
                 });
-            });
 
-            const split = splitOvernightBlocks(rawDayInputs, day.date);
-            nextDayOverflows = split.nextDay;
+                const responseText = result.response.text().replace(/```json\n?|```/g, '').trim();
+                const weekPlan = aiWeekResponseSchema.parse(JSON.parse(responseText));
 
-            const aiSolverBlocks: SolverBlock[] = split.today.map((b, idx) => {
-                let sMin = extractTimeMinutes(b.start_datetime);
-                let eMin = extractTimeMinutes(b.end_datetime);
-                if (b.category === 'meal') {
-                    const check = validateMealWindow(b.title, sMin);
-                    if (check.window && !check.valid) {
-                        sMin = check.nearestSlot;
-                        eMin = sMin + (extractTimeMinutes(b.end_datetime) - extractTimeMinutes(b.start_datetime));
-                        solverWarnings.push(`${day.date}: ${b.title} movido para janela.`);
+                let totalBlocksCreated = 0;
+                const solverWarnings: string[] = [];
+                let nextDayOverflows: BlockInput[] = [];
+
+                for (const day of weekPlan.days) {
+                    const dayOfWeek = getDayOfWeek(day.date);
+                    const { data: plan } = await supabase.from('daily_plan').upsert({
+                        user_id: userId!, plan_date: day.date, timezone: input.timezone, status: 'active', updated_at: new Date().toISOString()
+                    }, { onConflict: 'user_id, plan_date' }).select().single();
+
+                    if (!plan) continue;
+
+                    const dayFixed = fixedBlocksByDay[dayOfWeek] || [];
+                    const fixedSolverBlocks: SolverBlock[] = dayFixed.map(fb => ({
+                        id: `fixed-${fb.id}`, title: fb.title, category: fb.category || 'fixed',
+                        startMin: timeToMinutes(fb.start_time), endMin: timeToMinutes(fb.end_time),
+                        source: 'fixed', priority: 100, locked: true
+                    }));
+
+                    const rawDayInputs: BlockInput[] = [...nextDayOverflows];
+                    day.blocks.forEach(b => {
+                        const start = `${day.date}T${b.start_time}:00`;
+                        const end = `${day.date}T${b.end_time}:00`;
+                        rawDayInputs.push({
+                            title: b.title,
+                            category: b.category as any,
+                            start_datetime: start,
+                            end_datetime: end,
+                            source: 'ai',
+                            meta: {
+                                energyLevel: b.energyLevel,
+                                suggestedReason: b.suggested_reason,
+                                intent_id: runId,
+                                original_start: start,
+                                original_end: end
+                            }
+                        });
+                    });
+
+                    const split = splitOvernightBlocks(rawDayInputs, day.date);
+                    nextDayOverflows = split.nextDay;
+
+                    const aiSolverBlocks: SolverBlock[] = split.today.map((b, idx) => {
+                        let sMin = extractTimeMinutes(b.start_datetime);
+                        let eMin = extractTimeMinutes(b.end_datetime);
+                        if (b.category === 'meal') {
+                            const check = validateMealWindow(b.title, sMin);
+                            if (check.window && !check.valid) {
+                                sMin = check.nearestSlot;
+                                eMin = sMin + (extractTimeMinutes(b.end_datetime) - extractTimeMinutes(b.start_datetime));
+                                solverWarnings.push(`${day.date}: ${b.title} movido para janela.`);
+                            }
+                        }
+                        return { id: `ai-${idx}`, title: b.title, category: b.category, startMin: sMin, endMin: eMin, source: 'ai', priority: b.category === 'meal' ? 70 : 50, canShorten: true, minDuration: 15, meta: b.meta };
+                    });
+
+                    const solverResult = solveTimeline([...fixedSolverBlocks, ...aiSolverBlocks]);
+                    const finalInputs: BlockInput[] = solverResult.resolved
+                        .filter(sb => sb.category === 'sleep' || (sb.startMin < 23 * 60 && sb.endMin > 5 * 60))
+                        .map((sb, idx) => ({
+                            ...solverBlockToTimeFields(sb, day.date, input.timezone),
+                            title: sb.title,
+                            category: sb.category as any,
+                            source: sb.source as any,
+                            order_index: idx,
+                            is_fixed: sb.source === 'fixed',
+                            locked: sb.locked || sb.source === 'fixed',
+                            meta: sb.source === 'fixed'
+                                ? { ...(sb.meta || {}), fixed_block_id: sb.id.startsWith('fixed-') ? sb.id.replace('fixed-', '') : sb.id }
+                                : sb.meta
+                        }));
+
+                    const persistResult = await persistDailyBlocks(supabase, plan.id, userId!, day.date, finalInputs, {
+                        deleteStale: true,
+                        staleSources: ['ai', 'fixed']
+                    });
+                    totalBlocksCreated += persistResult.inserted + persistResult.updated;
+                }
+
+                // We don't return NextResponse inside background process.
+                // It just finishes execution and saves to DB.
+                console.log(`[plan-week] [${runId}] Background generation COMPLETED:`, {
+                    daysPlanned: weekPlan.days.length,
+                    totalBlocks: totalBlocksCreated,
+                    warnings: solverWarnings,
+                });
+
+            } catch (error: any) {
+                console.error(`[plan-week] [${runId}] Error in background process:`, error);
+            } finally {
+                if (lockAcquired && userId) {
+                    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+                    try {
+                        await supabase.from('processing_locks').delete().eq('lock_key', `plan-week:${userId}`);
+                        console.log(`[plan-week] [${runId}] Lock removed successfully.`);
+                    } catch (e) {
+                        console.error(`[plan-week] [${runId}] Failed to remove lock:`, e);
                     }
                 }
-                return { id: `ai-${idx}`, title: b.title, category: b.category, startMin: sMin, endMin: eMin, source: 'ai', priority: b.category === 'meal' ? 70 : 50, canShorten: true, minDuration: 15, meta: b.meta };
-            });
+            }
+        };
 
-            const solverResult = solveTimeline([...fixedSolverBlocks, ...aiSolverBlocks]);
-            const finalInputs: BlockInput[] = solverResult.resolved
-                .filter(sb => sb.category === 'sleep' || (sb.startMin < 23 * 60 && sb.endMin > 5 * 60))
-                .map((sb, idx) => ({
-                    ...solverBlockToTimeFields(sb, day.date, input.timezone),
-                    title: sb.title,
-                    category: sb.category as any,
-                    source: sb.source as any,
-                    order_index: idx,
-                    is_fixed: sb.source === 'fixed',
-                    locked: sb.locked || sb.source === 'fixed',
-                    meta: sb.source === 'fixed'
-                        ? { ...(sb.meta || {}), fixed_block_id: sb.id.startsWith('fixed-') ? sb.id.replace('fixed-', '') : sb.id }
-                        : sb.meta
-                }));
+        // 3. Fire-and-forget background execution
+        backgroundProcess();
 
-            const persistResult = await persistDailyBlocks(supabase, plan.id, userId!, day.date, finalInputs, {
-                deleteStale: true,
-                staleSources: ['ai', 'fixed']
-            });
-            totalBlocksCreated += persistResult.inserted + persistResult.updated;
-        }
-
+        // 4. Return immediately to avoid Vercel 10s timeout
         return NextResponse.json({
-            status: 'success',
-            weekSummary: weekPlan.weekSummary,
-            weekInsight: weekPlan.weekInsight,
-            daysPlanned: weekPlan.days.length,
-            totalBlocks: totalBlocksCreated,
-            warnings: solverWarnings,
-        }, { headers: { 'X-Run-Id': runId } });
+            success: true,
+            status: 'processing',
+            message: 'A geração da semana foi iniciada nos bastidores (Background Job).',
+            runId
+        }, { status: 202 });
 
-    } catch (error: any) {
-        console.error(`[plan-week] [${runId}] Error:`, error);
-        if (error instanceof z.ZodError) {
-            return NextResponse.json({ error: 'Dados de entrada inválidos.', details: error.issues }, { status: 400, headers: { 'X-Run-Id': runId } });
+        // Helper to extract minutes from ISO datetime or HH:MM
+        function extractTimeMinutes(dtOrTime: string): number {
+            if (dtOrTime.includes('T')) {
+                // ISO string
+                const match = dtOrTime.match(/T(\d{2}):(\d{2})/);
+                if (match) return parseInt(match[1]) * 60 + parseInt(match[2]);
+                return 0;
+            }
+            // HH:MM
+            const [h, m] = dtOrTime.split(':').map(Number);
+            return (h || 0) * 60 + (m || 0);
         }
-        return NextResponse.json(
-            {
-                error: error instanceof Error ? error.message : 'Erro crítico ao planejar semana.',
-                stack: error instanceof Error ? error.stack : undefined,
-                details: String(error)
-            },
-            { status: 500, headers: { 'X-Run-Id': runId } }
-        );
-    } finally {
+
+        function timeToMinutes(time: string): number {
+            const [h, m] = time.split(':').map(Number);
+            return (h || 0) * 60 + (m || 0);
+        }
+
+        function minutesToTimeStr(min: number): string {
+            const h = Math.floor(min / 60);
+            const m = min % 60;
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        }
+    } catch (e: any) {
+        console.error(`[plan-week] [${runId}] Initialization Error:`, e);
         if (lockAcquired && userId) {
             const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
             await supabase.from('processing_locks').delete().eq('lock_key', `plan-week:${userId}`);
         }
+        return NextResponse.json({ error: 'Erro ao despachar o background job.' }, { status: 500 });
     }
-}
-
-// Helper to extract minutes from ISO datetime or HH:MM
-function extractTimeMinutes(dtOrTime: string): number {
-    if (dtOrTime.includes('T')) {
-        // ISO string
-        const match = dtOrTime.match(/T(\d{2}):(\d{2})/);
-        if (match) return parseInt(match[1]) * 60 + parseInt(match[2]);
-        return 0;
-    }
-    // HH:MM
-    const [h, m] = dtOrTime.split(':').map(Number);
-    return (h || 0) * 60 + (m || 0);
-}
-
-function timeToMinutes(time: string): number {
-    const [h, m] = time.split(':').map(Number);
-    return (h || 0) * 60 + (m || 0);
-}
-
-function minutesToTimeStr(min: number): string {
-    const h = Math.floor(min / 60);
-    const m = min % 60;
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
