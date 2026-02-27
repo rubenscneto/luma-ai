@@ -10,6 +10,7 @@ import { persistDailyBlocks, BlockInput } from '@/lib/persistDailyBlocks';
 import { splitOvernightBlocks } from '@/lib/overnightSplit';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'edge'; // Edge function gives up to 30s on Hobby instead of Node.js 10s
 export const maxDuration = 60; // Extra time for Gemini 2.5 Pro to complete the full week JSON
 
 const planWeekInputSchema = z.object({
@@ -99,7 +100,7 @@ export async function POST(request: NextRequest) {
             lock_key: lockKey,
             user_id: userId,
             locked_at: new Date().toISOString(),
-            expires_at: new Date(Date.now() + 120000).toISOString()
+            expires_at: new Date(Date.now() + 35000).toISOString() // 35 seconds to avoid permanent lock if edge times out
         });
         lockAcquired = true;
 

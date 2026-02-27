@@ -12,10 +12,10 @@ export function getGeminiModel(config?: { temperature?: number, systemInstructio
 
     const genAI = new GoogleGenerativeAI(apiKey);
 
-    // Explicitly use gemini-2.5-pro for best reasoning unless env overrides
-    const modelName = process.env.GEMINI_MODEL ?? GEMINI_MODELS.PRO_2_5;
+    // Forcing gemini-2.5-pro as specifically requested by the user
+    const modelName = GEMINI_MODELS.PRO_2_5;
 
-    console.log("Usando modelo Gemini:", modelName);
+    console.log("Usando modelo Gemini EXCLUSIVAMENTE:", modelName);
 
     return genAI.getGenerativeModel({
         model: modelName,
