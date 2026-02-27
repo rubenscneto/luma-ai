@@ -151,31 +151,9 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
         setProfileState(newProfile);
         localStorage.setItem('luma_profile', JSON.stringify(newProfile));
 
-        if (user) {
-            try {
-                // Update specific profile fields
-                const { error } = await supabase
-                    .from('profiles')
-                    .update({
-                        occupations: newProfile.occupations,
-                        occupation: newProfile.occupations?.[0] || '', // Fallback for legacy
-                        objectives: newProfile.objectives,
-                        hobbies: newProfile.hobbies,
-                        peak_productivity: newProfile.peakProductivity,
-                        energy_level: newProfile.energyLevel,
-                        style: newProfile.style,
-                        description: newProfile.description,
-                        study_focus: newProfile.studyFocus,
-                        wake_up_time: newProfile.userSettings?.wake_up_time,
-                        bed_time: newProfile.userSettings?.bed_time
-                    })
-                    .eq('id', user.id);
-
-                if (error) console.error("Failed to sync profile:", error);
-            } catch (e) {
-                console.error(e);
-            }
-        }
+        // Profiles table sync is omitted here because the "save-profile" API
+        // correctly upserts to "routine_profiles", and "profiles" does not have
+        // columns like occupations, energy_level, etc.
     };
 
     const setMotivation = (data: { text: string; author: string }) => {
