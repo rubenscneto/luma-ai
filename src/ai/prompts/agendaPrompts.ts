@@ -373,27 +373,34 @@ DADOS DO USUÁRIO (use como verdade absoluta):
 - Rotina Fixa: ${JSON.stringify(fixedBlocks)}
 ${feedbackContext}
 
-EXEMPLO FEW-SHOT BASEADO NO PERFIL GERAL (copie a estrutura e a fidelidade estrita às regras inquebráveis acima):
+CHAIN-OF-THOUGHT EXIGIDO (faça internamente antes de gerar):
+1. **Parse verbal para blocos**: Extraia toda a intenção da descrição do usuário (ex: pausas frequentes, estudo Python à tarde).
+2. **Integre fixos**: Posicione os inegociáveis. Se houver leve colisão com o verbal, ajuste em volta (ex: atrase o estudo se o fixo demorar).
+3. **Preencha lacunas**: Use a energia e horários disponíveis para alocar trabalho, lazer, leitura, reflexão noturna (8 a 12 blocos extras).
+4. **Adicione buffers/derived**: Insira 10-15min de pausa pós-refeição, deslocamentos coerentes.
+5. **Ajuste final**: Garanta que o dia soe realista, fluido e humano (O solver no backend fará os cortes finais, sua função é não rejeitar as ideias do usuário).
+
+EXEMPLO FEW-SHOT BASEADO NO PERFIL DO USUÁRIO (copie a estrutura e fidelidade):
 Dia típico:
 05:30-06:45 Preparação inicial + Café da Manhã
 06:45-07:10 Deslocamento de ida (buffer)
-07:30-11:30 Trabalho Fixo (Seg/Ter/Qui/Sex) ou CIEE (Qua)
-11:30-12:00 Almoço prep
+07:30-11:30 Trabalho (Seg/Ter/Qui/Sex) ou CIEE (Qua)
+11:30-12:00 Almoço prep / Pausa
 12:00-13:00 Almoço
-13:00-14:00 Projetos / Afazeres
-14:00-15:00 Buffer
-15:00-16:00 Academia (caso seja dia de treino)
+13:00-14:00 Estudo / Projetos (1h)
+14:00-15:00 Buffer / Deslocamento
+15:00-16:00 Academia
 16:00-16:30 Volta para casa
-16:30-18:30 Tempo Livre
-22:00-22:30 Preparação para o sono
+16:30-18:30 Estudo pré-faculdade / Lazer
+22:00-22:30 Preparação para o sono / Reflexão noturna
 22:30 Dormir
 
-TAREFA: Gere o planejamento semanal, preenchendo as lacunas mas sem inventar atividades que não foram explicitamente mencionadas na "Descrição verbal completa". É melhor deixar buracos livres do que inventar se a descrição não diz.
+TAREFA: Gere o planejamento semanal, preenchendo as lacunas e respeitando totalmente o relato verbal do usuário.
 
 Dias para planejar e seus contextos:
 ${daysContextStr}
 
-Responda EXCLUSIVAMENTE em JSON no seguinte formato, e NÃO ESCREVA EXPLICAÇÕES texto fora do JSON.
+Responda EXCLUSIVAMENTE em JSON no seguinte formato:
 {
   "days": [{ "date": "YYYY-MM-DD", "blocks": [{ "title": "...", "category": "work|study|health|leisure|admin|sleep|meal|commute|fixed", "start_time": "HH:MM", "end_time": "HH:MM", "suggested_reason": "Justificativa explícita onde extraiu a informacao" }], "summary": "Resumo leve" }],
   "weekSummary": "Resumo geral da semana", "weekInsight": "Insight pertinente"

@@ -194,8 +194,25 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
     const fetchWeekBlocks = useCallback(async (startDate: string) => {
         if (!user) return;
 
-        // Don't set global isLoading to avoid blocking the whole UI, use local state in component or just let it load
-        // But we can set a flag if needed. For now, let's just fetch.
+        // Custom fetch wrapper to handle retries and log 406 errors explicitly
+        const fetchSupabaseWithRetry = async <T,>(queryFn: () => any, stepName: string, retries = 3, delayMs = 2000): Promise<{ data: T[] | null }> => {
+            for (let i = 1; i <= retries; i++) {
+                const res = await queryFn();
+                if (res.error) {
+                    console.error(`[fetchWeekBlocks] ${stepName} Timeout/Error, tentativa ${i}/${retries}:`, {
+                        code: res.error.code,
+                        message: res.error.message,
+                        details: res.error.details
+                    });
+                    if (i === retries) throw res.error;
+                    await new Promise(r => setTimeout(r, delayMs));
+                    continue;
+                }
+                return res as any;
+            }
+            throw new Error(`Failed to fetch ${stepName}`);
+        };
+
         try {
             // Calculate 7 days range
             const start = new Date(startDate);
@@ -205,33 +222,32 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
                 return d.toISOString().split('T')[0];
             });
 
-            // 1. Fetch Plans for these dates
-            const { data: plans } = await supabase
-                .from('daily_plan')
-                .select('id, plan_date')
-                .eq('user_id', user.id)
-                .in('plan_date', dates);
+            // 1. Fetch Plans for these dates (with retries and headers context if possible via PostgREST)
+            const plansRes = await fetchSupabaseWithRetry(
+                () => supabase.from('daily_plan').select('id, plan_date').eq('user_id', user.id).in('plan_date', dates),
+                'Fetch Plans', 3, 2000
+            );
+            const plans = plansRes.data || [];
 
-            const planMap = new Map((plans || []).map(p => [p.plan_date, p.id]));
-            const planIds = (plans || []).map(p => p.id);
+            const planMap = new Map((plans || []).map((p: any) => [p.plan_date, p.id]));
+            const planIds = (plans || []).map((p: any) => p.id);
 
             // 2. Fetch Blocks for these plans
             let dbBlocks: DailyBlock[] = [];
             if (planIds.length > 0) {
-                const { data: blocks } = await supabase
-                    .from('daily_blocks')
-                    .select('*')
-                    .in('plan_id', planIds)
-                    .order('start_datetime', { ascending: true });
-                dbBlocks = blocks || [];
+                const blocksRes = await fetchSupabaseWithRetry(
+                    () => supabase.from('daily_blocks').select('*').in('plan_id', planIds).order('start_datetime', { ascending: true }),
+                    'Fetch Blocks', 3, 2000
+                );
+                dbBlocks = (blocksRes.data as DailyBlock[]) || [];
             }
 
             // 3. Fetch Fixed Blocks (all active)
-            const { data: fixed } = await supabase
-                .from('fixed_blocks')
-                .select('*')
-                .eq('user_id', user.id)
-                .eq('is_active', true);
+            const fixedRes = await fetchSupabaseWithRetry(
+                () => supabase.from('fixed_blocks').select('*').eq('user_id', user.id).eq('is_active', true),
+                'Fetch Fixed', 3, 2000
+            );
+            const fixed = fixedRes.data || [];
 
             const activeFixed = fixed || [];
             const newWeekBlocks: Record<string, DailyBlock[]> = {};
@@ -240,10 +256,10 @@ export function DailyPlanProvider({ children }: { children: React.ReactNode }) {
             dates.forEach(dateStr => {
                 const planId = planMap.get(dateStr);
                 const dayOfWeek = new Date(dateStr + 'T12:00:00').getDay();
-                const daysFixed = activeFixed.filter(f => f.day_of_week === dayOfWeek);
+                const daysFixed = activeFixed.filter((f: any) => f.day_of_week === dayOfWeek);
 
                 // Convert fixed blocks to DailyBlock format
-                const fixedAsDailyBlocks: DailyBlock[] = daysFixed.map(f => ({
+                const fixedAsDailyBlocks: DailyBlock[] = daysFixed.map((f: any) => ({
                     id: `fixed-${f.id}-${dateStr}`,
                     user_id: user.id,
                     plan_id: planId || 'preview',

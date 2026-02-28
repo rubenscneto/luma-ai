@@ -191,14 +191,64 @@ export async function POST(request: NextRequest) {
 
                 const finalPrompt = weekPrompt(promptParams, allFixedBlocks, '', feedbackContext, daysContextStr);
 
-                const result = await model.generateContent({
-                    contents: [
-                        { role: 'user', parts: [{ text: finalPrompt }] },
-                    ],
-                });
+                const sendStatus = async (msg: string) => {
+                    console.log(`[plan-week] [${runId}] STATUS: ${msg}`);
+                    const channel = supabase.channel(`agenda-update:${userId}`);
+                    channel.subscribe(async (status) => {
+                        if (status === 'SUBSCRIBED') {
+                            await channel.send({ type: 'broadcast', event: 'status', payload: { message: msg } });
+                            supabase.removeChannel(channel);
+                        }
+                    });
+                };
 
-                const responseText = result.response.text().replace(/```json\n?|```/g, '').trim();
-                const weekPlan = aiWeekResponseSchema.parse(JSON.parse(responseText));
+                await sendStatus("Iniciando gerador de inteligência...");
+                let responseText = "";
+                let fallbackUsed = false;
+
+                try {
+                    const geminiPromise = model.generateContent({
+                        contents: [{ role: 'user', parts: [{ text: finalPrompt }] }],
+                    });
+                    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('GEMINI_TIMEOUT')), 25000));
+
+                    const result = await Promise.race([geminiPromise, timeoutPromise]) as any;
+                    responseText = result.response.text().replace(/```json\n?|```/g, '').trim();
+                    await sendStatus("Resposta da IA recebida. Validando regras do calendário...");
+                    console.log(`[plan-week] [${runId}] STEP 3: Zod Parse => \n${responseText.substring(0, 100)}...`);
+                } catch (error: any) {
+                    console.error(`[plan-week] [${runId}] Erro/Timeout Gemini:`, error.message);
+                    fallbackUsed = true;
+                    await sendStatus("Conexão com a IA muito lenta. Gerando um plano básico offline...");
+                }
+
+                let weekPlan;
+                if (fallbackUsed) {
+                    weekPlan = {
+                        days: datesToPlan.map(date => ({
+                            date,
+                            summary: "Gerado por fallback automático devido a atraso na rede.",
+                            blocks: [
+                                { title: "Preparação Matinal", category: "meal", start_time: "06:00", end_time: "07:00", suggested_reason: "Rotina básica automática" },
+                                ...((fixedBlocksByDay[getDayOfWeek(date)] || []).map((fb: any) => ({
+                                    title: fb.title, category: fb.category || 'fixed', start_time: fb.start_time, end_time: fb.end_time, suggested_reason: "Fixo inegociável"
+                                }))),
+                                { title: "Expediente / Estudo", category: "work", start_time: "13:00", end_time: "18:00", suggested_reason: "Bloco geral automático" },
+                                { title: "Descanso / Preparação Sono", category: "sleep", start_time: "21:30", end_time: "22:30", suggested_reason: "Higiene do sono padrão" }
+                            ]
+                        })),
+                        weekSummary: "Plano simplificado montado automaticamente.",
+                        weekInsight: "Tivemos um problema de conexão, então preenchemos o básico pra preencher sua semana."
+                    };
+                } else {
+                    try {
+                        weekPlan = aiWeekResponseSchema.parse(JSON.parse(responseText));
+                        await sendStatus("Resolvendo conflitos de horário com blocos fixos...");
+                    } catch (e) {
+                        console.error(`[plan-week] [${runId}] Zod fallback fail.`, e);
+                        weekPlan = { days: datesToPlan.map(date => ({ date, summary: "Erro no formato JSON.", blocks: [] })), weekSummary: "X", weekInsight: "X" };
+                    }
+                }
 
                 let totalBlocksCreated = 0;
                 const solverWarnings: string[] = [];
@@ -230,8 +280,8 @@ export async function POST(request: NextRequest) {
                             end_datetime: end,
                             source: 'ai',
                             meta: {
-                                energyLevel: b.energyLevel,
-                                suggestedReason: b.suggested_reason,
+                                energyLevel: (b as any).energyLevel,
+                                suggestedReason: (b as any).suggested_reason,
                                 intent_id: runId,
                                 original_start: start,
                                 original_end: end
@@ -278,6 +328,8 @@ export async function POST(request: NextRequest) {
                     });
                     totalBlocksCreated += persistResult.inserted + persistResult.updated;
                 }
+
+                await sendStatus("Planejamento concluído com sucesso!");
 
                 // We don't return NextResponse inside background process.
                 // It just finishes execution and saves to DB.
