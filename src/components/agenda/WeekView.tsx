@@ -14,6 +14,8 @@ import { useAgenda } from '@/context/agendaContext';
 import { DailyBlock } from '@/types';
 import { toast } from 'sonner';
 import { BlockEditorModal } from './BlockEditorModal';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useRouter } from 'next/navigation';
 
 const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const HOURS = Array.from({ length: 16 }, (_, i) => i + 6); // 6:00 to 21:00
@@ -60,6 +62,8 @@ function formatDateKey(date: Date): string {
 // }
 
 export default function WeekView() {
+    const supabase = createClientComponentClient();
+    const router = useRouter();
     const {
         todayBlocks,
         generatePlan,
@@ -109,32 +113,62 @@ export default function WeekView() {
     }, [currentWeekStart, fetchWeekBlocks]);
 
     React.useEffect(() => {
-        const allBlocks = Object.values(weekBlocks).flat();
-        const hasAIBlocks = allBlocks.some((b: any) => !b.is_fixed);
+        if (!user) return;
 
-        if (hasAIBlocks) {
-            setIsPolling(false);
-            pollingStartTimeRef.current = null;
-            return;
-        }
+        // Channel name definition (matches backend expected pattern agenda-update:{userId})
+        const channelName = `agenda-update:${user.id}`;
 
-        if (!pollingStartTimeRef.current) {
-            pollingStartTimeRef.current = Date.now();
-            setIsPolling(true);
-        }
+        const channel = supabase.channel(channelName)
+            .on('broadcast', { event: 'status' }, (payload) => {
+                const data = payload.payload;
 
+                if (data.status === 'processing') {
+                    // Update UI lightly if needed
+                } else if (data.status === 'completed') {
+                    setIsPolling(false);
+                    pollingStartTimeRef.current = null;
+                    toast.success(data.message || 'Planejamento concluído com sucesso!');
+                    fetchWeekBlocks(formatDateKey(currentWeekStart));
+                    loadTodayPlan();
+
+                    // Display returned interactive toasts
+                    if (data.toasts_interactive && Array.isArray(data.toasts_interactive)) {
+                        data.toasts_interactive.slice(0, 2).forEach((t: any, idx: number) => {
+                            setTimeout(() => {
+                                toast(t.message, {
+                                    duration: 8000,
+                                    action: t.action_link ? {
+                                        label: 'Ver mais',
+                                        onClick: () => router.push(t.action_link)
+                                    } : undefined
+                                });
+                            }, idx * 1500 + 1000); // Wait 1s and stagger by 1.5s
+                        });
+                    }
+                } else if (data.status === 'error') {
+                    setIsPolling(false);
+                    pollingStartTimeRef.current = null;
+                    toast.error(data.message || 'Erro ao gerar agenda.');
+                    fetchWeekBlocks(formatDateKey(currentWeekStart));
+                }
+            })
+            .subscribe();
+
+        // Safety fallback timeout
         const interval = setInterval(() => {
-            if (Date.now() - pollingStartTimeRef.current! > 60000) {
+            if (isPolling && pollingStartTimeRef.current && Date.now() - pollingStartTimeRef.current > 60000) {
                 setIsPolling(false);
-                toast.error("Tempo esgotado aguardando a geração da semana.");
+                toast.error("Tempo esgotado aguardando o servidor. Atualize a página e verifique sua agenda.");
+                fetchWeekBlocks(formatDateKey(currentWeekStart));
                 clearInterval(interval);
-                return;
             }
-            fetchWeekBlocks(formatDateKey(currentWeekStart));
-        }, 5000);
+        }, 10000);
 
-        return () => clearInterval(interval);
-    }, [weekBlocks, currentWeekStart, fetchWeekBlocks]);
+        return () => {
+            supabase.removeChannel(channel);
+            clearInterval(interval);
+        };
+    }, [user, currentWeekStart, fetchWeekBlocks, isPolling, loadTodayPlan, router, supabase]);
 
     const handleDayClick = useCallback((date: Date) => {
         const key = formatDateKey(date);

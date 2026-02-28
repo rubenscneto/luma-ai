@@ -49,7 +49,10 @@ Retorne APENAS um JSON válido com a estrutura:
     }
   ],
   "summary": "Resumo breve do plano gerado",
-  "insight": "Observação proativa curta sobre o dia (ex: 'Dia com bastante foco — inclui uma pausa ativa às 15h')"
+  "insight": "Observação proativa curta sobre o dia (ex: 'Dia com bastante foco — inclui uma pausa ativa às 15h')",
+  "toasts_interactive": [
+    { "message": "Estudando? Adicione matérias para blocos super personalizados!", "action_link": "/estudos" }
+  ]
 }`;
 
 export const AGENDA_REPLANNER_SYSTEM_PROMPT = `${LUMA_BASE_SYSTEM_PROMPT}

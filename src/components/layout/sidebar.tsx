@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Calendar, Compass, GraduationCap, FolderKanban, Library, LogOut, BarChart3, Bot, Heart, Settings, Dumbbell } from "lucide-react";
+import { LayoutDashboard, Calendar, Compass, GraduationCap, FolderKanban, Library, LogOut, BarChart3, Bot, Heart, Settings, Dumbbell, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/authContext";
 import { motion } from "framer-motion";
@@ -17,6 +17,7 @@ const menuItems = [
     { href: "/dashboard/routine", label: "Rotina", icon: Compass },
     { href: "/analytics", label: "Analytics", icon: BarChart3 },
     { href: "/estudos", label: "Estudos", icon: GraduationCap },
+    { href: "/materiais", label: "Materiais", icon: FileText },
     { href: "/projetos", label: "Projetos", icon: FolderKanban },
     { href: "/dashboard/assistant", label: "Assistente", icon: Bot },
     { href: "/biblioteca", label: "Biblioteca", icon: Library },

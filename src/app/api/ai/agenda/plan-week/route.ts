@@ -42,6 +42,10 @@ const aiWeekResponseSchema = z.object({
     days: z.array(aiDaySchema),
     weekSummary: z.string(),
     weekInsight: z.string().optional(),
+    toasts_interactive: z.array(z.object({
+        message: z.string(),
+        action_link: z.string().optional()
+    })).optional(),
 });
 
 function getDayOfWeek(dateStr: string): number {
@@ -123,17 +127,21 @@ export async function POST(request: NextRequest) {
         const backgroundProcess = async () => {
             try {
                 // Load user data inside background to not slow the initial 202
-                const [fixedRes, profileRes, healthRes, routineRes] = await Promise.all([
+                const [fixedRes, profileRes, healthRes, routineRes, treinosRes, insightsRes] = await Promise.all([
                     supabase.from('fixed_blocks').select('*').eq('user_id', userId).eq('is_active', true).in('day_of_week', daysOfWeek),
                     supabase.from('profiles').select('*').eq('id', userId).single(),
                     supabase.from('health_profile').select('*').eq('user_id', userId).single(),
                     supabase.from('routine_profiles').select('*').eq('user_id', userId).single(),
+                    supabase.from('treinos_profile').select('*').eq('user_id', userId).single(),
+                    supabase.from('estudos_insights').select('*').eq('user_id', userId).limit(10), // Limitar context size
                 ]);
 
                 const allFixedBlocks = fixedRes.data || [];
                 const profile = profileRes.data;
                 const healthProfile = healthRes.data;
                 const routineProfile = routineRes.data;
+                const treinosProfile = treinosRes.data;
+                const estudosInsights = insightsRes.data;
 
                 const weekStart = datesToPlan[0];
                 const weekEnd = datesToPlan[datesToPlan.length - 1];
@@ -186,7 +194,9 @@ export async function POST(request: NextRequest) {
                 const promptParams = {
                     userProfile: profile,
                     routineProfile: routineProfile,
-                    healthProfile: healthProfile
+                    healthProfile: healthProfile,
+                    treinosProfile: treinosProfile,
+                    estudosInsights: estudosInsights
                 };
 
                 const finalPrompt = weekPrompt(promptParams, allFixedBlocks, '', feedbackContext, daysContextStr);
@@ -229,16 +239,14 @@ export async function POST(request: NextRequest) {
                             date,
                             summary: "Gerado por fallback automático devido a atraso na rede.",
                             blocks: [
-                                { title: "Preparação Matinal", category: "meal", start_time: "06:00", end_time: "07:00", suggested_reason: "Rotina básica automática" },
                                 ...((fixedBlocksByDay[getDayOfWeek(date)] || []).map((fb: any) => ({
                                     title: fb.title, category: fb.category || 'fixed', start_time: fb.start_time, end_time: fb.end_time, suggested_reason: "Fixo inegociável"
                                 }))),
-                                { title: "Expediente / Estudo", category: "work", start_time: "13:00", end_time: "18:00", suggested_reason: "Bloco geral automático" },
-                                { title: "Descanso / Preparação Sono", category: "sleep", start_time: "21:30", end_time: "22:30", suggested_reason: "Higiene do sono padrão" }
                             ]
                         })),
                         weekSummary: "Plano simplificado montado automaticamente.",
-                        weekInsight: "Tivemos um problema de conexão, então preenchemos o básico pra preencher sua semana."
+                        weekInsight: "Tivemos um problema de conexão, falha isolada: exibindo apenas a base fixa da sua Agenda para segurança.",
+                        toasts_interactive: []
                     };
                 } else {
                     try {
@@ -266,7 +274,8 @@ export async function POST(request: NextRequest) {
                     const fixedSolverBlocks: SolverBlock[] = dayFixed.map(fb => ({
                         id: `fixed-${fb.id}`, title: fb.title, category: fb.category || 'fixed',
                         startMin: timeToMinutes(fb.start_time), endMin: timeToMinutes(fb.end_time),
-                        source: 'fixed', priority: 100, locked: true
+                        // Priority lowered to 70 as per user constraints: let verbal AI instructions override minor overlaps
+                        source: 'fixed', priority: 70, locked: true
                     }));
 
                     const rawDayInputs: BlockInput[] = [...nextDayOverflows];
@@ -303,7 +312,7 @@ export async function POST(request: NextRequest) {
                                 solverWarnings.push(`${day.date}: ${b.title} movido para janela.`);
                             }
                         }
-                        return { id: `ai-${idx}`, title: b.title, category: b.category, startMin: sMin, endMin: eMin, source: 'ai', priority: b.category === 'meal' ? 70 : 50, canShorten: true, minDuration: 15, meta: b.meta };
+                        return { id: `ai-${idx}`, title: b.title, category: b.category, startMin: sMin, endMin: eMin, source: 'ai', priority: b.category === 'meal' ? 90 : 80, canShorten: true, minDuration: 15, meta: b.meta };
                     });
 
                     const solverResult = solveTimeline([...fixedSolverBlocks, ...aiSolverBlocks]);
