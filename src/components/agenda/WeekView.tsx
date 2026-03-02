@@ -140,7 +140,9 @@ export default function WeekView() {
                                     duration: 8000,
                                     action: t.action_link ? {
                                         label: 'Ver mais',
-                                        onClick: () => router.push(t.action_link)
+                                        onClick: () => {
+                                            if (t.action_link) router.push(t.action_link);
+                                        }
                                     } : undefined
                                 });
                             }, idx * 1500 + 1000); // Wait 1s and stagger by 1.5s
