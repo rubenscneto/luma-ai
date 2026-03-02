@@ -6,7 +6,7 @@ import {
     ChevronLeft, ChevronRight, Calendar, Wand2, Loader2,
     Briefcase, GraduationCap, Dumbbell, Utensils,
     Moon, Heart, Users, Sparkles, CheckCircle2, Plus,
-    Clock, XCircle, ThumbsDown, Pencil
+    Clock, XCircle, ThumbsDown, Pencil, Minus
 } from 'lucide-react';
 import { useDailyPlan } from '@/context/dailyPlanContext';
 import { useAuth } from '@/context/authContext';
@@ -19,6 +19,7 @@ import { useRouter } from 'next/navigation';
 
 const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const HOURS = Array.from({ length: 16 }, (_, i) => i + 6); // 6:00 to 21:00
+const TIMELINE_BASE_HEIGHT = 1152;
 
 const CATEGORY_CONFIG: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
     work: { icon: Briefcase, color: 'text-blue-400', bg: 'bg-blue-500/20 border-blue-500/30' },
@@ -83,6 +84,7 @@ export default function WeekView() {
     const [isWeekLoading, setIsWeekLoading] = useState(false);
     const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
     const [editingBlock, setEditingBlock] = useState<DailyBlock | null>(null);
+    const [timelineZoom, setTimelineZoom] = useState(1);
 
     const [isPolling, setIsPolling] = useState(false);
     const pollingStartTimeRef = useRef<number | null>(null);
@@ -132,13 +134,15 @@ export default function WeekView() {
 
                     // Display returned interactive toasts
                     if (data.toasts_interactive && Array.isArray(data.toasts_interactive)) {
-                        data.toasts_interactive.slice(0, 2).forEach((t: any, idx: number) => {
+                        data.toasts_interactive.slice(0, 2).forEach((t: { message: string; action_link?: string }, idx: number) => {
                             setTimeout(() => {
                                 toast(t.message, {
                                     duration: 8000,
                                     action: t.action_link ? {
                                         label: 'Ver mais',
-                                        onClick: () => router.push(t.action_link)
+                                        onClick: () => {
+                                            if (t.action_link) router.push(t.action_link);
+                                        }
                                     } : undefined
                                 });
                             }, idx * 1500 + 1000); // Wait 1s and stagger by 1.5s
@@ -278,6 +282,12 @@ export default function WeekView() {
         return `${start.getDate()} ${startMonth} - ${end.getDate()} ${endMonth}`;
     }, [weekDates]);
 
+    const timelineHeight = useMemo(() => `${Math.round(TIMELINE_BASE_HEIGHT * timelineZoom)}px`, [timelineZoom]);
+
+    const adjustTimelineZoom = (delta: number) => {
+        setTimelineZoom(prev => Math.min(1.35, Math.max(0.75, Number((prev + delta).toFixed(2)))));
+    };
+
     // Count blocks per day for summary
     const dayBlockCounts = useMemo(() => {
         return weekDates.reduce((acc, date) => {
@@ -290,7 +300,7 @@ export default function WeekView() {
     return (
         <div className="bg-foreground/5 dark:bg-foreground/5 rounded-2xl border border-card-border/50 dark:border-card-border/50 overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-card-border/50">
+            <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-card-border/50">
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => navigateWeek('prev')}
@@ -309,7 +319,7 @@ export default function WeekView() {
                     </button>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-2">
                     <button
                         onClick={handleReplanClick}
                         disabled={isWeekLoading || isPolling}
@@ -338,6 +348,24 @@ export default function WeekView() {
                         <Calendar className="w-4 h-4" />
                         Hoje
                     </button>
+
+                    <div className="hidden md:flex items-center gap-1 px-2 py-1 rounded-lg border border-card-border/50" data-testid="timeline-zoom-controls">
+                        <button
+                            onClick={() => adjustTimelineZoom(-0.1)}
+                            className="p-1 rounded-md hover:bg-foreground/10 transition-colors"
+                            aria-label="Diminuir zoom"
+                        >
+                            <Minus className="w-3.5 h-3.5 text-muted" />
+                        </button>
+                        <span className="text-xs text-muted min-w-12 text-center">{Math.round(timelineZoom * 100)}%</span>
+                        <button
+                            onClick={() => adjustTimelineZoom(0.1)}
+                            className="p-1 rounded-md hover:bg-foreground/10 transition-colors"
+                            aria-label="Aumentar zoom"
+                        >
+                            <Plus className="w-3.5 h-3.5 text-muted" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -348,12 +376,50 @@ export default function WeekView() {
                 </div>
             )}
 
+            {/* Compact mobile fallback */}
+            <div className="md:hidden divide-y divide-card-border/50 bg-surface dark:bg-zinc-950" data-testid="mobile-week-list">
+                {weekDates.map((date, idx) => {
+                    const dateKey = formatDateKey(date);
+                    const blocks = getBlocksForDate(date);
+                    const isToday = dateKey === todayKey;
+
+                    return (
+                        <div key={`mobile-${dateKey}`} className="p-3">
+                            <div className="flex items-center justify-between mb-2">
+                                <p className={`text-sm font-semibold ${isToday ? 'text-purple-500' : 'text-foreground'}`}>
+                                    {DAYS[idx]} · {date.getDate()}
+                                </p>
+                                <span className="text-xs text-muted">{blocks.length} blocos</span>
+                            </div>
+                            {blocks.length === 0 ? (
+                                <p className="text-xs text-muted">Nenhum bloco para este dia.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {blocks.map(block => {
+                                        const start = new Date(block.start_datetime);
+                                        const end = new Date(block.end_datetime);
+                                        return (
+                                            <div key={`mobile-block-${block.id}`} className="rounded-lg border border-card-border/50 p-2">
+                                                <p className="text-sm font-medium text-foreground">{block.title}</p>
+                                                <p className="text-xs text-muted">
+                                                    {start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {end.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                </p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+
             {/* Week Grid */}
-            <div className="flex bg-surface dark:bg-zinc-950">
+            <div className="hidden md:flex bg-surface dark:bg-zinc-950">
                 {/* Time Column */}
-                < div className="w-14 flex-shrink-0 border-r border-card-border/50 bg-bg" >
+                <div className="w-14 flex-shrink-0 border-r border-card-border/50 bg-bg" >
                     <div className="h-16 border-b border-card-border/50" /> {/* Header spacer */}
-                    <div className="relative" style={{ height: '1152px' }}> {/* 16 * 72px */}
+                    <div className="relative" style={{ height: timelineHeight }}> {/* 16 * 72px */}
                         {HOURS.map(hour => (
                             <div
                                 key={hour}
@@ -364,10 +430,10 @@ export default function WeekView() {
                             </div>
                         ))}
                     </div>
-                </div >
+                </div>
 
                 {/* Days Columns */}
-                < div className="flex-1 flex overflow-x-auto snap-x" >
+                <div className="flex-1 flex overflow-x-auto snap-x" data-testid="desktop-week-grid">
                     {
                         weekDates.map((date, idx) => {
                             const dateKey = formatDateKey(date);
@@ -381,7 +447,7 @@ export default function WeekView() {
                             return (
                                 <div
                                     key={dateKey}
-                                    className={`flex-1 min-w-[120px] snap-center border-r border-card-border/50 last:border-r-0 cursor-pointer transition-colors ${isToday ? 'bg-purple-500/[0.03]' :
+                                    className={`flex-1 min-w-[96px] lg:min-w-[120px] snap-center border-r border-card-border/50 last:border-r-0 cursor-pointer transition-colors ${isToday ? 'bg-purple-500/[0.03]' :
                                         isSelected ? 'bg-blue-500/[0.03]' :
                                             isPast ? 'bg-black/[0.01] dark:bg-white/[0.01]' : ''
                                         }`}
@@ -411,8 +477,8 @@ export default function WeekView() {
                                         ) : null}
                                     </div>
 
-                                    {/* Blocks Area (Height: 1152px) */}
-                                    <div className="relative" style={{ height: '1152px' }}>
+                                    {/* Blocks Area */}
+                                    <div className="relative" style={{ height: timelineHeight }}>
                                         {/* Hour Lines - Enhanced contrast for legibility */}
                                         {HOURS.map(hour => (
                                             <div
@@ -559,8 +625,8 @@ export default function WeekView() {
                             );
                         })
                     }
-                </div >
-            </div >
+                </div>
+            </div>
 
             <AnimatePresence>
                 {editingBlock && (
@@ -579,6 +645,6 @@ export default function WeekView() {
                     />
                 )}
             </AnimatePresence>
-        </div >
+        </div>
     );
 }
