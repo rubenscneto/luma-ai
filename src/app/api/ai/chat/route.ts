@@ -3,10 +3,39 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { getGeminiModel } from "@/lib/ai/gemini";
 import { LUMAAI_SYSTEM_PROMPT } from "@/lib/ai/prompts";
+import { persistDailyBlocks, type BlockInput } from "@/lib/persistDailyBlocks";
+
+type ChatHistoryItem = {
+    role: 'user' | 'assistant';
+    content: string;
+};
+
+type ActionInput = {
+    type: string;
+    title: string;
+    date?: string;
+    start?: string;
+    durationMin?: number;
+    category?: string;
+};
+
+type ParsedResponse = {
+    reply?: string;
+    actions?: ActionInput[];
+};
+
+function toIsoRange(date: string, start: string, durationMin: number) {
+    const startDate = new Date(`${date}T${start}:00`);
+    const endDate = new Date(startDate.getTime() + durationMin * 60_000);
+    return {
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+    };
+}
 
 export async function POST(req: Request) {
     try {
-        const { message, history } = await req.json();
+        const { message, history }: { message: string; history: ChatHistoryItem[] } = await req.json();
 
         // 1. Auth & Supabase Client
         const cookieStore = await cookies();
@@ -34,12 +63,12 @@ export async function POST(req: Request) {
         let userName = user.email?.split("@")[0] || "Usuário";
         const { data: profile } = await supabase
             .from("profiles")
-            .select("full_name") // Assuming 'full_name' or 'name' exists based on schema. Checking prior context... using full_name or name
+            .select("full_name")
             .eq("id", user.id)
             .single();
 
         if (profile?.full_name) {
-            userName = profile.full_name.split(" ")[0]; // First name
+            userName = profile.full_name.split(" ")[0];
         }
 
         // 3. Prepare Prompt
@@ -48,7 +77,7 @@ export async function POST(req: Request) {
         // 4. Call Gemini
         const model = getGeminiModel();
         const chat = model.startChat({
-            history: history.map((msg: any) => ({
+            history: history.map((msg) => ({
                 role: msg.role === "user" ? "user" : "model",
                 parts: [{ text: msg.content }],
             })),
@@ -58,18 +87,15 @@ export async function POST(req: Request) {
         const responseText = result.response.text();
 
         // 5. Parse JSON (Robust)
-        let parsedResponse;
+        let parsedResponse: ParsedResponse;
         try {
-            // Try strictly first
-            parsedResponse = JSON.parse(responseText);
-        } catch (e) {
-            // Fallback: Try regex to extract JSON
+            parsedResponse = JSON.parse(responseText) as ParsedResponse;
+        } catch {
             const jsonMatch = responseText.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
                 try {
-                    parsedResponse = JSON.parse(jsonMatch[0]);
-                } catch (e2) {
-                    // Final Fallback: Return text as reply
+                    parsedResponse = JSON.parse(jsonMatch[0]) as ParsedResponse;
+                } catch {
                     parsedResponse = { reply: responseText, actions: [] };
                 }
             } else {
@@ -79,27 +105,94 @@ export async function POST(req: Request) {
 
         // 6. Handle Actions (Server-Side Execution)
         if (parsedResponse.actions && parsedResponse.actions.length > 0) {
-            const tasksToInsert: any[] = [];
+            const tasksByDate = new Map<string, BlockInput[]>();
 
-            parsedResponse.actions.forEach((action: any) => {
+            parsedResponse.actions.forEach((action) => {
                 if (action.type === 'create_task' || action.type === 'create_project_task') {
-                    // Determine table based on action or simplified to 'agenda_items' vs 'tasks' 
-                    // For now, let's put everything in 'agenda_items' for the calendar
-                    tasksToInsert.push({
-                        user_id: user.id,
+                    const date = action.date || new Date().toISOString().split("T")[0];
+                    const start = action.start || "09:00";
+                    const duration = action.durationMin || 30;
+                    const range = toIsoRange(date, start, duration);
+
+                    const block: BlockInput = {
                         title: action.title,
-                        date: action.date || new Date().toISOString().split("T")[0],
-                        start_time: action.start || "09:00",
-                        duration: action.durationMin || 30,
                         category: action.category || "work",
-                        status: "todo",
-                        generated: true
-                    });
+                        start_datetime: range.start,
+                        end_datetime: range.end,
+                        source: "manual",
+                        meta: {
+                            created_via: "ai_chat_action",
+                            action_type: action.type,
+                        },
+                    };
+
+                    const list = tasksByDate.get(date) || [];
+                    list.push(block);
+                    tasksByDate.set(date, list);
                 }
             });
 
-            if (tasksToInsert.length > 0) {
-                await supabase.from('agenda_items').insert(tasksToInsert);
+            for (const [date, newBlocks] of tasksByDate.entries()) {
+                const { data: existingPlan } = await supabase
+                    .from('daily_plan')
+                    .select('id')
+                    .eq('user_id', user.id)
+                    .eq('plan_date', date)
+                    .maybeSingle();
+
+                let planId = existingPlan?.id as string | undefined;
+
+                if (!planId) {
+                    const { data: createdPlan, error: planError } = await supabase
+                        .from('daily_plan')
+                        .upsert({ user_id: user.id, plan_date: date }, { onConflict: 'user_id,plan_date' })
+                        .select('id')
+                        .single();
+
+                    if (planError || !createdPlan) {
+                        throw new Error(planError?.message || 'Falha ao criar daily_plan.');
+                    }
+                    planId = createdPlan.id;
+                }
+
+                if (!planId) {
+                    throw new Error('Falha ao resolver daily_plan para persistência.');
+                }
+
+                const resolvedPlanId = planId;
+
+                const { data: existingBlocks } = await supabase
+                    .from('daily_blocks')
+                    .select('*')
+                    .eq('plan_id', resolvedPlanId)
+                    .order('start_datetime', { ascending: true });
+
+                const priorBlocks: BlockInput[] = (existingBlocks || []).map((block: Record<string, unknown>) => ({
+                    title: String(block.title || ''),
+                    category: String(block.category || 'work'),
+                    start_datetime: String(block.start_datetime || ''),
+                    end_datetime: String(block.end_datetime || ''),
+                    source: (block.source as BlockInput['source']) || 'manual',
+                    is_done: Boolean(block.is_done),
+                    is_skipped: Boolean(block.is_skipped),
+                    skip_reason: typeof block.skip_reason === 'string' ? block.skip_reason : undefined,
+                    done_at: typeof block.done_at === 'string' ? block.done_at : undefined,
+                    order_index: typeof block.order_index === 'number' ? block.order_index : undefined,
+                    meta: (block.meta as Record<string, unknown>) || {},
+                }));
+
+                await persistDailyBlocks(
+                    supabase,
+                    resolvedPlanId,
+                    user.id,
+                    date,
+                    [...priorBlocks, ...newBlocks],
+                    {
+                        deleteStale: false,
+                        deleteNullKeys: false,
+                        preserveStatus: true,
+                    }
+                );
             }
         }
 
@@ -109,8 +202,9 @@ export async function POST(req: Request) {
             actions: parsedResponse.actions || []
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Chat API Error:", error);
-        return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+        const message = error instanceof Error ? error.message : "Internal Server Error";
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

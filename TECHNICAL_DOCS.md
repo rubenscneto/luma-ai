@@ -476,3 +476,25 @@ Gera automaticamente "Pausa pós-refeição" (30min) ancorada a blocos meal.
 ---
 
 *Este documento DEVE ser atualizado a cada implementação, remoção ou refatoração. Veja `.agent/workflows/update-technical-docs.md`.*
+
+---
+
+
+## 8. Modelo Canônico de Agenda e Endpoints Legados
+
+### Fonte de Verdade
+A agenda agora possui **fonte única de verdade**:
+- `daily_plan` (registro diário por usuário/data)
+- `daily_blocks` (blocos vinculados ao `plan_id`)
+
+### Endpoint legado descontinuado
+- `POST /api/ai/schedule/generate` → **410 Gone**.
+- Motivo: escrevia em `agenda_items` (modelo legado).
+- Substituições oficiais:
+  - `POST /api/ai/agenda/plan-day`
+  - `POST /api/ai/agenda/plan-week`
+
+### Contratos e Migração
+- Contratos atualizados: `docs/API_CONTRACTS.md`
+- Plano de migração de dados legados: `docs/DATA_MIGRATION_PLAN_DAILY_BLOCKS.md`
+
