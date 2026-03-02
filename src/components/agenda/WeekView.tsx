@@ -14,8 +14,6 @@ import { useAgenda } from '@/context/agendaContext';
 import { DailyBlock } from '@/types';
 import { toast } from 'sonner';
 import { BlockEditorModal } from './BlockEditorModal';
-import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
 
 const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const HOURS = Array.from({ length: 16 }, (_, i) => i + 6); // 6:00 to 21:00
@@ -63,7 +61,6 @@ function formatDateKey(date: Date): string {
 // }
 
 export default function WeekView() {
-    const router = useRouter();
     const {
         todayBlocks,
         generatePlan,
@@ -74,7 +71,7 @@ export default function WeekView() {
         removeBlock,
     } = useDailyPlan();
     const { user } = useAuth();
-    const { addFeedback, pendingFeedbacks, removeFeedback } = useAgenda();
+    const { addFeedback, pendingFeedbacks } = useAgenda();
     const [activeFeedbackBlock, setActiveFeedbackBlock] = useState<string | null>(null);
     const [currentWeekStart, setCurrentWeekStart] = useState(() => {
         const today = new Date();
@@ -87,6 +84,7 @@ export default function WeekView() {
     const [timelineZoom, setTimelineZoom] = useState(1);
 
     const [isPolling, setIsPolling] = useState(false);
+    const [currentRunId, setCurrentRunId] = useState<string | null>(null);
     const pollingStartTimeRef = useRef<number | null>(null);
 
     const weekDates = useMemo(() => getWeekDates(currentWeekStart), [currentWeekStart]);
@@ -114,62 +112,43 @@ export default function WeekView() {
     }, [currentWeekStart, fetchWeekBlocks]);
 
     React.useEffect(() => {
-        if (!user) return;
+        if (!user || !isPolling || !currentRunId) return;
 
-        // Channel name definition (matches backend expected pattern agenda-update:{userId})
-        const channelName = `agenda-update:${user.id}`;
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch(`/api/ai/agenda/plan-week/status?runId=${currentRunId}&userId=${user.id}`);
+                if (!res.ok) return;
 
-        const channel = supabase.channel(channelName)
-            .on('broadcast', { event: 'status' }, (payload) => {
-                const data = payload.payload;
+                const data = await res.json();
+                const status = data?.status;
+                if (!status) return;
 
-                if (data.status === 'processing') {
-                    // Update UI lightly if needed
-                } else if (data.status === 'completed') {
+                if (status.status === 'completed') {
                     setIsPolling(false);
+                    setCurrentRunId(null);
                     pollingStartTimeRef.current = null;
-                    toast.success(data.message || 'Planejamento concluído com sucesso!');
-                    fetchWeekBlocks(formatDateKey(currentWeekStart));
-                    loadTodayPlan();
-
-                    // Display returned interactive toasts
-                    if (data.toasts_interactive && Array.isArray(data.toasts_interactive)) {
-                        data.toasts_interactive.slice(0, 2).forEach((t: { message: string; action_link?: string }, idx: number) => {
-                            setTimeout(() => {
-                                toast(t.message, {
-                                    duration: 8000,
-                                    action: t.action_link ? {
-                                        label: 'Ver mais',
-                                        onClick: () => router.push(t.action_link)
-                                    } : undefined
-                                });
-                            }, idx * 1500 + 1000); // Wait 1s and stagger by 1.5s
-                        });
-                    }
-                } else if (data.status === 'error') {
+                    toast.success(status.message || 'Planejamento concluído com sucesso!');
+                    await fetchWeekBlocks(formatDateKey(currentWeekStart));
+                    await loadTodayPlan();
+                } else if (status.status === 'failed') {
                     setIsPolling(false);
+                    setCurrentRunId(null);
                     pollingStartTimeRef.current = null;
-                    toast.error(data.message || 'Erro ao gerar agenda.');
-                    fetchWeekBlocks(formatDateKey(currentWeekStart));
+                    toast.error(status.message || status.error_message || 'Erro ao gerar agenda.');
                 }
-            })
-            .subscribe();
-
-        // Safety fallback timeout
-        const interval = setInterval(() => {
-            if (isPolling && pollingStartTimeRef.current && Date.now() - pollingStartTimeRef.current > 60000) {
-                setIsPolling(false);
-                toast.error("Tempo esgotado aguardando o servidor. Atualize a página e verifique sua agenda.");
-                fetchWeekBlocks(formatDateKey(currentWeekStart));
-                clearInterval(interval);
+            } catch {
+                // keep polling
             }
-        }, 10000);
 
-        return () => {
-            supabase.removeChannel(channel);
-            clearInterval(interval);
-        };
-    }, [user, currentWeekStart, fetchWeekBlocks, isPolling, loadTodayPlan, router, supabase]);
+            if (pollingStartTimeRef.current && Date.now() - pollingStartTimeRef.current > 120000) {
+                setIsPolling(false);
+                setCurrentRunId(null);
+                toast.error('Tempo esgotado aguardando o servidor. Atualize a página e verifique sua agenda.');
+            }
+        }, 3000);
+
+        return () => clearInterval(interval);
+    }, [user, isPolling, currentRunId, currentWeekStart, fetchWeekBlocks, loadTodayPlan]);
 
     const handleDayClick = useCallback((date: Date) => {
         const key = formatDateKey(date);
@@ -203,9 +182,10 @@ export default function WeekView() {
 
             if (response.ok) {
                 const data = await response.json();
-                if (data.status === 'processing' || response.status === 202) {
+                if (data.runId && (data.status === 'queued' || data.status === 'running' || data.status === 'processing' || response.status === 202)) {
                     toast.success("A IA está trabalhando! Sua semana aparecerá em alguns segundos.");
                     pollingStartTimeRef.current = Date.now();
+                    setCurrentRunId(data.runId);
                     setIsPolling(true);
                 } else {
                     toast.success(`Semana planejada! ${data.totalBlocks} blocos criados.`);
@@ -237,19 +217,19 @@ export default function WeekView() {
             await generatePlan(dateStr, 'first_time');
             toast.success(`Dia ${date.getDate()} planejado com sucesso!`);
             fetchWeekBlocks(formatDateKey(currentWeekStart));
-        } catch (error) {
+        } catch {
             toast.error('Erro ao planejar dia.');
         }
     };
 
     // Get blocks for a specific date
-    const getBlocksForDate = (date: Date): DailyBlock[] => {
+    const getBlocksForDate = useCallback((date: Date): DailyBlock[] => {
         const key = formatDateKey(date);
         if (key === todayKey) {
             return todayBlocks;
         }
         return weekBlocks[key] || [];
-    };
+    }, [todayKey, todayBlocks, weekBlocks]);
 
     // Calculate block position and height
     const getBlockStyle = (block: DailyBlock) => {
@@ -293,7 +273,7 @@ export default function WeekView() {
             acc[key] = getBlocksForDate(date).length;
             return acc;
         }, {} as Record<string, number>);
-    }, [weekDates, todayBlocks, weekBlocks]);
+    }, [weekDates, getBlocksForDate]);
 
     return (
         <div className="bg-foreground/5 dark:bg-foreground/5 rounded-2xl border border-card-border/50 dark:border-card-border/50 overflow-hidden">
