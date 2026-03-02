@@ -1,7 +1,7 @@
 # LumaAI — Documentação Técnica & Diário de Bordo 🛠️
 
-- **Version**: 2.5.0
-- **Last Updated**: 2026-02-22
+- **Version**: 2.6.0
+- **Last Updated**: 2026-03-02
 **Data de Início**: Dezembro 2025
 
 Este documento é a **referência técnica definitiva** do LumaAI. Deve ser atualizado a cada implementação, remoção ou refatoração.
@@ -153,14 +153,21 @@ src/
 | `profiles` | Nome, ocupação, avatar (synced from Auth) |
 | `health_profile` | Meta de saúde, treino, sono, dieta |
 | `routine_profile` | Descrição da rotina, hobbies, objetivos (**✅ LIDO pelo planner desde v2.1.0**) |
+| `treinos_profile` | Rotina e objetivos musculares do usuário (lido pelo planner) |
+| `estudos_profile` | Grade ou matérias ativas do usuário (lido pelo planner) |
+| `estudos_insights`| Resumos, flashcards e extração de PDFs via Gemini (lido pela IA) |
 | `subjects` | Matérias de estudo |
 | `study_materials` | Links e textos de estudo |
 | `flashcards` | Flashcards com SRS (Spaced Repetition) |
 | `workout_sessions` | Sessões de treino |
 
-### 2.5 Segurança
+### 2.6 Storage Buckets
 
-- **RLS (Row Level Security)**: Habilitado em todas as tabelas. Filtro: `auth.uid() = user_id`.
+- `user_materials`: Bucket privado para upload de PDFs, TXTs e DOCX dos usuários. Limite de segurança de 30MB estipulado visualmente no client.
+
+### 2.7 Segurança
+
+- **RLS (Row Level Security)**: Habilitado em todas as tabelas (incluindo Storage Bucket `user_materials`). Filtro padrão: `auth.uid() = user_id` e no app folder `storage.foldername(name)[1] = auth.uid()::text`.
 
 ---
 
@@ -182,8 +189,10 @@ Gemini 2.0/1.5 Flash gera JSON (aiWeekResponseSchema)
 Validação Zod (aiWeekResponseSchema)
     ↓
 Para cada dia:
-  1. UPSERT daily_plan (onConflict: user_id, plan_date)
-  2. DELETE daily_blocks existentes (exceto category='fixed')
+  1. Extrai `health_profile`, `treinos_profile` e `estudos_insights` combinados via queries paralelas do DB
+  2. Ajusta prioridades no solver (IA assume > Fixos Flexíveis) para evitar silenciamento das predições interativas
+  3. UPSERT daily_plan (onConflict: user_id, plan_date)
+  4. DELETE daily_blocks existentes (exceto category='fixed')
   3. Filtro: rejeita blocos IA que colidem com fixos
   4. Filtro: rejeita duplicatas semânticas (título igual ou meal <60min)
   5. Converte para SolverBlock
@@ -375,6 +384,14 @@ Gera automaticamente "Pausa pós-refeição" (30min) ancorada a blocos meal.
 ---
 
 ## 📅 Diário de Bordo (Changelog)
+
+### [02/03/2026] - Sprint 7: Ecosistema Luma Integral & Fixes de Build (v2.6.0)
+- **Feature**: Nova engine de leitura plural (`treinos_profile`, `estudos_profile`, `estudos_insights`) combinada nos prompts de Planejamento da Semana.
+- **Database**: Novas tabelas de base criadas e RLS implementado para Bucket Supabase Storage de `user_materials`.
+- **UI**: Nova aba "Materiais" com Drag & Drop de PDFs/DOCX e parser de insights via LLM Gemini. Google Drive Mockado (Planejado Sprint 8).
+- **UI**: Nova aba "Estudos" com cronômetro Pomodoro sincronizado localmente.
+- **Feature**: UX reescrita em `WeekView.tsx` usando Supabase Realtime channels (`agenda-update`) abolindo API Pooling Client, servindo feedback background da AI (inclusive Toasts dinâmicos em JSON).
+- **Fix**: Resolver loop de encoding UTF-16 residual do SO do usuário em arquivos de rota Next.js, suprimir erros de Overlap Typescript no Next Compiler e remover pacote client-side supersedido `@supabase/auth-helpers-nextjs`.
 
 ### [22/02/2026] - Agenda Engine V2: Scoring & Intent (v2.5.0)
 - **Feature**: Sistema Integrado de Pontuação (Consistency + Adherence).
