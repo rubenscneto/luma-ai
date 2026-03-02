@@ -136,11 +136,12 @@ export default function WeekView() {
                     if (data.toasts_interactive && Array.isArray(data.toasts_interactive)) {
                         data.toasts_interactive.slice(0, 2).forEach((t: { message: string; action_link?: string }, idx: number) => {
                             setTimeout(() => {
+                                const actionLink = t.action_link;
                                 toast(t.message, {
                                     duration: 8000,
-                                    action: t.action_link ? {
+                                    action: actionLink ? {
                                         label: 'Ver mais',
-                                        onClick: () => router.push(t.action_link)
+                                        onClick: () => router.push(actionLink)
                                     } : undefined
                                 });
                             }, idx * 1500 + 1000); // Wait 1s and stagger by 1.5s
