@@ -155,10 +155,16 @@ export async function POST(req: Request) {
                     planId = createdPlan.id;
                 }
 
+                if (!planId) {
+                    throw new Error('Falha ao resolver daily_plan para persistência.');
+                }
+
+                const resolvedPlanId = planId;
+
                 const { data: existingBlocks } = await supabase
                     .from('daily_blocks')
                     .select('*')
-                    .eq('plan_id', planId)
+                    .eq('plan_id', resolvedPlanId)
                     .order('start_datetime', { ascending: true });
 
                 const priorBlocks: BlockInput[] = (existingBlocks || []).map((block: Record<string, unknown>) => ({
@@ -177,7 +183,7 @@ export async function POST(req: Request) {
 
                 await persistDailyBlocks(
                     supabase,
-                    planId,
+                    resolvedPlanId,
                     user.id,
                     date,
                     [...priorBlocks, ...newBlocks],
