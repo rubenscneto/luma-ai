@@ -37,6 +37,10 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
+    "**/*.backup",
+    "**/*.bak",
+    "**/backups/**",
+    "backups",
     "node_modules"
   ]
 }
