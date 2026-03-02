@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/authContext';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase';
 import { FileUp, File as FileIcon, Trash2, Loader2, Link as LinkIcon, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -16,7 +16,6 @@ interface Material {
 
 export default function MateriaisPage() {
     const { user } = useAuth();
-    const supabase = createClientComponentClient();
     const [files, setFiles] = useState<Material[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isUploading, setIsUploading] = useState(false);

@@ -14,7 +14,7 @@ import { useAgenda } from '@/context/agendaContext';
 import { DailyBlock } from '@/types';
 import { toast } from 'sonner';
 import { BlockEditorModal } from './BlockEditorModal';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
 const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -62,7 +62,6 @@ function formatDateKey(date: Date): string {
 // }
 
 export default function WeekView() {
-    const supabase = createClientComponentClient();
     const router = useRouter();
     const {
         todayBlocks,

@@ -13,7 +13,7 @@ const LONG_BREAK = 15 * 60;
 
 export default function EstudosPage() {
     const { todayBlocks } = useDailyPlan();
-    
+
     // Timer state
     const [timeLeft, setTimeLeft] = useState(WORK_TIME);
     const [isRunning, setIsRunning] = useState(false);
@@ -30,7 +30,7 @@ export default function EstudosPage() {
 
     // Get today's study blocks
     const studyBlocks = useMemo(() => {
-        return todayBlocks.filter(b => b.category === 'study' || b.category === 'estudo').sort((a,b) => a.start_datetime.localeCompare(b.start_datetime));
+        return todayBlocks.filter(b => (b.category as any) === 'study' || (b.category as any) === 'estudo').sort((a, b) => a.start_datetime.localeCompare(b.start_datetime));
     }, [todayBlocks]);
 
     useEffect(() => {
@@ -55,7 +55,7 @@ export default function EstudosPage() {
     const handleTimerComplete = () => {
         setIsRunning(false);
         if (audioRef.current) {
-             audioRef.current.play().catch(e => console.log('Audio play failed:', e));
+            audioRef.current.play().catch(e => console.log('Audio play failed:', e));
         }
 
         if (mode === 'pomodoro') {
@@ -161,7 +161,7 @@ export default function EstudosPage() {
                         >
                             {isRunning ? <Pause className="w-8 h-8 fill-current" /> : <Play className="w-8 h-8 fill-current translate-x-1" />}
                         </button>
-                        
+
                         <button
                             onClick={resetTimer}
                             className="w-12 h-12 rounded-xl bg-surface border border-card-border/50 flex items-center justify-center text-muted hover:text-foreground transition-all hover:bg-black/5"
@@ -180,7 +180,7 @@ export default function EstudosPage() {
                         <BookOpen className="w-5 h-5 text-purple-500" />
                         Sessões de Hoje
                     </h3>
-                    
+
                     {studyBlocks.length === 0 ? (
                         <div className="text-center py-6 text-muted">
                             <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -208,19 +208,19 @@ export default function EstudosPage() {
                         </div>
                     )}
                 </div>
-                
+
                 <div className="bg-surface dark:bg-zinc-900 border border-card-border/50 rounded-2xl p-6">
-                     <h4 className="text-sm font-bold text-foreground mb-2 flex items-center gap-2">
-                         <Clock className="w-4 h-4 text-blue-500" /> Estatísticas Rápidas
-                     </h4>
-                     <div className="flex justify-between items-center text-sm py-2 border-b border-card-border/30">
-                         <span className="text-muted">Ciclos concluídos</span>
-                         <span className="font-bold text-foreground">{cycles} / 4</span>
-                     </div>
-                     <div className="flex justify-between items-center text-sm py-2">
-                         <span className="text-muted">Tempo focado</span>
-                         <span className="font-bold text-foreground">{Math.floor(cycles * 25)} min</span>
-                     </div>
+                    <h4 className="text-sm font-bold text-foreground mb-2 flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-blue-500" /> Estatísticas Rápidas
+                    </h4>
+                    <div className="flex justify-between items-center text-sm py-2 border-b border-card-border/30">
+                        <span className="text-muted">Ciclos concluídos</span>
+                        <span className="font-bold text-foreground">{cycles} / 4</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm py-2">
+                        <span className="text-muted">Tempo focado</span>
+                        <span className="font-bold text-foreground">{Math.floor(cycles * 25)} min</span>
+                    </div>
                 </div>
             </div>
         </div>
