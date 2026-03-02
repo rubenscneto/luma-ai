@@ -36,6 +36,16 @@ export default function MateriaisPage() {
         }
     }, [user]);
 
+    // Defensively check if scripts are already cached by the browser out-of-bounds
+    useEffect(() => {
+        if (window.gapi && window.gapi.load) {
+            window.gapi.load('picker', () => setPickerApiLoaded(true));
+        }
+        if (window.google?.accounts?.oauth2) {
+            setGsiLoaded(true);
+        }
+    }, []);
+
     const loadFiles = async () => {
         if (!user) return;
         setIsLoading(true);
@@ -158,9 +168,11 @@ export default function MateriaisPage() {
 
     // --- Google Drive Integration ---
     const loadPickerApi = () => {
-        window.gapi.load('picker', () => {
-            setPickerApiLoaded(true);
-        });
+        if (window.gapi && window.gapi.load) {
+            window.gapi.load('picker', () => {
+                setPickerApiLoaded(true);
+            });
+        }
     };
 
     const handleDriveAuth = () => {
@@ -261,8 +273,8 @@ export default function MateriaisPage() {
 
     return (
         <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-bg">
-            <Script src="https://apis.google.com/js/api.js" onLoad={loadPickerApi} />
-            <Script src="https://accounts.google.com/gsi/client" onLoad={() => setGsiLoaded(true)} />
+            <Script src="https://apis.google.com/js/api.js" onReady={loadPickerApi} />
+            <Script src="https://accounts.google.com/gsi/client" onReady={() => setGsiLoaded(true)} />
 
             <div className="max-w-4xl mx-auto space-y-8">
                 {/* Header */}
