@@ -5,6 +5,14 @@ import { useAuth } from '@/context/authContext';
 import { supabase } from '@/lib/supabase';
 import { FileUp, File as FileIcon, Trash2, Loader2, Link as LinkIcon, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import Script from 'next/script';
+
+declare global {
+    interface Window {
+        google: any;
+        gapi: any;
+    }
+}
 
 interface Material {
     id: string; // The file name in storage essentially
@@ -19,6 +27,8 @@ export default function MateriaisPage() {
     const [files, setFiles] = useState<Material[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
+    const [pickerApiLoaded, setPickerApiLoaded] = useState(false);
+    const [gsiLoaded, setGsiLoaded] = useState(false);
 
     useEffect(() => {
         if (user) {
@@ -146,6 +156,101 @@ export default function MateriaisPage() {
         }
     };
 
+    // --- Google Drive Integration ---
+    const loadPickerApi = () => {
+        window.gapi.load('picker', () => {
+            setPickerApiLoaded(true);
+        });
+    };
+
+    const handleDriveAuth = () => {
+        if (!window.google || !window.gapi) {
+            toast.error("Serviços do Google não carregaram. Verifique a sua conexão.");
+            return;
+        }
+
+        const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+        if (!clientId) {
+            toast.error("Aviso: Configuração do Google Client ID ausente.");
+            return;
+        }
+
+        const tokenClient = window.google.accounts.oauth2.initTokenClient({
+            client_id: clientId,
+            scope: 'https://www.googleapis.com/auth/drive.readonly',
+            callback: (response: any) => {
+                if (response.error !== undefined) {
+                    toast.error("Erro na autorização do Google Drive.");
+                    return;
+                }
+                showPicker(response.access_token);
+            },
+        });
+        tokenClient.requestAccessToken();
+    };
+
+    const showPicker = (accessToken: string) => {
+        const view = new window.google.picker.View(window.google.picker.ViewId.DOCS);
+        view.setMimeTypes('application/pdf,application/vnd.google-apps.document,text/plain');
+
+        let builder = new window.google.picker.PickerBuilder()
+            .addView(view)
+            .setOAuthToken(accessToken)
+            .setCallback((data: any) => pickerCallback(data, accessToken));
+
+        const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
+        if (apiKey) {
+            builder = builder.setDeveloperKey(apiKey);
+        }
+
+        const picker = builder.build();
+        picker.setVisible(true);
+    };
+
+    const pickerCallback = async (data: any, accessToken: string) => {
+        if (data.action === window.google.picker.Action.PICKED) {
+            const document = data.docs[0];
+            const fileId = document.id;
+            const fileName = document.name;
+            const mimeType = document.mimeType;
+
+            await importFromDrive(fileId, fileName, mimeType, accessToken);
+        }
+    };
+
+    const importFromDrive = async (fileId: string, fileName: string, mimeType: string, accessToken: string) => {
+        if (!user) return;
+        setIsUploading(true);
+        const toastId = toast.loading(`Importando ${fileName} do Google Drive...`);
+
+        try {
+            const res = await fetch('/api/drive/import', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    fileId,
+                    fileName,
+                    mimeType,
+                    accessToken,
+                    userId: user.id
+                })
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Falha ao importar arquivo do drive.');
+            }
+
+            toast.success(`Material "${fileName}" processado com sucesso! Flashcards prontos.`, { id: toastId });
+            await loadFiles();
+        } catch (error: any) {
+            toast.error(`Erro: ${error.message}`, { id: toastId });
+        } finally {
+            setIsUploading(false);
+        }
+    };
+    // ---------------------------------
+
     const formatSize = (bytes: number) => {
         if (bytes === 0) return '0 Bytes';
         const k = 1024;
@@ -156,6 +261,9 @@ export default function MateriaisPage() {
 
     return (
         <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-bg">
+            <Script src="https://apis.google.com/js/api.js" onLoad={loadPickerApi} />
+            <Script src="https://accounts.google.com/gsi/client" onLoad={() => setGsiLoaded(true)} />
+
             <div className="max-w-4xl mx-auto space-y-8">
                 {/* Header */}
                 <div>
@@ -198,11 +306,12 @@ export default function MateriaisPage() {
 
                         {/* Google Drive Button */}
                         <button
-                            onClick={() => toast.info('Integração com o Google Drive em desenvolvimento! Em breve você poderá importar links diretamente.')}
-                            className="flex-1 flex items-center justify-center gap-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium py-3 px-6 rounded-xl transition-all"
+                            onClick={handleDriveAuth}
+                            disabled={!pickerApiLoaded || !gsiLoaded || isUploading}
+                            className={`flex-1 flex items-center justify-center gap-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium py-3 px-6 rounded-xl transition-all ${(!pickerApiLoaded || !gsiLoaded || isUploading) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
                         >
                             <LinkIcon className="w-5 h-5" />
-                            Google Drive
+                            {(!pickerApiLoaded || !gsiLoaded) ? 'Carregando UI...' : 'Google Drive'}
                         </button>
                     </div>
 

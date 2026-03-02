@@ -1,6 +1,6 @@
 # LumaAI — Documentação Técnica & Diário de Bordo 🛠️
 
-- **Version**: 2.6.0
+- **Version**: 2.7.0
 - **Last Updated**: 2026-03-02
 **Data de Início**: Dezembro 2025
 
@@ -384,6 +384,12 @@ Gera automaticamente "Pausa pós-refeição" (30min) ancorada a blocos meal.
 ---
 
 ## 📅 Diário de Bordo (Changelog)
+
+### [02/03/2026] - Sprint 8: Google Drive Integration (v2.7.0)
+- **Feature**: Botão Oficial de Importação do Google Drive na aba Materiais via `Google API JS Client` e `Google Identity Services`.
+- **UI**: UI de Google Picker (Seletor Nativo do Google Workspace Popup) com filtros de visualização apenas para PDFs e Documentos.
+- **Backend API**: Nova Rota nativa do app (`/api/drive/import`) com depêndencia `@googleapis/drive` que executa download de Buffer Array nativo ou conversão de exportação on-the-fly para arquivos Nativos do Google Docs, subindo automaticamente para a Bucket do usuário local em Produção.
+- **AI Core**: `GoogleGenerativeAI` refatorado para operar de forma isolada do arquivo `aiHelpers` e extrair metadados e flashcards de materiais Google Docs antes mesmo de alocá-los localmente no DB do Supabase.
 
 ### [02/03/2026] - Sprint 7: Ecosistema Luma Integral & Fixes de Build (v2.6.0)
 - **Feature**: Nova engine de leitura plural (`treinos_profile`, `estudos_profile`, `estudos_insights`) combinada nos prompts de Planejamento da Semana.
