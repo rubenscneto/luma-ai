@@ -254,7 +254,10 @@ ${JSON.stringify({
             });
 
             const combinedSystemPrompt = AGENDA_REPLANNER_SYSTEM_PROMPT + (userContextBlock ? '\n\n' + userContextBlock : '');
-            const model = getGeminiModel({ systemInstruction: combinedSystemPrompt });
+            const model = getGeminiModel({
+                systemInstruction: combinedSystemPrompt,
+                routePolicy: 'agenda_fast_ops'
+            });
 
             const result = await model.generateContent({
                 contents: [

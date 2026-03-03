@@ -106,7 +106,10 @@ export async function POST(request: NextRequest) {
         // --- BACKGROUND GENERATION ---
         // Vercel Hobby kills await calls longer than 10 seconds.
         // We dispatch the heavy 25-sec Gemini prompt into background and return 202 immediately.
-        const model = getGeminiModel({ systemInstruction: AGENDA_PLANNER_SYSTEM_PROMPT });
+        const model = getGeminiModel({
+            systemInstruction: AGENDA_PLANNER_SYSTEM_PROMPT,
+            routePolicy: 'agenda_weekly_heavy'
+        });
 
         // Determine which days to plan
         const daysOfWeek = input.days_to_plan || [0, 1, 2, 3, 4, 5, 6];

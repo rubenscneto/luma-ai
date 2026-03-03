@@ -184,7 +184,11 @@ function buildFixedBlockInputs(dateStr: string, timezone: string, fixedBlocks: a
 }
 
 async function generateAIBlocks(systemPrompt: string, userPrompt: string, temperature: number) {
-    const model = getGeminiModel({ temperature, systemInstruction: systemPrompt });
+    const model = getGeminiModel({
+        temperature,
+        systemInstruction: systemPrompt,
+        routePolicy: 'agenda_fast_ops'
+    });
 
     const result = await model.generateContent({
         contents: [

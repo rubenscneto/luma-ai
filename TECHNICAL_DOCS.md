@@ -173,6 +173,20 @@ src/
 
 ## 3. Pipeline de Geração de Rotina (IA)
 
+### 3.0 Matriz de decisão de modelo (rota x SLA)
+
+| Rota / Fluxo | SLA esperado | Política de seleção | Modelo efetivo (ordem de resolução) |
+|---|---|---|---|
+| `/api/ai/agenda/plan-week` (planejamento pesado semanal) | Throughput e qualidade > latência | `agenda_weekly_heavy` | `GEMINI_PREMIUM_MODEL` (opcional) → `GEMINI_MODEL` → `gemini-2.5-flash` |
+| `/api/ai/agenda/plan-day` (geração diária rápida) | Latência baixa e previsível | `agenda_fast_ops` | `GEMINI_FAST_MODEL` (opcional) → `gemini-2.5-flash` |
+| `/api/ai/agenda/replan-day` (replanejamento em tempo real) | Resposta rápida para interação | `agenda_fast_ops` | `GEMINI_FAST_MODEL` (opcional) → `gemini-2.5-flash` |
+| Demais rotas IA (default) | Balanceado | `default` | `GEMINI_MODEL` → `gemini-2.5-flash` |
+
+Observações:
+- `GEMINI_MODEL` define o modelo padrão global da aplicação.
+- Se nenhuma variável estiver definida, o fallback seguro é sempre `gemini-2.5-flash`.
+- O uso de premium no semanal é opt-in explícito por ambiente, sem hardcode no código.
+
 ### 3.1 Fluxo `plan-week`
 
 ```
