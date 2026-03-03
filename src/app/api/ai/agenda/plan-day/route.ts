@@ -8,6 +8,7 @@ import { solveTimeline, dailyBlockToSolverBlock, solverBlockToTimeFields, Solver
 import { splitOvernightBlocks } from '@/lib/overnightSplit';
 import { validateMealWindow } from '@/lib/mealWindows';
 import { timeToTimestamptz } from '@/lib/mealWindows';
+import { getAuthenticatedUserId } from '@/lib/supabase/serverAuth';
 
 // Force dynamic to avoid static generation issues
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,7 @@ export const dynamic = 'force-dynamic';
 const planDayInputSchema = z.object({
     date: z.string().optional(), // YYYY-MM-DD, default today
     mode: z.enum(['first_time', 'regenerate', 'fill_gaps', 'generate_ab', 'confirm_plan']).default('first_time'),
-    user_id: z.string().uuid(),
+    user_id: z.string().uuid().optional(),
     timezone: z.string().default('America/Sao_Paulo'),
     // For confirm_plan mode
     selected_plan: z.enum(['A', 'B']).optional(),
@@ -333,6 +334,7 @@ export async function POST(request: NextRequest) {
 
         const body = await request.json();
         const input = planDayInputSchema.parse(body);
+        const userId = await getAuthenticatedUserId(input.user_id);
 
         const now = new Date();
         const dateStr = input.date || now.toISOString().split('T')[0];
@@ -350,8 +352,8 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ error: 'No plan blocks provided' }, { status: 400 });
             }
 
-            const planId = await getOrCreatePlan(supabase, input.user_id, dateStr, input.timezone);
-            const context = await getSharedContext(supabase, input.user_id, dateStr, dayOfWeek);
+            const planId = await getOrCreatePlan(supabase, userId, dateStr, input.timezone);
+            const context = await getSharedContext(supabase, userId, dateStr, dayOfWeek);
 
             // Get existing blocks
             const { data: existingBlocks } = await supabase
@@ -382,7 +384,7 @@ export async function POST(request: NextRequest) {
 
             // Persist all blocks with stale cleanup (replaces old AI blocks)
             const persistResult = await persistDailyBlocks(
-                supabase, planId, input.user_id, dateStr,
+                supabase, planId, userId, dateStr,
                 [...fixedInputs, ...confirmedInputs],
                 { deleteStale: true, deleteNullKeys: true, staleSources: ['ai'] }
             );
@@ -414,10 +416,10 @@ export async function POST(request: NextRequest) {
         // MODE: generate_ab — create two alternative plans
         // ========================================
         if (input.mode === 'generate_ab') {
-            const context = await getSharedContext(supabase, input.user_id, dateStr, dayOfWeek);
+            const context = await getSharedContext(supabase, userId, dateStr, dayOfWeek);
 
             // Get existing blocks for context
-            const planId = await getOrCreatePlan(supabase, input.user_id, dateStr, input.timezone);
+            const planId = await getOrCreatePlan(supabase, userId, dateStr, input.timezone);
             const { data: existingBlocks } = await supabase
                 .from('daily_blocks')
                 .select('*')
@@ -500,8 +502,8 @@ export async function POST(request: NextRequest) {
         // ========================================
         // STANDARD MODES: first_time, regenerate, fill_gaps
         // ========================================
-        const planId = await getOrCreatePlan(supabase, input.user_id, dateStr, input.timezone);
-        const context = await getSharedContext(supabase, input.user_id, dateStr, dayOfWeek);
+        const planId = await getOrCreatePlan(supabase, userId, dateStr, input.timezone);
+        const context = await getSharedContext(supabase, userId, dateStr, dayOfWeek);
 
         // Get existing daily_blocks for this plan
         const { data: existingBlocks } = await supabase
@@ -554,7 +556,7 @@ export async function POST(request: NextRequest) {
 
             // Persist all (fixed + AI) with stale cleanup for AI blocks only
             const persistResult = await persistDailyBlocks(
-                supabase, planId, input.user_id, dateStr,
+                supabase, planId, userId, dateStr,
                 [...fixedInputs, ...aiInputs],
                 {
                     deleteStale: true, // Always clean up old AI blocks when replanning
@@ -585,7 +587,7 @@ export async function POST(request: NextRequest) {
         // No AI blocks generated — just persist fixed blocks
         if (fixedInputs.length > 0) {
             await persistDailyBlocks(
-                supabase, planId, input.user_id, dateStr, fixedInputs,
+                supabase, planId, userId, dateStr, fixedInputs,
                 { deleteStale: false, deleteNullKeys: true }
             );
         }
@@ -613,6 +615,12 @@ export async function POST(request: NextRequest) {
 
     } catch (error) {
         console.error(`[plan-day] [${runId}] Plan day error:`, error);
+        if (error instanceof Error && error.message === 'UNAUTHENTICATED') {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: { 'X-Run-Id': runId } });
+        }
+        if (error instanceof Error && error.message === 'FORBIDDEN_USER_MISMATCH') {
+            return NextResponse.json({ error: 'Forbidden user mismatch' }, { status: 403, headers: { 'X-Run-Id': runId } });
+        }
         return NextResponse.json(
             { error: 'Failed to generate daily plan', details: String(error) },
             { status: 500, headers: { 'X-Run-Id': runId } }

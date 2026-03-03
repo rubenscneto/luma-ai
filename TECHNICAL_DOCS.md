@@ -168,6 +168,7 @@ src/
 ### 2.7 Segurança
 
 - **RLS (Row Level Security)**: Habilitado em todas as tabelas (incluindo Storage Bucket `user_materials`). Filtro padrão: `auth.uid() = user_id` e no app folder `storage.foldername(name)[1] = auth.uid()::text`.
+- **Auth em rotas de Agenda (server-side)**: `/api/ai/agenda/plan-week`, `/api/ai/agenda/plan-day` e `/api/ai/agenda/replan-day` validam usuário via cookie de sessão Supabase (`auth.getUser()`), e rejeitam mismatch entre payload e sessão (`403`).
 
 ---
 

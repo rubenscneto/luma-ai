@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { AGENDA_REPLANNER_SYSTEM_PROMPT, buildReplanPrompt } from '@/ai/prompts/agendaPrompts';
 import { solveTimeline, dailyBlockToSolverBlock, solverBlockToTimeFields, SolverBlock } from '@/lib/timelineSolver';
 import { validateMealWindow, normalizeForComparison } from '@/lib/mealWindows';
+import { getAuthenticatedUserId } from '@/lib/supabase/serverAuth';
 
 // Force dynamic to avoid static generation issues
 export const dynamic = 'force-dynamic';
@@ -20,7 +21,7 @@ const replanInputSchema = z.object({
     date: z.string().optional(),
     now: z.string().optional(),
     signal: z.enum(['late', 'done', 'skip', 'manual_request']),
-    user_id: z.string().uuid(),
+    user_id: z.string().uuid().optional(),
     user_note: z.string().optional(),
     block_id: z.string().uuid().optional(), // For done/skip signals
 });
@@ -100,6 +101,7 @@ export async function POST(request: NextRequest) {
         const supabase = getSupabase();
         const body = await request.json();
         const input = replanInputSchema.parse(body);
+        const userId = await getAuthenticatedUserId(input.user_id);
 
         const now = input.now ? new Date(input.now) : new Date();
         const dateStr = input.date || now.toISOString().split('T')[0];
@@ -109,7 +111,7 @@ export async function POST(request: NextRequest) {
         const { data: plan } = await supabase
             .from('daily_plan')
             .select('*')
-            .eq('user_id', input.user_id)
+            .eq('user_id', userId)
             .eq('plan_date', dateStr)
             .single();
 
@@ -117,13 +119,13 @@ export async function POST(request: NextRequest) {
         const { data: profile } = await supabase
             .from('profiles')
             .select('full_name, occupation')
-            .eq('id', input.user_id)
+            .eq('id', userId)
             .single();
 
         const { data: routineProfile } = await supabase
             .from('routine_profiles')
             .select('*')
-            .eq('user_id', input.user_id)
+            .eq('user_id', userId)
             .single();
 
         const userContextBlock = routineProfile ? `
@@ -208,7 +210,7 @@ ${JSON.stringify({
             await supabase
                 .from('daily_scores')
                 .upsert({
-                    user_id: input.user_id,
+                    user_id: userId,
                     plan_date: dateStr,
                     consistency_score: weightedScore,
                     adherence_score: adherenceScore,
@@ -301,7 +303,7 @@ ${JSON.stringify({
             const { data: fixedBlocks } = await supabase
                 .from('fixed_blocks')
                 .select('*')
-                .eq('user_id', input.user_id)
+                .eq('user_id', userId)
                 .eq('is_active', true)
                 .eq('day_of_week', dayOfWeek);
 
@@ -390,7 +392,7 @@ ${JSON.stringify({
             await supabase
                 .from('daily_scores')
                 .upsert({
-                    user_id: input.user_id,
+                    user_id: userId,
                     plan_date: dateStr,
                     consistency_score: weightedScore,
                     adherence_score: adherenceScore,
@@ -442,6 +444,12 @@ ${JSON.stringify({
 
     } catch (error) {
         console.error('Replan day error:', error);
+        if (error instanceof Error && error.message === 'UNAUTHENTICATED') {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        if (error instanceof Error && error.message === 'FORBIDDEN_USER_MISMATCH') {
+            return NextResponse.json({ error: 'Forbidden user mismatch' }, { status: 403 });
+        }
         return NextResponse.json(
             { error: 'Failed to replan day', details: String(error) },
             { status: 500 }

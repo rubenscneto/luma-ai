@@ -8,12 +8,13 @@ import { processDerivedBlocks } from '@/lib/derivedBlocks';
 import { validateMealWindow, normalizeForComparison } from '@/lib/mealWindows';
 import { persistDailyBlocks, BlockInput } from '@/lib/persistDailyBlocks';
 import { splitOvernightBlocks } from '@/lib/overnightSplit';
+import { getAuthenticatedUserId } from '@/lib/supabase/serverAuth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // Extra time for Gemini 2.5 Pro to complete the full week JSON
 
 const planWeekInputSchema = z.object({
-    user_id: z.string().uuid(),
+    user_id: z.string().uuid().optional(),
     start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // Sunday of the week
     timezone: z.string().default('America/Sao_Paulo'),
     days_to_plan: z.array(z.number().min(0).max(6)).optional(),
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
         const input = planWeekInputSchema.parse(body);
-        userId = input.user_id;
+        userId = await getAuthenticatedUserId(input.user_id);
 
         // STRICT VALIDATION: start_date must be valid YYYY-MM-DD
         if (!input.start_date || !/^\d{4}-\d{2}-\d{2}$/.test(input.start_date)) {
@@ -405,6 +406,12 @@ export async function POST(request: NextRequest) {
         if (lockAcquired && userId) {
             const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
             await supabase.from('processing_locks').delete().eq('lock_key', `plan-week:${userId}`);
+        }
+        if (e instanceof Error && e.message === 'UNAUTHENTICATED') {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        if (e instanceof Error && e.message === 'FORBIDDEN_USER_MISMATCH') {
+            return NextResponse.json({ error: 'Forbidden user mismatch' }, { status: 403 });
         }
         return NextResponse.json({ error: 'Erro ao despachar o background job.' }, { status: 500 });
     }
