@@ -168,7 +168,7 @@ export async function processAgendaWeeklyJob(
     weekPlan = JSON.parse(responseText);
   } catch {
     weekPlan = {
-      days: datesToPlan.map(date => ({ date, summary: 'Fallback automático.', blocks: (fixedBlocksByDay[getDayOfWeek(date)] || []).map((fb: Record<string, string>) => ({ title: fb.title, category: fb.category || 'fixed', start_time: fb.start_time, end_time: fb.end_time })) })),
+      days: datesToPlan.map(date => ({ date, summary: 'Fallback automático.', blocks: (fixedBlocksByDay[getDayOfWeek(date)] || []).map((fb) => ({ title: fb.title, category: fb.category || 'fixed', start_time: fb.start_time, end_time: fb.end_time })) })),
       weekSummary: 'Fallback',
       weekInsight: 'Erro de IA',
     };
